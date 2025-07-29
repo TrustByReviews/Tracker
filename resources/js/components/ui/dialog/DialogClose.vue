@@ -5,7 +5,7 @@ const props = defineProps<DialogCloseProps>();
 </script>
 
 <template>
-    <DialogClose v-bind="props">
+    <DialogClose :as-child="props.asChild || false" :as="props.as || 'button'">
         <slot />
     </DialogClose>
 </template>

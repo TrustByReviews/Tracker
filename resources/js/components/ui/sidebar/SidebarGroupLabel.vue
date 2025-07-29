@@ -3,10 +3,13 @@ import { cn } from '@/lib/utils';
 import type { PrimitiveProps } from 'reka-ui';
 import { Primitive } from 'reka-ui';
 import type { HTMLAttributes } from 'vue';
+import type { Component } from 'vue';
+import type { AsTag } from 'reka-ui';
 
 const props = defineProps<
-    PrimitiveProps & {
+    Omit<PrimitiveProps, 'as'> & {
         class?: HTMLAttributes['class'];
+        as?: AsTag | Component | undefined;
     }
 >();
 </script>
@@ -14,8 +17,8 @@ const props = defineProps<
 <template>
     <Primitive
         data-sidebar="group-label"
-        :as="as"
-        :as-child="asChild"
+        :as="as || 'div'"
+        :as-child="asChild || false"
         :class="
             cn(
                 'flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 outline-none ring-sidebar-ring transition-[margin,opa] duration-200 ease-linear focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0',

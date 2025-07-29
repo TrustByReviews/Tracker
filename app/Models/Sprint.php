@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Traits\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -11,7 +12,7 @@ class Sprint extends Model
 {
     protected $table = 'sprints';
 
-    use softDeletes;
+    use softDeletes, HasUuid;
     protected $fillable = [
       'name',
       'goal',
@@ -25,7 +26,7 @@ class Sprint extends Model
           'goal' => 'string',
           'start_date' => 'date',
           'end_date' => 'date',
-          'project_id' => 'integer',
+          'project_id' => 'string',
     ];
 
     public function project(): BelongsTo

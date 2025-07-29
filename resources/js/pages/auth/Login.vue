@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PasswordInput } from '@/components/ui/password-input';
 import AuthBase from '@/layouts/AuthLayout.vue';
 import { Head, useForm } from '@inertiajs/vue3';
 import { LoaderCircle } from 'lucide-vue-next';
@@ -49,7 +50,7 @@ const submit = () => {
                         v-model="form.email"
                         placeholder="email@example.com"
                     />
-                    <InputError :message="form.errors.email" />
+                    <InputError :message="form.errors.email || ''" />
                 </div>
 
                 <div class="grid gap-2">
@@ -59,16 +60,15 @@ const submit = () => {
                             Forgot password?
                         </TextLink>
                     </div>
-                    <Input
+                    <PasswordInput
                         id="password"
-                        type="password"
                         required
                         :tabindex="2"
                         autocomplete="current-password"
                         v-model="form.password"
                         placeholder="Password"
                     />
-                    <InputError :message="form.errors.password" />
+                    <InputError :message="form.errors.password || ''" />
                 </div>
 
                 <div class="flex items-center justify-between" :tabindex="3">

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Traits\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -11,21 +12,21 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Project extends Model
 {
     protected $table = 'projects';
-    use SoftDeletes;
+    use SoftDeletes, HasUuid;
 
 
     protected $fillable = [
         'name',
         'description',
         'status',
-        'create_by',
+        'created_by',
     ];
 
     protected $casts = [
         'name' => 'string',
         'description' => 'string',
         'status' => 'string',
-        'create_by' => 'string',
+        'created_by' => 'string',
     ];
 
 
@@ -37,7 +38,7 @@ class Project extends Model
 
     public function creator(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'create_by');
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function sprints(): HasMany

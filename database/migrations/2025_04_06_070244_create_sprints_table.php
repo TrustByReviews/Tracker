@@ -12,13 +12,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('sprints', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('name')->nullable(false);
             $table->string('goal')->nullable(false);
             $table->date('start_date')->nullable(true);
             $table->date('end_date')->nullable(true);
 
-            $table->unsignedInteger('project_id');
+            $table->uuid('project_id');
             $table->foreign('project_id')->references('id')->on('projects')->onDelete('cascade');
 
             $table->timestamps();

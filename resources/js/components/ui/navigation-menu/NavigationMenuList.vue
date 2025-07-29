@@ -16,7 +16,8 @@ const forwardedProps = useForwardProps(delegatedProps)
 
 <template>
   <NavigationMenuList
-    v-bind="forwardedProps"
+    :as-child="forwardedProps.asChild || false"
+    :as="forwardedProps.as || 'ul'"
     :class="
       cn(
         'group flex flex-1 list-none items-center justify-center gap-x-1',

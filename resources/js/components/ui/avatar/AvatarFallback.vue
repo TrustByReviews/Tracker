@@ -5,7 +5,7 @@ const props = defineProps<AvatarFallbackProps>();
 </script>
 
 <template>
-    <AvatarFallback v-bind="props">
+    <AvatarFallback :delay-ms="props.delayMs || 600" :as-child="props.asChild || false" :as="props.as || 'span'">
         <slot />
     </AvatarFallback>
 </template>

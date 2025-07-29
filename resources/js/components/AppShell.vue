@@ -1,7 +1,12 @@
 <script setup lang="ts">
+interface SharedData {
+  sidebarOpen: boolean;
+  user: any;
+  [key: string]: any;
+}
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { usePage } from '@inertiajs/vue3';
-import { SharedData } from '@/types';
+// import { SharedData } from '@/types';
 
 interface Props {
     variant?: 'header' | 'sidebar';

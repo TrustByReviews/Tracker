@@ -1,13 +1,13 @@
 <script setup lang="ts">
-defineProps<{
+const props = defineProps<{
     message?: string;
 }>();
 </script>
 
 <template>
-    <div v-show="message">
+    <div v-show="props.message">
         <p class="text-sm text-red-600 dark:text-red-500">
-            {{ message }}
+            {{ props.message }}
         </p>
     </div>
 </template>

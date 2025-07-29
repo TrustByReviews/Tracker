@@ -2,7 +2,8 @@
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { type NavItem } from '@/types';
+// import { type NavItem } from '@/types';
+type NavItem = any;
 import { Link, usePage } from '@inertiajs/vue3';
 
 const sidebarNavItems: NavItem[] = [
@@ -22,7 +23,7 @@ const sidebarNavItems: NavItem[] = [
 
 const page = usePage();
 
-const currentPath = page.props.ziggy?.location ? new URL(page.props.ziggy.location).pathname : '';
+const currentPath = (page.props['ziggy'] as any)?.location ? new URL((page.props['ziggy'] as any).location).pathname : '';
 </script>
 
 <template>

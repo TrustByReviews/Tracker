@@ -5,7 +5,7 @@ const props = defineProps<DialogTriggerProps>();
 </script>
 
 <template>
-    <DialogTrigger v-bind="props">
+    <DialogTrigger :as-child="props.asChild || false" :as="props.as || 'button'">
         <slot />
     </DialogTrigger>
 </template>

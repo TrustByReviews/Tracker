@@ -22,7 +22,9 @@ const forwardedProps = useForwardProps(delegatedProps)
 
 <template>
   <NavigationMenuTrigger
-    v-bind="forwardedProps"
+    :disabled="forwardedProps.disabled || false"
+    :as-child="forwardedProps.asChild || false"
+    :as="forwardedProps.as || 'button'"
     :class="cn(navigationMenuTriggerStyle(), 'group', props.class)"
   >
     <slot />

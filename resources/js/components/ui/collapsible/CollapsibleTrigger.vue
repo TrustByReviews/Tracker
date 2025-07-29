@@ -5,7 +5,7 @@ const props = defineProps<CollapsibleTriggerProps>();
 </script>
 
 <template>
-    <CollapsibleTrigger v-bind="props">
+    <CollapsibleTrigger :as-child="props.asChild || false" :as="props.as || 'button'">
         <slot />
     </CollapsibleTrigger>
 </template>

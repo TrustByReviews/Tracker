@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Models\Sprint;
 use App\Models\User;
+use App\Services\EmailService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,6 +15,10 @@ use Inertia\Response;
 
 class ProjectController extends Controller
 {
+    public function __construct(private EmailService $emailService)
+    {
+    }
+
     public function index(): Response
     {
         $authUser = User::find(Auth::id());
@@ -24,20 +29,35 @@ class ProjectController extends Controller
         })->get();
 
         $projects = [];
-        if ($role[0]->name === 'admin'){
-            $projects = Project::all();
-        } elseif ($role[0]->name === 'developer'){
-            $projects = $authUser->projects;
+        $permissions = 'developer'; // Default permission
+
+        if ($role->count() > 0) {
+            $permissions = $role->first()->name;
+            
+            if ($permissions === 'admin'){
+                $projects = Project::with(['users', 'sprints.tasks', 'creator'])->get();
+            } elseif ($permissions === 'developer'){
+                $projects = $authUser->projects()->with(['users', 'sprints.tasks', 'creator'])->get();
+            }
         }
 
         foreach ($projects as $project) {
             $project['create_by'] = $project->creator->name;
         }
 
+        // Calculate project statistics
+        $stats = [
+            'total' => $projects->count(),
+            'active' => $projects->where('status', 'active')->count(),
+            'completed' => $projects->where('status', 'completed')->count(),
+            'paused' => $projects->where('status', 'paused')->count(),
+        ];
+
         return Inertia::render('Project/Index', [
             'projects' => $projects,
-            'permissions' => $role[0]->name,
+            'permissions' => $permissions,
             'developers' => $developers,
+            'stats' => $stats,
         ]);
 
     }
@@ -46,9 +66,13 @@ class ProjectController extends Controller
     {
         $authUser = User::find(Auth::id());
         $role = $authUser->roles;
-        $permissions = $role[0]->name;
+        $permissions = 'developer'; // Default permission
 
-        $project = Project::with('sprints')->findOrFail($id);
+        if ($role->count() > 0) {
+            $permissions = $role->first()->name;
+        }
+
+        $project = Project::with('sprints.tasks')->findOrFail($id);
         $developers = $project->users;
 
         return Inertia::render('Project/Show', [
@@ -72,11 +96,17 @@ class ProjectController extends Controller
         $project = Project::create([
             'name' => $validatedData['name'],
             'description' => $validatedData['description'],
-            'create_by' => auth()->id(),
+            'created_by' => auth()->id(),
         ]);
 
         if (isset($validatedData['developer_ids'])) {
-            $project->users()->attch($validatedData['developer_ids']);
+            $project->users()->attach($validatedData['developer_ids']);
+            
+            // Send email notifications to assigned users
+            $assignedUsers = User::whereIn('id', $validatedData['developer_ids'])->get();
+            foreach ($assignedUsers as $user) {
+                $this->emailService->sendProjectAssignmentEmail($user, $project->name);
+            }
         }
 
         return redirect()->route('projects.show', $project->id)
@@ -101,8 +131,21 @@ class ProjectController extends Controller
             'status' => $validatedData['status'],
         ]);
 
+        // Get current and new developer assignments
+        $currentDevelopers = $project->users->pluck('id')->toArray();
+        $newDevelopers = $validatedData['developer_ids'] ?? [];
+        
         if (isset($validatedData['developer_ids'])) {
             $project->users()->sync($validatedData['developer_ids']);
+            
+            // Find newly assigned users
+            $newlyAssigned = array_diff($newDevelopers, $currentDevelopers);
+            if (!empty($newlyAssigned)) {
+                $newlyAssignedUsers = User::whereIn('id', $newlyAssigned)->get();
+                foreach ($newlyAssignedUsers as $user) {
+                    $this->emailService->sendProjectAssignmentEmail($user, $project->name);
+                }
+            }
         }
 
         return redirect()->route('projects.show', $project->id);

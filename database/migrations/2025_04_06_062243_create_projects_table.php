@@ -12,12 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('projects', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('name')->nullable(false);
             $table->string('description')->nullable(false);
             $table->enum('status', ['active', 'inactive', 'completed', 'cancelled', 'paused'])->default('active');
 
-            $table->unsignedInteger('create_by');
+            $table->uuid('create_by');
             $table->foreign('create_by')->references('id')->on('users')->onDelete('cascade');
 
             $table->timestamps();

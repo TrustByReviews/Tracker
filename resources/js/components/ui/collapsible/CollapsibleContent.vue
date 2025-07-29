@@ -6,7 +6,9 @@ const props = defineProps<CollapsibleContentProps>();
 
 <template>
     <CollapsibleContent
-        v-bind="props"
+        :force-mount="props.forceMount || false"
+        :as-child="props.asChild || false"
+        :as="props.as || 'div'"
         class="data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down overflow-hidden transition-all"
     >
         <slot />

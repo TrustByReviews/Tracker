@@ -1,52 +1,53 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import Button from './ui/button/Button.vue';
-import Dialog from './ui/dialog/Dialog.vue';
-import DialogContent from './ui/dialog/DialogContent.vue';
-import DialogTitle from './ui/dialog/DialogTitle.vue';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { useForm, router } from '@inertiajs/vue3';
-import Input from './ui/input/Input.vue';
+import Icon from '@/components/Icon.vue';
+import { conditionalClass } from '@/lib/utils';
 
 interface Sprint {
-    id: number,
+    id: string,
     name: string
     goal: string
     start_date: string
     end_date: string
 }
+
 const props = defineProps<{
     sprint: Sprint
-    project_id: number
-}>()
-
+    project_id: string
+}>();
 
 const open = ref(false);
 
-watch (open, (isOpen) => {
+const form = useForm({
+    name: '',
+    goal: '',
+    start_date: '',
+    end_date: ''
+});
+
+watch(open, (isOpen) => {
     if (isOpen) {
         form.name = props.sprint.name;
         form.goal = props.sprint.goal;
-        form.start_date = props.sprint.start_date.split('T')[0];
-        form.end_date = props.sprint.end_date.split('T')[0];
+        form.start_date = props.sprint.start_date?.split('T')[0] || '';
+        form.end_date = props.sprint.end_date?.split('T')[0] || '';
     }
-})
+});
 
 const formatToISO = (date: Date) => {
   return date.toISOString().split('T')[0];
-}
+};
 
-const today = new Date()
+const today = new Date();
 const todayFormatted = formatToISO(today);
 
-const form = useForm({
-    name: props.sprint.name,
-    goal: props.sprint.goal,
-    start_date: props.sprint.start_date.split('T')[0],
-    end_date: props.sprint.end_date.split('T')[0]
-});
-
 const submit = () => {
-    if (form.start_date < todayFormatted) {
+    if (form.start_date < (todayFormatted || '')) {
         alert('Start date cannot be before today.');
         return;
     }
@@ -63,44 +64,84 @@ const submit = () => {
             router.reload();
         },
     });
-}
+};
 </script>
+
 <template>
-    <div >
-        <Button @click="open = true" class="border-black bg-black text-white hover:bg-gray-400 hover:border-white hover:text-black">
-            Update Sprint
-        </Button>
+  <div>
+    <Button @click="open = true" variant="outline" size="sm">
+      <Icon name="edit" class="h-4 w-4 mr-2" />
+      Update Sprint
+    </Button>
+    
+    <Dialog :open="open" @update:open="open = $event">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Update Sprint</DialogTitle>
+        </DialogHeader>
         
-        <Dialog :open="open" @update:open="open = $event">
-            <DialogContent class="max-w-md p-6 bg-white rounded-lg shadow-lg">
-                <DialogTitle class="text-lg font-bold mb-4 text-gray-800">Update Sprint</DialogTitle>
-                <form @submit.prevent="submit" class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Name</label>
-                        <Input v-model="form.name" class="w-full border-gray-300 text-black bg-white" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Goal</label>
-                        <Input v-model="form.goal" class="w-full border-gray-300 text-black bg-white" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Start date</label>
-                        <Input v-model="form.start_date" :min="todayFormatted" type="date" class="w-full border-gray-300 text-black bg-white" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">End date</label>
-                        <Input v-model="form.end_date" :min="form.start_date" type="date" class="w-full border-gray-300 text-black bg-white" />
-                    </div>
-                    <div class="flex justify-end gap-2">
-                        <Button type="button" variant="secondary" @click="open = false" class="bg-gray-200 text-gray-800 hover:bg-gray-300">
-                            Cancel
-                        </Button>
-                        <Button type="submit" :disabled="form.processing" class="bg-blue-500 text-white hover:bg-blue-600">
-                            Update
-                        </Button>
-                    </div>              
-                </form>
-            </DialogContent>
-        </Dialog>
-    </div>
+        <form @submit.prevent="submit" class="space-y-4">
+          <!-- Name -->
+          <div class="space-y-2">
+            <Label for="name">Name</Label>
+            <Input 
+              id="name"
+              v-model="form.name" 
+              placeholder="Enter sprint name"
+              :class="conditionalClass('', form.errors.name, 'border-red-500')"
+            />
+            <p v-if="form.errors.name" class="text-sm text-red-600">{{ form.errors.name }}</p>
+          </div>
+
+          <!-- Goal -->
+          <div class="space-y-2">
+            <Label for="goal">Goal</Label>
+            <Input 
+              id="goal"
+              v-model="form.goal" 
+              placeholder="Enter sprint goal"
+              :class="conditionalClass('', form.errors.goal, 'border-red-500')"
+            />
+            <p v-if="form.errors.goal" class="text-sm text-red-600">{{ form.errors.goal }}</p>
+          </div>
+
+          <!-- Start Date -->
+          <div class="space-y-2">
+            <Label for="start_date">Start Date</Label>
+            <Input 
+              id="start_date"
+              v-model="form.start_date" 
+              type="date"
+              :min="todayFormatted"
+              :class="conditionalClass('', form.errors.start_date, 'border-red-500')"
+            />
+            <p v-if="form.errors.start_date" class="text-sm text-red-600">{{ form.errors.start_date }}</p>
+          </div>
+
+          <!-- End Date -->
+          <div class="space-y-2">
+            <Label for="end_date">End Date</Label>
+            <Input 
+              id="end_date"
+              v-model="form.end_date" 
+              type="date"
+              :min="form.start_date"
+              :class="conditionalClass('', form.errors.end_date, 'border-red-500')"
+            />
+            <p v-if="form.errors.end_date" class="text-sm text-red-600">{{ form.errors.end_date }}</p>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" @click="open = false">
+              Cancel
+            </Button>
+            <Button type="submit" :disabled="form.processing">
+              <span v-if="form.processing">Updating...</span>
+              <span v-else>Update Sprint</span>
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  </div>
 </template>

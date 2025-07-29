@@ -2,12 +2,15 @@
 import { cn } from '@/lib/utils';
 import { Primitive, type PrimitiveProps } from 'reka-ui';
 import type { HTMLAttributes } from 'vue';
+import type { Component } from 'vue';
+import type { AsTag } from 'reka-ui';
 
 const props = withDefaults(
     defineProps<
-        PrimitiveProps & {
+        Omit<PrimitiveProps, 'as'> & {
             showOnHover?: boolean;
             class?: HTMLAttributes['class'];
+            as?: AsTag | Component | undefined;
         }
     >(),
     {
@@ -32,8 +35,8 @@ const props = withDefaults(
                 props.class,
             )
         "
-        :as="as"
-        :as-child="asChild"
+        :as="as || 'button'"
+        :as-child="asChild || false"
     >
         <slot />
     </Primitive>

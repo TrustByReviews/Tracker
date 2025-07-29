@@ -8,7 +8,7 @@ const forwarded = useForwardPropsEmits(props, emits);
 </script>
 
 <template>
-    <DropdownMenuRoot v-bind="forwarded">
+    <DropdownMenuRoot :default-open="forwarded.defaultOpen || false" :open="forwarded.open || false" :dir="forwarded.dir || 'ltr'" :modal="forwarded.modal || true">
         <slot />
     </DropdownMenuRoot>
 </template>

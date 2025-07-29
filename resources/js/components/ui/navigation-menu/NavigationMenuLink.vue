@@ -13,7 +13,7 @@ const forwarded = useForwardPropsEmits(props, emits)
 </script>
 
 <template>
-  <NavigationMenuLink v-bind="forwarded">
+  <NavigationMenuLink :active="forwarded.active || false" :as-child="forwarded.asChild || false" :as="forwarded.as || 'a'">
     <slot />
   </NavigationMenuLink>
 </template>

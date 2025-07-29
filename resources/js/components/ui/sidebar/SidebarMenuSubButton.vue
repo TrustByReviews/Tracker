@@ -3,13 +3,16 @@ import { cn } from '@/lib/utils';
 import type { PrimitiveProps } from 'reka-ui';
 import { Primitive } from 'reka-ui';
 import type { HTMLAttributes } from 'vue';
+import type { Component } from 'vue';
+import type { AsTag } from 'reka-ui';
 
 const props = withDefaults(
     defineProps<
-        PrimitiveProps & {
+        Omit<PrimitiveProps, 'as'> & {
             size?: 'sm' | 'md';
             isActive?: boolean;
             class?: HTMLAttributes['class'];
+            as?: AsTag | Component | undefined;
         }
     >(),
     {
@@ -22,8 +25,8 @@ const props = withDefaults(
 <template>
     <Primitive
         data-sidebar="menu-sub-button"
-        :as="as"
-        :as-child="asChild"
+        :as="as || 'a'"
+        :as-child="asChild || false"
         :data-size="size"
         :data-active="isActive"
         :class="

@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -13,13 +15,21 @@ class RoleSeeder extends Seeder
      */
     public function run(): void
     {
-        DB::table('roles')->insert([
-           ['id' => 1, 'name' => 'admin', 'value' => 'admin'],
-            ['id' => 2, 'name' => 'developer', 'value' => 'developer'],
+        // Crear roles con UUIDs
+        $adminRole = Role::create([
+            'name' => 'admin',
+            'value' => 'admin'
         ]);
 
-        DB::table('role_user')->insert([
-            ['user_id' => 1, 'role_id' => 1],
+        $developerRole = Role::create([
+            'name' => 'developer',
+            'value' => 'developer'
         ]);
+
+        // Asignar rol de admin al primer usuario si existe
+        $firstUser = User::first();
+        if ($firstUser) {
+            $firstUser->roles()->attach($adminRole->id);
+        }
     }
 }

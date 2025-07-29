@@ -70,7 +70,7 @@ const updatePassword = () => {
                             autocomplete="current-password"
                             placeholder="Current password"
                         />
-                        <InputError :message="form.errors.current_password" />
+                        <InputError :message="form.errors.current_password || ''" />
                     </div>
 
                     <div class="grid gap-2">
@@ -84,7 +84,7 @@ const updatePassword = () => {
                             autocomplete="new-password"
                             placeholder="New password"
                         />
-                        <InputError :message="form.errors.password" />
+                        <InputError :message="form.errors.password || ''" />
                     </div>
 
                     <div class="grid gap-2">
@@ -97,7 +97,7 @@ const updatePassword = () => {
                             autocomplete="new-password"
                             placeholder="Confirm password"
                         />
-                        <InputError :message="form.errors.password_confirmation" />
+                        <InputError :message="form.errors.password_confirmation || ''" />
                     </div>
 
                     <div class="flex items-center gap-4">

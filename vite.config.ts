@@ -22,6 +22,15 @@ export default defineConfig({
             },
         }),
     ],
+    build: {
+        rollupOptions: {
+            onwarn(warning, warn) {
+                // No mostrar advertencias sobre imports no utilizados durante el build
+                if (warning.code === 'UNUSED_EXTERNAL_IMPORT') return;
+                warn(warning);
+            },
+        },
+    },
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './resources/js'),

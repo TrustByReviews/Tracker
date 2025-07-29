@@ -8,7 +8,7 @@ const forwarded = useForwardPropsEmits(props, emits);
 </script>
 
 <template>
-    <DropdownMenuRadioGroup v-bind="forwarded">
+    <DropdownMenuRadioGroup :model-value="forwarded.modelValue || ''" :as-child="forwarded.asChild || false" :as="forwarded.as || 'div'">
         <slot />
     </DropdownMenuRadioGroup>
 </template>

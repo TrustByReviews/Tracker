@@ -1,6 +1,17 @@
 <script setup lang="ts">
+interface SharedData {
+  sidebarOpen: boolean;
+  user: any;
+  [key: string]: any;
+}
+interface NavItem {
+  title: string;
+  href: string;
+  icon?: string | any;
+  external?: boolean;
+}
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
-import { type NavItem, type SharedData } from '@/types';
+// import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
 
 defineProps<{

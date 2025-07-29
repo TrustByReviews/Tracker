@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, withDefaults, defineProps } from 'vue';
+import { ref, defineProps } from 'vue';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -68,14 +68,15 @@ const submit = () => {
                 multiple
                 class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2"
                 >
-                <option v-for="developer in props.developers"
-                  :key="developer.id"
-                  :value="developer.id"
-                  v-if="props.developers?.length"
-                  class="text-black"
-                >
-                {{ developer.name }} ( {{ developer.email }} )
-                </option>
+                <template v-if="props.developers?.length">
+                  <option v-for="developer in props.developers"
+                    :key="developer.id"
+                    :value="developer.id"
+                    class="text-black"
+                  >
+                  {{ developer.name }} ( {{ developer.email }} )
+                  </option>
+                </template>
                 <option v-else disabled>No developers available</option>
                 </select>
           </div>

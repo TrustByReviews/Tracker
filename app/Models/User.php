@@ -4,9 +4,11 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Models\Role;
+use App\Models\Traits\HasUuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -17,7 +19,7 @@ class User extends Authenticatable
      * @var string
      */
     protected $table = 'users';
-    use softdeletes;
+    use softdeletes, HasUuid;
 
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable;
@@ -71,8 +73,8 @@ class User extends Authenticatable
         return $this->belongsToMany(Project::class, 'project_user', 'user_id', 'project_id');
     }
 
-    public function tasks(): BelongsTo
+    public function tasks(): HasMany
     {
-        return $this->belongsTo(Task::class);
+        return $this->hasMany(Task::class);
     }
 }

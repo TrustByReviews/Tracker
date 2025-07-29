@@ -1,22 +1,24 @@
 <script setup lang="ts">
-import { cn } from '@/lib/utils';
-import { Label, type LabelProps } from 'reka-ui';
-import { computed, type HTMLAttributes } from 'vue';
+import { computed } from 'vue'
+import { cn } from '@/lib/utils'
 
-const props = defineProps<LabelProps & { class?: HTMLAttributes['class'] }>();
+interface Props {
+  htmlFor?: string
+  class?: string
+}
 
-const delegatedProps = computed(() => {
-    const { class: _, ...delegated } = props;
+const props = defineProps<Props>()
 
-    return delegated;
-});
+const classes = computed(() => {
+  return cn(
+    'text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70',
+    props.class
+  )
+})
 </script>
 
 <template>
-    <Label
-        v-bind="delegatedProps"
-        :class="cn('text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70', props.class)"
-    >
-        <slot />
-    </Label>
+  <label v-bind="htmlFor ? { for: htmlFor } : {}" :class="classes">
+    <slot />
+  </label>
 </template>

@@ -6,14 +6,15 @@ import DialogContent from './ui/dialog/DialogContent.vue';
 import DialogTitle from './ui/dialog/DialogTitle.vue';
 import { router, useForm } from '@inertiajs/vue3';
 import Input from './ui/input/Input.vue';
+import { useToast } from '@/composables/useToast';
 
 interface User {
-    id: number,
+    id: string,
     name: string,
     status: string,
     email: string,
-    password: string,
-    nickname: string,
+    password?: string,
+    nickname?: string,
     hour_value: number,
     work_time: string
 }
@@ -23,6 +24,7 @@ const props = defineProps<{
 }>()
 
 const open = ref(false)
+const { success, error } = useToast()
 
 const form = useForm({
     name: props.user.name,
@@ -36,15 +38,20 @@ const form = useForm({
 
 const submit = () => {
     try {
-        form.put(`/users/${props.user.id}`), {
+        form.put(`/users/${props.user.id}`, {
             onSuccess: () => {
+                success('Usuario actualizado', `El usuario ${props.user.name} ha sido actualizado exitosamente`);
                 form.reset();
-                open.value = true
+                open.value = false;
                 router.reload();
+            },
+            onError: () => {
+                error('Error al actualizar', 'Hubo un problema al actualizar el usuario. Por favor, verifica los datos.');
             }
-        }
-    } catch {
-        console.log(Error)
+        });
+    } catch (err) {
+        error('Error inesperado', 'Ocurrió un error inesperado al actualizar el usuario.');
+        console.log(err);
     }
 }
 
@@ -69,7 +76,7 @@ const disableInput = () => {
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700">Nick name</label>
-                        <Input v-model="form.nickname" class="w-full border-gray-300 text-black bg-white capitalize" :disabled="disableInput()" />
+                        <Input :model-value="form.nickname || ''" @update:model-value="(value) => form.nickname = String(value)" class="w-full border-gray-300 text-black bg-white capitalize" :disabled="disableInput()" />
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700">Email</label>

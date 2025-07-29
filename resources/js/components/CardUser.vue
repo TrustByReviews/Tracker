@@ -6,12 +6,14 @@ import UpdateUserModal from './UpdateUserModal.vue';
 type UserStatus = 'active' | 'inactive' | 'completed' | 'cancelled' | 'paused'
 
 interface User {
-    id: number,
+    id: string,
     name: string,
     status: UserStatus,
-    email: string
-    hour_value: number
-    work_time: string
+    email: string,
+    hour_value: number,
+    work_time: string,
+    nickname?: string,
+    password?: string
 }
 
 const props = defineProps<{

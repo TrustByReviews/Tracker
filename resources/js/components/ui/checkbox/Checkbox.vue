@@ -19,7 +19,13 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
 
 <template>
   <CheckboxRoot
-    v-bind="forwarded"
+    :default-value="forwarded.defaultValue ?? false"
+    :model-value="forwarded.modelValue ?? false"
+    :disabled="forwarded.disabled ?? false"
+    :value="forwarded.value ?? ''"
+    :required="forwarded.required ?? false"
+    :as-child="forwarded.asChild ?? false"
+    :as="forwarded.as ?? 'div'"
     :class="
       cn('peer size-5 shrink-0 rounded-sm border border-input ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground data-[state=checked]:border-accent-foreground',
          props.class)"

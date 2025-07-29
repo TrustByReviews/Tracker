@@ -13,6 +13,11 @@ export default defineConfigWithVueTs(
         rules: {
             'vue/multi-word-component-names': 'off',
             '@typescript-eslint/no-explicit-any': 'off',
+            '@typescript-eslint/no-unused-vars': ['error', { 'argsIgnorePattern': '^_', 'varsIgnorePattern': '^_' }],
+            'vue/no-unused-vars': 'error',
+            'no-unused-vars': 'off', // Desactivar la regla base ya que usamos la de TypeScript
+            'no-console': 'warn',
+            'no-debugger': 'error',
         },
     },
     prettier,

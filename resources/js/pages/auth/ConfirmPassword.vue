@@ -38,7 +38,7 @@ const submit = () => {
                         autofocus
                     />
 
-                    <InputError :message="form.errors.password" />
+                    <InputError :message="form.errors.password || ''" />
                 </div>
 
                 <div class="flex items-center">
