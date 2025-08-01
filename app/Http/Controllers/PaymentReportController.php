@@ -19,7 +19,7 @@ class PaymentReportController extends Controller
 
         $developers = User::with(['tasks', 'projects'])
             ->whereHas('roles', function ($query) {
-                $query->where('value', '!=', 'admin');
+                $query->where('name', '!=', 'admin');
             })
             ->get()
             ->map(function ($developer) {

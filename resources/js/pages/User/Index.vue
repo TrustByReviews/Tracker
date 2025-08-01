@@ -62,6 +62,8 @@ const props = defineProps<{
 const { success } = useToast()
 const page = usePage()
 
+// Los roles ahora se cargan correctamente desde el middleware
+
 // Filtros reactivos
 const search = ref(props.filters?.search || '')
 const statusFilter = ref(props.filters?.status || '')
@@ -378,6 +380,19 @@ const formatCurrency = (amount: number) => {
                 <Icon name="edit" class="h-4 w-4 mr-1" />
                 Edit
               </Button>
+                    <!-- TEMPORARILY DISABLED - Login as User functionality -->
+      <!-- 
+      <Button 
+        v-if="(page.props as any)['auth']?.user?.roles?.some((role: any) => role.name === 'admin')"
+        variant="secondary" 
+        size="sm" 
+        class="flex-1"
+        @click="router.get(route('admin.login-as-user', user.id))"
+      >
+        <Icon name="log-in" class="h-4 w-4 mr-1" />
+        Login As
+      </Button>
+      -->
             </div>
           </div>
         </CardContent>

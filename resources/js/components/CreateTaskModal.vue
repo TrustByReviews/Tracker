@@ -27,6 +27,10 @@ interface User {
     id: string,
     name: string,
     email: string,
+    roles?: Array<{
+        name: string,
+        value: string
+    }>
 }
 
 const props = defineProps<{
@@ -48,24 +52,26 @@ const form = useForm({
     project_id: '',
     estimated_hours: 1,
     assigned_user_id: '',
-    estimated_start: '',
-    estimated_finish: '',
+    // Removemos las fechas estimadas ya que no son necesarias
+    // estimated_start: '',
+    // estimated_finish: '',
 });
 
-// Helper functions
-const formatToISO = (date: Date) => {
-    return date.toISOString().split('T')[0];
-}
+// Helper functions - removido ya que no usamos fechas estimadas
+// const formatToISO = (date: Date) => {
+//     return date.toISOString().split('T')[0];
+// }
 
-const setDefaultDates = () => {
-    if (props.sprint) {
-        const start_sprint = new Date(props.sprint.start_date);
-        const end_sprint = new Date(props.sprint.end_date);
-        
-        form.estimated_start = formatToISO(start_sprint);
-        form.estimated_finish = formatToISO(end_sprint);
-    }
-}
+// Removemos la función setDefaultDates ya que no usamos fechas estimadas
+// const setDefaultDates = () => {
+//     if (props.sprint) {
+//         const start_sprint = new Date(props.sprint.start_date);
+//         const end_sprint = new Date(props.sprint.end_date);
+//         
+//         form.estimated_start = formatToISO(start_sprint);
+//         form.estimated_finish = formatToISO(end_sprint);
+//     }
+// }
 
 // Priority options
 const priorityOptions = [
@@ -93,7 +99,7 @@ const storyPointsOptions = [1, 2, 3, 5, 8, 13, 21];
 watch(() => props.sprint, (newSprint) => {
     if (newSprint) {
         form.sprint_id = newSprint.id;
-        setDefaultDates();
+        // setDefaultDates(); // Removido ya que no usamos fechas estimadas
     }
 }, { immediate: true });
 
@@ -183,6 +189,27 @@ const handleKeydown = (event: KeyboardEvent) => {
     }
 }
 
+// Función para obtener usuarios desarrolladores o mostrar roles
+const getFilteredUsers = () => {
+    console.log('Developers props:', props.developers);
+    
+    if (!props.developers) return [];
+    
+    return props.developers.map(user => {
+        console.log('Processing user:', user);
+        const roles = user.roles || [];
+        const roleNames = roles.map(role => role.name).join(', ');
+        const roleDisplay = roleNames ? ` (${roleNames})` : '';
+        
+        const result = {
+            ...user,
+            displayName: `${user.name}${roleDisplay} (${user.email})`
+        };
+        console.log('Result user:', result);
+        return result;
+    });
+}
+
 // Reset form when modal opens
 const openModal = () => {
     open.value = true;
@@ -204,8 +231,8 @@ const openModal = () => {
         form.project_id = props.project_id;
     }
     
-    // Set default dates
-    setDefaultDates();
+    // Set default dates - removido ya que no usamos fechas estimadas
+    // setDefaultDates();
 }
 </script>
 
@@ -216,7 +243,7 @@ const openModal = () => {
         </Button>
         
         <Dialog :open="open" :modal="true">
-            <DialogContent class="max-w-2xl p-6 bg-white rounded-lg shadow-lg">
+            <DialogContent class="max-w-2xl max-h-[90vh] overflow-y-auto p-6 bg-white rounded-lg shadow-lg">
                 <DialogTitle class="text-xl font-bold mb-6 text-gray-800 flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -244,7 +271,7 @@ const openModal = () => {
                             id="description"
                             v-model="form.description" 
                             placeholder="Describe the task in detail, including requirements and acceptance criteria..."
-                            rows="3"
+                            :rows="3"
                             class="w-full border-gray-300 text-black bg-white focus:border-blue-500 focus:ring-blue-500" 
                             required
                         />
@@ -310,29 +337,7 @@ const openModal = () => {
                         </div>
                     </div>
 
-                    <!-- Estimated Dates -->
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <Label for="estimated_start" class="block text-sm font-medium text-gray-700 mb-2">Estimated Start Date</Label>
-                            <Input
-                                id="estimated_start"
-                                v-model="form.estimated_start"
-                                type="date"
-                                class="w-full border-gray-300 text-black bg-white focus:border-blue-500 focus:ring-blue-500"
-                            />
-                        </div>
-
-                        <div>
-                            <Label for="estimated_finish" class="block text-sm font-medium text-gray-700 mb-2">Estimated Finish Date</Label>
-                            <Input
-                                id="estimated_finish"
-                                v-model="form.estimated_finish"
-                                type="date"
-                                :min="form.estimated_start"
-                                class="w-full border-gray-300 text-black bg-white focus:border-blue-500 focus:ring-blue-500"
-                            />
-                        </div>
-                    </div>
+                    <!-- Removemos las fechas estimadas ya que no son necesarias -->
 
                     <!-- Assign to Developer -->
                     <div v-if="props.developers && props.developers.length > 0">
@@ -341,10 +346,10 @@ const openModal = () => {
                             <SelectTrigger class="w-full border-gray-300 text-black bg-white focus:border-blue-500 focus:ring-blue-500">
                                 <SelectValue placeholder="Select a developer..." />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent class="max-h-60 overflow-y-auto">
                                 <SelectItem value="">Unassigned</SelectItem>
-                                <SelectItem v-for="developer in props.developers" :key="developer.id" :value="developer.id">
-                                    {{ developer.name }} ({{ developer.email }})
+                                <SelectItem v-for="user in getFilteredUsers()" :key="user.id" :value="user.id">
+                                    {{ user.displayName }}
                                 </SelectItem>
                             </SelectContent>
                         </Select>

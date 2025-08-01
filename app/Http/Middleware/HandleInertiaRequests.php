@@ -44,8 +44,10 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
-                'user' => $request->user(),
+                'user' => $request->user() ? $request->user()->load(['roles.permissions', 'directPermissions']) : null,
             ],
+            // TEMPORARILY DISABLED - Login as User functionality
+            // 'admin_original_user_id' => $request->session()->get('admin_original_user_id'),
             'ziggy' => [
                 ...(new Ziggy)->toArray(),
                 'location' => $request->url(),

@@ -4,8 +4,9 @@ import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Icon from '@/components/Icon.vue'
-import CardTask from '@/components/CardTask.vue'
+import TaskCard from '@/components/TaskCard.vue'
 import CreateTaskModal from '@/components/CreateTaskModal.vue'
+import { usePermissions } from '@/composables/usePermissions'
 
 const breadcrumbs: BreadcrumbItem[] = [
   {
@@ -45,15 +46,21 @@ interface Task {
     project?: {
         id: string,
         name: string
-    }
+    },
+    is_working?: boolean,
+    work_started_at?: string | null,
+    total_time_seconds?: number
 }
 
 const props = defineProps<{
     tasks: Task[],
     permissions: string,
     projects: any[],
-    sprints: any[]
+    sprints: any[],
+    developers: any[]
 }>()
+
+const { hasPermission } = usePermissions();
 
 // Obtener estadísticas generales de tareas
 const getTaskStats = () => {
@@ -107,15 +114,126 @@ const getDefaultSprint = () => {
 }
 
 const getDefaultDevelopers = () => {
-  // Obtener todos los usuarios únicos de las tareas
-  const developers = new Map();
-  props.tasks.forEach(task => {
-    if (task.user && !developers.has(task.user.id)) {
-      developers.set(task.user.id, task.user);
-    }
-  });
-  return Array.from(developers.values());
+  // Usar los desarrolladores del backend que ya incluyen roles
+  return props.developers || [];
 }
+
+// Tracking de tiempo - manejo de eventos
+const handleStartWork = async (taskId: string) => {
+  try {
+    const response = await fetch(`/tasks/${taskId}/start-work`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+      }
+    });
+    
+    if (response.ok) {
+      // Recargar la página para actualizar el estado
+      window.location.reload();
+    } else {
+      const error = await response.json();
+      alert(error.message || 'Error al iniciar trabajo');
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    alert('Error al iniciar trabajo');
+  }
+};
+
+const handlePauseWork = async (taskId: string) => {
+  try {
+    const response = await fetch(`/tasks/${taskId}/pause-work`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+      }
+    });
+    
+    if (response.ok) {
+      window.location.reload();
+    } else {
+      const error = await response.json();
+      alert(error.message || 'Error al pausar trabajo');
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    alert('Error al pausar trabajo');
+  }
+};
+
+const handleResumeWork = async (taskId: string) => {
+  try {
+    const response = await fetch(`/tasks/${taskId}/resume-work`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+      }
+    });
+    
+    if (response.ok) {
+      window.location.reload();
+    } else {
+      const error = await response.json();
+      alert(error.message || 'Error al reanudar trabajo');
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    alert('Error al reanudar trabajo');
+  }
+};
+
+const handleFinishWork = async (taskId: string) => {
+  try {
+    const response = await fetch(`/tasks/${taskId}/finish-work`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+      }
+    });
+    
+    if (response.ok) {
+      window.location.reload();
+    } else {
+      const error = await response.json();
+      alert(error.message || 'Error al finalizar trabajo');
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    alert('Error al finalizar trabajo');
+  }
+};
+
+const handleSelfAssign = async (taskId: string) => {
+  try {
+    const response = await fetch(`/tasks/${taskId}/self-assign`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+      }
+    });
+    
+    if (response.ok) {
+      window.location.reload();
+    } else {
+      const error = await response.json();
+      alert(error.message || 'Error al auto-asignar tarea');
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    alert('Error al auto-asignar tarea');
+  }
+};
+
+// Verificar si una tarea está siendo trabajada actualmente
+const isTaskWorking = (task: Task) => {
+  return task.is_working === true;
+};
 </script>
 
 <template>
@@ -129,7 +247,7 @@ const getDefaultDevelopers = () => {
           <p class="text-sm text-gray-600 dark:text-gray-400">Manage and track all project tasks</p>
         </div>
         <CreateTaskModal 
-          v-if="permissions === 'admin' && projects.length > 0 && sprints.length > 0" 
+          v-if="hasPermission('tasks.create') && projects.length > 0 && sprints.length > 0" 
           :project="getDefaultProject()"
           :sprint="getDefaultSprint()"
           :developers="getDefaultDevelopers()"
@@ -187,14 +305,17 @@ const getDefaultDevelopers = () => {
         To Do Tasks
       </h2>
       <div class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        <CardTask
+        <TaskCard
           v-for="task in getToDoTasks()"
           :key="task.id"
           :task="task"
-          :permissions="permissions"
-          :project_id="task.project?.id || ''"
-          :sprint="task.sprint || { id: '', name: '', goal: '', start_date: '', end_date: '' }"
-          :developers="getDefaultDevelopers()"
+          :is-working="isTaskWorking(task)"
+          :show-approval-status="false"
+          @start-work="handleStartWork"
+          @pause-work="handlePauseWork"
+          @resume-work="handleResumeWork"
+          @finish-work="handleFinishWork"
+          @self-assign="handleSelfAssign"
         />
       </div>
     </div>
@@ -206,14 +327,17 @@ const getDefaultDevelopers = () => {
         In Progress Tasks
       </h2>
       <div class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        <CardTask
+        <TaskCard
           v-for="task in getInProgressTasks()"
           :key="task.id"
           :task="task"
-          :permissions="permissions"
-          :project_id="task.project?.id || ''"
-          :sprint="task.sprint || { id: '', name: '', goal: '', start_date: '', end_date: '' }"
-          :developers="getDefaultDevelopers()"
+          :is-working="isTaskWorking(task)"
+          :show-approval-status="false"
+          @start-work="handleStartWork"
+          @pause-work="handlePauseWork"
+          @resume-work="handleResumeWork"
+          @finish-work="handleFinishWork"
+          @self-assign="handleSelfAssign"
         />
       </div>
     </div>
@@ -225,14 +349,17 @@ const getDefaultDevelopers = () => {
         Completed Tasks
       </h2>
       <div class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        <CardTask
+        <TaskCard
           v-for="task in getDoneTasks()"
           :key="task.id"
           :task="task"
-          :permissions="permissions"
-          :project_id="task.project?.id || ''"
-          :sprint="task.sprint || { id: '', name: '', goal: '', start_date: '', end_date: '' }"
-          :developers="getDefaultDevelopers()"
+          :is-working="isTaskWorking(task)"
+          :show-approval-status="false"
+          @start-work="handleStartWork"
+          @pause-work="handlePauseWork"
+          @resume-work="handleResumeWork"
+          @finish-work="handleFinishWork"
+          @self-assign="handleSelfAssign"
         />
       </div>
     </div>
@@ -245,7 +372,7 @@ const getDefaultDevelopers = () => {
         Get started by creating your first task for a project.
       </p>
       <CreateTaskModal 
-        v-if="permissions === 'admin' && projects.length > 0 && sprints.length > 0" 
+        v-if="hasPermission('tasks.create') && projects.length > 0 && sprints.length > 0" 
         :project="getDefaultProject()"
         :sprint="getDefaultSprint()"
         :developers="getDefaultDevelopers()"

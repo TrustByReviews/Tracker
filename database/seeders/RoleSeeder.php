@@ -26,6 +26,11 @@ class RoleSeeder extends Seeder
             'value' => 'developer'
         ]);
 
+        $teamLeaderRole = Role::create([
+            'name' => 'team_leader',
+            'value' => 'team_leader'
+        ]);
+
         // Asignar rol de admin al primer usuario si existe
         $firstUser = User::first();
         if ($firstUser) {

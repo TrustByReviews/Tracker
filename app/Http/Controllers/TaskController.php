@@ -6,6 +6,8 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Project;
 use App\Models\Sprint;
+use App\Services\TaskAssignmentService;
+use App\Services\TaskTimeTrackingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,10 +19,30 @@ use Inertia\Response;
 
 class TaskController extends Controller
 {
+    public function __construct(
+        private TaskAssignmentService $taskAssignmentService,
+        private TaskTimeTrackingService $taskTimeTrackingService
+    ) {
+    }
+
     public function index(): Response
     {
-        $authUser = User::find(Auth::id());
-        $role = $authUser->roles;
+        $authUser = Auth::user();
+        
+        if (!$authUser) {
+            abort(401, 'Unauthorized');
+        }
+
+        // TEMPORARILY DISABLED - Login as User functionality
+        // Verificar si está en sesión de impersonación
+        // $adminOriginalUserId = session('admin_original_user_id');
+        // $isImpersonating = !empty($adminOriginalUserId);
+        
+        // Determinar el usuario efectivo (el que está siendo impersonado o el actual)
+        $effectiveUser = $authUser;
+        
+        // Obtener el rol del usuario efectivo
+        $role = $effectiveUser->roles;
         $permissions = 'developer'; // Default permission
 
         if ($role->count() > 0) {
@@ -32,26 +54,44 @@ class TaskController extends Controller
         $sprints = [];
 
         if ($permissions === 'admin') {
+            // Admin ve todo
             $tasks = Task::with(['user', 'sprint', 'project'])->orderBy('created_at', 'desc')->get();
             $projects = Project::orderBy('name')->get();
             $sprints = Sprint::with('project')->orderBy('start_date', 'desc')->get();
-        } elseif ($permissions === 'developer') {
-            $tasks = Task::whereHas('sprint.project.users', function ($query) use ($authUser) {
-                $query->where('users.id', $authUser->id);
+        } elseif ($permissions === 'team_leader') {
+            // Team leader ve tareas de sus proyectos
+            $tasks = Task::whereHas('sprint.project.users', function ($query) use ($effectiveUser) {
+                $query->where('users.id', $effectiveUser->id);
             })->with(['user', 'sprint', 'project'])->orderBy('created_at', 'desc')->get();
-            $projects = $authUser->projects()->orderBy('name')->get();
-            $sprints = Sprint::whereHas('project.users', function ($query) use ($authUser) {
-                $query->where('users.id', $authUser->id);
+            $projects = $effectiveUser->projects()->orderBy('name')->get();
+            $sprints = Sprint::whereHas('project.users', function ($query) use ($effectiveUser) {
+                $query->where('users.id', $effectiveUser->id);
+            })->with('project')->orderBy('start_date', 'desc')->get();
+        } elseif ($permissions === 'developer') {
+            // Developer ve solo sus tareas asignadas
+            $tasks = Task::where('user_id', $effectiveUser->id)
+                ->with(['user', 'sprint', 'project'])
+                ->orderBy('created_at', 'desc')
+                ->get();
+            $projects = $effectiveUser->projects()->orderBy('name')->get();
+            $sprints = Sprint::whereHas('project.users', function ($query) use ($effectiveUser) {
+                $query->where('users.id', $effectiveUser->id);
             })->with('project')->orderBy('start_date', 'desc')->get();
         }
 
 
+
+        // Obtener desarrolladores para el modal de creación de tareas
+        $developers = User::with('roles')->whereHas('roles', function ($query) {
+            $query->whereIn('value', ['developer', 'team_leader']);
+        })->orderBy('name')->get();
 
         return Inertia::render('Task/Index', [
             'tasks' => $tasks,
             'permissions' => $permissions,
             'projects' => $projects,
             'sprints' => $sprints,
+            'developers' => $developers,
         ]);
     }
 
@@ -227,6 +267,387 @@ class TaskController extends Controller
             ]);
             
             return redirect()->back()->with('error', 'Failed to update task. Please try again.');
+        }
+    }
+
+    /**
+     * Asignar tarea a un desarrollador (por team leader)
+     */
+    public function assignTask(Request $request, $taskId): JsonResponse
+    {
+        try {
+            $validatedData = $request->validate([
+                'developer_id' => 'required|string|exists:users,id',
+            ]);
+
+            $task = Task::findOrFail($taskId);
+            $developer = User::findOrFail($validatedData['developer_id']);
+            $teamLeader = Auth::user();
+
+            $this->taskAssignmentService->assignTaskByTeamLeader($task, $developer, $teamLeader);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Tarea asignada correctamente',
+                'task' => $task->fresh(['user', 'assignedBy'])
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al asignar tarea', [
+                'error' => $e->getMessage(),
+                'task_id' => $taskId,
+                'developer_id' => $validatedData['developer_id'] ?? null
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Auto-asignar tarea (por desarrollador)
+     */
+    public function selfAssignTask(Request $request, $taskId): JsonResponse
+    {
+        try {
+            $task = Task::findOrFail($taskId);
+            $developer = Auth::user();
+
+            $this->taskAssignmentService->selfAssignTask($task, $developer);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Tarea auto-asignada correctamente',
+                'task' => $task->fresh(['user', 'assignedBy'])
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al auto-asignar tarea', [
+                'error' => $e->getMessage(),
+                'task_id' => $taskId,
+                'developer_id' => Auth::id()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Obtener tareas disponibles para auto-asignación
+     */
+    public function getAvailableTasks(): JsonResponse
+    {
+        try {
+            $developer = Auth::user();
+            $availableTasks = $this->taskAssignmentService->getAvailableTasksForDeveloper($developer);
+
+            return response()->json([
+                'success' => true,
+                'tasks' => $availableTasks
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener tareas disponibles', [
+                'error' => $e->getMessage(),
+                'developer_id' => Auth::id()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener tareas disponibles'
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener tareas asignadas al desarrollador actual
+     */
+    public function getMyTasks(): JsonResponse
+    {
+        try {
+            $developer = Auth::user();
+            $assignedTasks = $this->taskAssignmentService->getAssignedTasksForDeveloper($developer);
+
+            return response()->json([
+                'success' => true,
+                'tasks' => $assignedTasks
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener tareas asignadas', [
+                'error' => $e->getMessage(),
+                'developer_id' => Auth::id()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener tareas asignadas'
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener desarrolladores disponibles para un proyecto
+     */
+    public function getAvailableDevelopers($projectId): JsonResponse
+    {
+        try {
+            $project = Project::findOrFail($projectId);
+            $developers = $this->taskAssignmentService->getAvailableDevelopersForProject($project);
+
+            return response()->json([
+                'success' => true,
+                'developers' => $developers
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener desarrolladores disponibles', [
+                'error' => $e->getMessage(),
+                'project_id' => $projectId
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener desarrolladores disponibles'
+            ], 500);
+        }
+    }
+
+    /**
+     * Iniciar trabajo en una tarea
+     */
+    public function startWork(Request $request, $taskId): JsonResponse
+    {
+        try {
+            $task = Task::findOrFail($taskId);
+            $user = Auth::user();
+
+            $this->taskTimeTrackingService->startWork($task, $user);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Trabajo iniciado correctamente',
+                'task' => $task->fresh(['user', 'sprint', 'project'])
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al iniciar trabajo', [
+                'error' => $e->getMessage(),
+                'task_id' => $taskId,
+                'user_id' => Auth::id()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Pausar trabajo en una tarea
+     */
+    public function pauseWork(Request $request, $taskId): JsonResponse
+    {
+        try {
+            $task = Task::findOrFail($taskId);
+            $user = Auth::user();
+
+            $this->taskTimeTrackingService->pauseWork($task, $user);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Trabajo pausado correctamente',
+                'task' => $task->fresh(['user', 'sprint', 'project'])
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al pausar trabajo', [
+                'error' => $e->getMessage(),
+                'task_id' => $taskId,
+                'user_id' => Auth::id()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Reanudar trabajo en una tarea
+     */
+    public function resumeWork(Request $request, $taskId): JsonResponse
+    {
+        try {
+            $task = Task::findOrFail($taskId);
+            $user = Auth::user();
+
+            $this->taskTimeTrackingService->resumeWork($task, $user);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Trabajo reanudado correctamente',
+                'task' => $task->fresh(['user', 'sprint', 'project'])
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al reanudar trabajo', [
+                'error' => $e->getMessage(),
+                'task_id' => $taskId,
+                'user_id' => Auth::id()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Finalizar trabajo en una tarea
+     */
+    public function finishWork(Request $request, $taskId): JsonResponse
+    {
+        try {
+            $task = Task::findOrFail($taskId);
+            $user = Auth::user();
+
+            $this->taskTimeTrackingService->finishWork($task, $user);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Trabajo finalizado correctamente. Pendiente de revisión por team leader.',
+                'task' => $task->fresh(['user', 'sprint', 'project'])
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al finalizar trabajo', [
+                'error' => $e->getMessage(),
+                'task_id' => $taskId,
+                'user_id' => Auth::id()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Obtener tiempo actual de trabajo en una tarea
+     */
+    public function getCurrentWorkTime($taskId): JsonResponse
+    {
+        try {
+            $task = Task::findOrFail($taskId);
+            $currentTime = $this->taskTimeTrackingService->getCurrentWorkTime($task);
+
+            return response()->json([
+                'success' => true,
+                'current_time_seconds' => $currentTime,
+                'formatted_time' => gmdate('H:i:s', $currentTime)
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener tiempo de trabajo', [
+                'error' => $e->getMessage(),
+                'task_id' => $taskId
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener tiempo de trabajo'
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener logs de tiempo de una tarea
+     */
+    public function getTaskTimeLogs($taskId): JsonResponse
+    {
+        try {
+            $task = Task::findOrFail($taskId);
+            $timeLogs = $this->taskTimeTrackingService->getTaskTimeLogs($task);
+
+            return response()->json([
+                'success' => true,
+                'time_logs' => $timeLogs
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener logs de tiempo', [
+                'error' => $e->getMessage(),
+                'task_id' => $taskId
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener logs de tiempo'
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener tareas activas del usuario
+     */
+    public function getActiveTasks(): JsonResponse
+    {
+        try {
+            $user = Auth::user();
+            $activeTasks = $this->taskTimeTrackingService->getActiveTasksForUser($user);
+
+            return response()->json([
+                'success' => true,
+                'active_tasks' => $activeTasks
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener tareas activas', [
+                'error' => $e->getMessage(),
+                'user_id' => Auth::id()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener tareas activas'
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener tareas pausadas del usuario
+     */
+    public function getPausedTasks(): JsonResponse
+    {
+        try {
+            $user = Auth::user();
+            $pausedTasks = $this->taskTimeTrackingService->getPausedTasksForUser($user);
+
+            return response()->json([
+                'success' => true,
+                'paused_tasks' => $pausedTasks
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener tareas pausadas', [
+                'error' => $e->getMessage(),
+                'user_id' => Auth::id()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener tareas pausadas'
+            ], 500);
         }
     }
 }

@@ -1,0 +1,10 @@
+[33m7d47f8a[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeature/type-migration-manual[m[33m)[m Refactor and update various components, services, and controllers across the application, including enhancements to task, user, and project management functionalities. Additionally, improve documentation and update dependencies in package files.
+[33m7e8d1c7[m Merge pull request #7 from YulioDevelopment26/dev
+[33mf54afcd[m Merge pull request #6 from YulioDevelopment26/feature/Crud-tasks
+[33m2d5379e[m Creation of task crud and user crud
+[33mb584071[m Merge pull request #5 from YulioDevelopment26/feature/CRUD-sprint
+[33mfc3b327[m feature/Crud for prints
+[33m2ef8808[m Merge pull request #4 from YulioDevelopment26/feature/controllers
+[33m8183c70[m feature: CRUD for projects
+[33m988931b[m Merge pull request #3 from YulioDevelopment26/feature/controllers
+[33m76ec6bc[m feature: Startup of all controllers and front-end base

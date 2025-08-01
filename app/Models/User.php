@@ -77,4 +77,148 @@ class User extends Authenticatable
     {
         return $this->hasMany(Task::class);
     }
+
+    public function paymentReports(): HasMany
+    {
+        return $this->hasMany(PaymentReport::class);
+    }
+
+    /**
+     * Check if user has a specific role
+     */
+    public function hasRole(string $roleName): bool
+    {
+        return $this->roles()->where('name', $roleName)->exists();
+    }
+
+    /**
+     * Check if user has any of the specified roles
+     */
+    public function hasAnyRole(array $roleNames): bool
+    {
+        return $this->roles()->whereIn('name', $roleNames)->exists();
+    }
+
+    /**
+     * Get direct permissions for this user
+     */
+    public function directPermissions(): BelongsToMany
+    {
+        return $this->belongsToMany(Permission::class, 'user_permissions', 'user_id', 'permission_id')
+            ->withPivot(['type', 'expires_at', 'reason', 'granted_by'])
+            ->withTimestamps();
+    }
+
+    /**
+     * Get all user permissions (direct + through roles)
+     */
+    public function getAllPermissions()
+    {
+        // Get permissions from roles
+        $rolePermissions = $this->roles()->with('permissions')->get()
+            ->flatMap(function ($role) {
+                return $role->permissions;
+            });
+
+        // Get direct permissions
+        $directPermissions = $this->directPermissions()->active()->get();
+
+        // Merge and remove duplicates
+        return $rolePermissions->merge($directPermissions)->unique('id');
+    }
+
+    /**
+     * Check if user has a specific permission
+     */
+    public function hasPermission(string $permissionName): bool
+    {
+        // Check direct permissions first
+        $directPermission = $this->directPermissions()
+            ->where('name', $permissionName)
+            ->active()
+            ->exists();
+
+        if ($directPermission) {
+            return true;
+        }
+
+        // Check permissions through roles
+        return $this->roles()->whereHas('permissions', function ($query) use ($permissionName) {
+            $query->where('name', $permissionName);
+        })->exists();
+    }
+
+    /**
+     * Check if user has any of the specified permissions
+     */
+    public function hasAnyPermission(array $permissionNames): bool
+    {
+        // Check direct permissions first
+        $directPermission = $this->directPermissions()
+            ->whereIn('name', $permissionNames)
+            ->active()
+            ->exists();
+
+        if ($directPermission) {
+            return true;
+        }
+
+        // Check permissions through roles
+        return $this->roles()->whereHas('permissions', function ($query) use ($permissionNames) {
+            $query->whereIn('name', $permissionNames);
+        })->exists();
+    }
+
+    /**
+     * Grant a permission to user
+     */
+    public function grantPermission(string $permissionName, string $type = 'temporary', ?string $reason = null, ?string $expiresAt = null): bool
+    {
+        $permission = Permission::where('name', $permissionName)->first();
+        
+        if (!$permission) {
+            return false;
+        }
+
+        // Check if user already has this permission
+        $existingPermission = $this->directPermissions()
+            ->where('permission_id', $permission->id)
+            ->first();
+
+        if ($existingPermission) {
+            // Update existing permission
+            $this->directPermissions()->updateExistingPivot($permission->id, [
+                'type' => $type,
+                'reason' => $reason,
+                'expires_at' => $expiresAt,
+                'granted_by' => auth()->id(),
+            ]);
+        } else {
+            // Create new permission using UserPermission model
+            \App\Models\UserPermission::create([
+                'user_id' => $this->id,
+                'permission_id' => $permission->id,
+                'type' => $type,
+                'reason' => $reason,
+                'expires_at' => $expiresAt,
+                'granted_by' => auth()->id(),
+            ]);
+        }
+
+        return true;
+    }
+
+    /**
+     * Revoke a permission from user
+     */
+    public function revokePermission(string $permissionName): bool
+    {
+        $permission = Permission::where('name', $permissionName)->first();
+        
+        if (!$permission) {
+            return false;
+        }
+
+        return $this->directPermissions()->detach($permission->id) > 0;
+    }
 }

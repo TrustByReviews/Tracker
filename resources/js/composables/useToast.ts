@@ -1,9 +1,8 @@
 import { ref } from 'vue'
 
-export interface Toast {
+interface Toast {
   id: string
-  type: 'success' | 'error' | 'info'
-  title: string
+  type: 'success' | 'error' | 'warning' | 'info'
   message: string
   duration?: number
 }
@@ -11,22 +10,23 @@ export interface Toast {
 const toasts = ref<Toast[]>([])
 
 export function useToast() {
-  const addToast = (toast: Omit<Toast, 'id'>) => {
-    const id = Math.random().toString(36).substr(2, 9)
-    const newToast: Toast = {
+  const addToast = (type: Toast['type'], message: string, duration = 5000) => {
+    const id = Date.now().toString()
+    const toast: Toast = {
       id,
-      duration: 5000,
-      ...toast
+      type,
+      message,
+      duration
     }
-    
-    toasts.value.push(newToast)
-    
-    // Auto remove after duration
-    if (newToast.duration) {
-      setTimeout(() => {
-        removeToast(id)
-      }, newToast.duration)
-    }
+
+    toasts.value.push(toast)
+
+    // Auto remove toast after duration
+    setTimeout(() => {
+      removeToast(id)
+    }, duration)
+
+    return id
   }
 
   const removeToast = (id: string) => {
@@ -36,16 +36,20 @@ export function useToast() {
     }
   }
 
-  const success = (title: string, message: string) => {
-    addToast({ type: 'success', title, message })
+  const success = (message: string, duration?: number) => {
+    return addToast('success', message, duration)
   }
 
-  const error = (title: string, message: string) => {
-    addToast({ type: 'error', title, message })
+  const error = (message: string, duration?: number) => {
+    return addToast('error', message, duration)
   }
 
-  const info = (title: string, message: string) => {
-    addToast({ type: 'info', title, message })
+  const warning = (message: string, duration?: number) => {
+    return addToast('warning', message, duration)
+  }
+
+  const info = (message: string, duration?: number) => {
+    return addToast('info', message, duration)
   }
 
   return {
@@ -54,6 +58,7 @@ export function useToast() {
     removeToast,
     success,
     error,
+    warning,
     info
   }
 } 
