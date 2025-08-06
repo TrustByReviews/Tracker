@@ -193,7 +193,7 @@ class EmailService
     }
 
     /**
-     * Send weekly report email to developer
+     * Send weekly report email
      */
     public function sendWeeklyReportEmail(string $developerName, string $developerEmail, array $reportData, string $startDate, string $endDate): bool
     {
@@ -204,18 +204,45 @@ class EmailService
                 $startDate,
                 $endDate
             ));
+            
             Log::info('Weekly report email sent successfully', [
                 'developer_email' => $developerEmail,
-                'period' => $startDate . ' to ' . $endDate,
-                'total_hours' => $reportData['total_hours'],
-                'total_payment' => $reportData['total_payment']
+                'start_date' => $startDate,
+                'end_date' => $endDate
             ]);
+            
             return true;
         } catch (\Exception $e) {
             Log::error('Failed to send weekly report email', [
                 'developer_email' => $developerEmail,
                 'error' => $e->getMessage()
             ]);
+            
+            return false;
+        }
+    }
+
+    /**
+     * Send generic HTML email
+     */
+    public function sendEmail(string $to, string $subject, string $htmlMessage): bool
+    {
+        try {
+            Mail::to($to)->send(new \App\Mail\GenericEmail($subject, $htmlMessage));
+            
+            Log::info('Generic email sent successfully', [
+                'to' => $to,
+                'subject' => $subject
+            ]);
+            
+            return true;
+        } catch (\Exception $e) {
+            Log::error('Failed to send generic email', [
+                'to' => $to,
+                'subject' => $subject,
+                'error' => $e->getMessage()
+            ]);
+            
             return false;
         }
     }

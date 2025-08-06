@@ -19,30 +19,103 @@ class ProjectController extends Controller
     {
     }
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
-        $authUser = User::find(Auth::id());
+        $authUser = Auth::user();
+        
+        if (!$authUser) {
+            return redirect()->route('login');
+        }
+        
         $role = $authUser->roles;
+        $permissions = 'developer'; // Default permission
 
+        if ($role && $role->count() > 0) {
+            $permissions = $role->first()->name;
+        }
+
+        $projectsQuery = null;
         $developers = User::whereHas('roles', function ($query) {
             $query->where('name', 'developer');
         })->get();
 
-        $projects = [];
-        $permissions = 'developer'; // Default permission
-
-        if ($role->count() > 0) {
-            $permissions = $role->first()->name;
-            
-            if ($permissions === 'admin'){
-                $projects = Project::with(['users', 'sprints.tasks', 'creator'])->get();
-            } elseif ($permissions === 'developer'){
-                $projects = $authUser->projects()->with(['users', 'sprints.tasks', 'creator'])->get();
-            }
+        if ($permissions === 'admin') {
+            $projectsQuery = Project::with(['users', 'sprints.tasks', 'creator']);
+        } elseif ($permissions === 'developer') {
+            $projectsQuery = $authUser->projects()->with(['users', 'sprints.tasks', 'creator']);
         }
 
-        foreach ($projects as $project) {
+        // Aplicar filtros
+        $filters = $request->only(['status', 'assigned_user_id', 'sort_by', 'sort_order', 'search']);
+
+        // Filtro por estado
+        if (!empty($filters['status'])) {
+            $projectsQuery->where('status', $filters['status']);
+        }
+
+        // Filtro por usuario asignado
+        if (!empty($filters['assigned_user_id'])) {
+            $projectsQuery->whereHas('users', function ($query) use ($filters) {
+                $query->where('users.id', $filters['assigned_user_id']);
+            });
+        }
+
+        // Filtro de búsqueda por nombre
+        if (!empty($filters['search'])) {
+            $projectsQuery->where('name', 'like', '%' . $filters['search'] . '%');
+        }
+
+        $projects = $projectsQuery->get();
+
+        // Agregar información adicional a cada proyecto
+        $projects->each(function ($project) {
             $project['create_by'] = $project->creator->name;
+            
+            // Calcular estadísticas del proyecto
+            $allTasks = $project->sprints->flatMap->tasks;
+            $project['total_tasks'] = $allTasks->count();
+            $project['completed_tasks'] = $allTasks->where('status', 'done')->count();
+            $project['in_progress_tasks'] = $allTasks->where('status', 'in progress')->count();
+            $project['pending_tasks'] = $allTasks->where('status', 'to do')->count();
+            $project['completion_rate'] = $allTasks->count() > 0 
+                ? round(($allTasks->where('status', 'done')->count() / $allTasks->count()) * 100, 2)
+                : 0;
+            $project['team_members_count'] = $project->users->count();
+            $project['sprints_count'] = $project->sprints->count();
+        });
+
+        // Aplicar ordenamiento personalizado
+        if (!empty($filters['sort_by'])) {
+            $projects = $projects->sortBy(function ($project) use ($filters) {
+                switch ($filters['sort_by']) {
+                    case 'name':
+                        return strtolower($project->name);
+                    case 'status':
+                        $statusOrder = ['active' => 1, 'in progress' => 2, 'paused' => 3, 'completed' => 4, 'cancelled' => 5];
+                        return $statusOrder[$project->status] ?? 6;
+                    case 'completion_rate':
+                        return $project['completion_rate'];
+                    case 'total_tasks':
+                        return $project['total_tasks'];
+                    case 'completed_tasks':
+                        return $project['completed_tasks'];
+                    case 'team_members':
+                        return $project['team_members_count'];
+                    case 'sprints_count':
+                        return $project['sprints_count'];
+                    case 'created_at':
+                        return $project->created_at;
+                    case 'updated_at':
+                        return $project->updated_at;
+                    default:
+                        return $project->created_at;
+                }
+            });
+
+            // Aplicar orden
+            if ($filters['sort_order'] === 'desc') {
+                $projects = $projects->reverse();
+            }
         }
 
         // Calculate project statistics
@@ -51,6 +124,7 @@ class ProjectController extends Controller
             'active' => $projects->where('status', 'active')->count(),
             'completed' => $projects->where('status', 'completed')->count(),
             'paused' => $projects->where('status', 'paused')->count(),
+            'cancelled' => $projects->where('status', 'cancelled')->count(),
         ];
 
         return Inertia::render('Project/Index', [
@@ -58,17 +132,22 @@ class ProjectController extends Controller
             'permissions' => $permissions,
             'developers' => $developers,
             'stats' => $stats,
+            'filters' => $filters,
         ]);
-
     }
 
     public function show($id): Response
     {
-        $authUser = User::find(Auth::id());
+        $authUser = Auth::user();
+        
+        if (!$authUser) {
+            return redirect()->route('login');
+        }
+        
         $role = $authUser->roles;
         $permissions = 'developer'; // Default permission
 
-        if ($role->count() > 0) {
+        if ($role && $role->count() > 0) {
             $permissions = $role->first()->name;
         }
 

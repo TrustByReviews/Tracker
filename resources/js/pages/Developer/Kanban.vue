@@ -139,6 +139,7 @@
                 @pause-work="pauseWork"
                 @resume-work="resumeWork"
                 @finish-work="finishWork"
+                @resume-auto-paused="resumeAutoPaused"
               />
             </div>
             <div
@@ -387,6 +388,30 @@ const selfAssignTask = async (taskId) => {
   } catch (error) {
     console.error('Error self-assigning task:', error)
     toast.error('Error al auto-asignar tarea')
+  }
+}
+
+const resumeAutoPaused = async (taskId) => {
+  try {
+    const response = await fetch(`/tasks/${taskId}/resume-auto-paused`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+      }
+    })
+    
+    const data = await response.json()
+    
+    if (data.success) {
+      await loadTasks()
+      toast.success('Tarea auto-pausada reanudada correctamente')
+    } else {
+      toast.error(data.message || 'Error al reanudar tarea auto-pausada')
+    }
+  } catch (error) {
+    console.error('Error resuming auto-paused task:', error)
+    toast.error('Error al reanudar tarea auto-pausada')
   }
 }
 

@@ -36,13 +36,16 @@ interface Task {
     id: string,
     name: string,
     description: string,
-    estimated_start: string | null,
-    estimated_finish: string | null,
+    long_description?: string,
     status: string,
     priority: string,
     category: string,
     story_points: number,
     estimated_hours: number,
+    estimated_minutes: number,
+    actual_hours?: number,
+    actual_minutes?: number,
+    total_time_seconds?: number,
     user_id: string | null,
     user?: User,
     sprint?: Sprint,
@@ -50,6 +53,32 @@ interface Task {
         id: string,
         name: string
     },
+    assigned_by?: string,
+    assigned_by_user?: User,
+    assigned_at?: string,
+    actual_start?: string,
+    actual_finish?: string,
+    work_started_at?: string,
+    is_working?: boolean,
+    work_paused_at?: string,
+    work_finished_at?: string,
+    approval_status?: string,
+    rejection_reason?: string,
+    reviewed_by?: string,
+    reviewed_by_user?: User,
+    reviewed_at?: string,
+    auto_close_at?: string,
+    alert_count?: number,
+    last_alert_at?: string,
+    auto_paused?: boolean,
+    auto_paused_at?: string,
+    auto_pause_reason?: string,
+    acceptance_criteria?: string,
+    technical_notes?: string,
+    complexity_level?: string,
+    task_type?: string,
+    tags?: string,
+    attachments?: any[],
     created_at?: string,
     updated_at?: string
 }
@@ -65,14 +94,21 @@ const isEditing = ref(false);
 const form = useForm({
     name: props.task.name,
     description: props.task.description,
+    long_description: props.task.long_description || '',
     priority: props.task.priority,
     category: props.task.category,
     story_points: props.task.story_points,
     estimated_hours: props.task.estimated_hours,
+    estimated_minutes: props.task.estimated_minutes || 0,
     assigned_user_id: props.task.user_id || '',
-    estimated_start: props.task.estimated_start || '',
-    estimated_finish: props.task.estimated_finish || '',
+    actual_start: props.task.actual_start || '',
+    actual_finish: props.task.actual_finish || '',
     status: props.task.status,
+    acceptance_criteria: props.task.acceptance_criteria || '',
+    technical_notes: props.task.technical_notes || '',
+    complexity_level: props.task.complexity_level || 'medium',
+    task_type: props.task.task_type || 'feature',
+    tags: props.task.tags || '',
 });
 
 const formatDate = (date: string | null) => {
@@ -86,6 +122,29 @@ const formatDate = (date: string | null) => {
     } catch {
         return 'Invalid date';
     }
+}
+
+const formatDateTime = (date: string | null) => {
+    if (!date) return 'Not set';
+    try {
+        return new Date(date).toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch {
+        return 'Invalid date';
+    }
+}
+
+const formatTime = (seconds: number | null) => {
+    if (!seconds) return '0h 0m 0s';
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hours}h ${minutes}m ${secs}s`;
 }
 
 const getStatusColor = (status: string) => {
@@ -107,11 +166,62 @@ const getStatusColor = (status: string) => {
 
 const getPriorityColor = (priority: string) => {
     switch (priority) {
-        case 'high':
+        case 'critical':
             return 'text-red-600 bg-red-100';
-        case 'medium':
+        case 'high':
             return 'text-orange-600 bg-orange-100';
+        case 'medium':
+            return 'text-yellow-600 bg-yellow-100';
         case 'low':
+            return 'text-green-600 bg-green-100';
+        default:
+            return 'text-gray-600 bg-gray-100';
+    }
+}
+
+const getComplexityColor = (complexity: string) => {
+    switch (complexity) {
+        case 'expert':
+            return 'text-red-600 bg-red-100';
+        case 'high':
+            return 'text-orange-600 bg-orange-100';
+        case 'medium':
+            return 'text-yellow-600 bg-yellow-100';
+        case 'low':
+            return 'text-green-600 bg-green-100';
+        default:
+            return 'text-gray-600 bg-gray-100';
+    }
+}
+
+const getTaskTypeColor = (taskType: string) => {
+    switch (taskType) {
+        case 'feature':
+            return 'text-blue-600 bg-blue-100';
+        case 'bugfix':
+            return 'text-red-600 bg-red-100';
+        case 'improvement':
+            return 'text-green-600 bg-green-100';
+        case 'refactor':
+            return 'text-purple-600 bg-purple-100';
+        case 'documentation':
+            return 'text-gray-600 bg-gray-100';
+        case 'testing':
+            return 'text-orange-600 bg-orange-100';
+        case 'research':
+            return 'text-indigo-600 bg-indigo-100';
+        default:
+            return 'text-gray-600 bg-gray-100';
+    }
+}
+
+const getApprovalStatusColor = (status: string) => {
+    switch (status) {
+        case 'approved':
+            return 'text-green-600 bg-green-100';
+        case 'rejected':
+            return 'text-red-600 bg-red-100';
+        case 'pending':
             return 'text-yellow-600 bg-yellow-100';
         default:
             return 'text-gray-600 bg-gray-100';
@@ -127,35 +237,31 @@ const back = () => {
 }
 
 const startEditing = () => {
-    console.log('🔍 DEBUG: startEditing called');
-    console.log('🔍 DEBUG: isEditing before:', isEditing.value);
-    console.log('🔍 DEBUG: task data:', props.task);
-    
     isEditing.value = true;
-    
-    console.log('🔍 DEBUG: isEditing after:', isEditing.value);
     
     // Reset form with current task values
     form.name = props.task.name;
     form.description = props.task.description;
+    form.long_description = props.task.long_description || '';
     form.priority = props.task.priority;
     form.category = props.task.category;
     form.story_points = props.task.story_points;
     form.estimated_hours = props.task.estimated_hours;
+    form.estimated_minutes = props.task.estimated_minutes || 0;
     form.assigned_user_id = props.task.user_id || '';
-    form.estimated_start = props.task.estimated_start || '';
-    form.estimated_finish = props.task.estimated_finish || '';
+    form.actual_start = props.task.actual_start || '';
+    form.actual_finish = props.task.actual_finish || '';
     form.status = props.task.status;
-    
-    console.log('🔍 DEBUG: form values set:', form.data());
-    console.log('🔍 DEBUG: form processing:', form.processing);
+    form.acceptance_criteria = props.task.acceptance_criteria || '';
+    form.technical_notes = props.task.technical_notes || '';
+    form.complexity_level = props.task.complexity_level || 'medium';
+    form.task_type = props.task.task_type || 'feature';
+    form.tags = props.task.tags || '';
 }
 
 const saveChanges = () => {
-    console.log('Saving changes...');
     form.put(`/tasks/${props.task.id}`, {
         onSuccess: () => {
-            console.log('Task updated successfully');
             isEditing.value = false;
             form.reset();
         },
@@ -166,9 +272,68 @@ const saveChanges = () => {
 }
 
 const cancelEditing = () => {
-    console.log('Canceling edit mode...');
     isEditing.value = false;
     form.reset();
+}
+
+// Time tracking handlers
+const handleStartWork = async () => {
+    try {
+        await router.post(`/tasks/${props.task.id}/start-work`);
+        router.reload();
+    } catch (error) {
+        console.error('Error starting work:', error);
+    }
+}
+
+const handlePauseWork = async () => {
+    try {
+        await router.post(`/tasks/${props.task.id}/pause-work`);
+        router.reload();
+    } catch (error) {
+        console.error('Error pausing work:', error);
+    }
+}
+
+const handleResumeWork = async () => {
+    try {
+        await router.post(`/tasks/${props.task.id}/resume-work`);
+        router.reload();
+    } catch (error) {
+        console.error('Error resuming work:', error);
+    }
+}
+
+const handleFinishWork = async () => {
+    try {
+        await router.post(`/tasks/${props.task.id}/finish-work`);
+        router.reload();
+    } catch (error) {
+        console.error('Error finishing work:', error);
+    }
+}
+
+const getFileName = (attachment: any) => {
+    if (typeof attachment === 'string') {
+        return attachment.split('/').pop();
+    }
+    return attachment.name || 'File';
+}
+
+const formatFileSize = (bytes: number) => {
+    if (!bytes) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+const openAttachment = (attachment: any) => {
+    if (typeof attachment === 'string') {
+        window.open(attachment, '_blank');
+    } else if (attachment.path) {
+        window.open(`/storage/${attachment.path}`, '_blank');
+    }
 }
 </script>
 
@@ -178,11 +343,6 @@ const cancelEditing = () => {
   <AppLayout :breadcrumbs="breadcrumbs">
     <template #header>
       <div class="flex items-center justify-between p-6 border-b border-gray-200 bg-white">
-        <!-- Debug info -->
-        <div class="text-xs text-red-500 mb-2">
-          🔍 DEBUG: isEditing = {{ isEditing }}, task.name = {{ task.name }}, task.id = {{ task.id }}
-        </div>
-        
         <div class="flex items-center space-x-4">
           <Button variant="ghost" size="sm" @click="back" class="flex items-center">
             <Icon name="arrow-left" class="h-4 w-4 mr-2" />
@@ -199,7 +359,7 @@ const cancelEditing = () => {
             @click="startEditing" 
             class="border-blue-500 text-white bg-blue-500 hover:bg-blue-600 transition-colors"
           >
-            Edit Task (DEBUG: {{ isEditing ? 'TRUE' : 'FALSE' }})
+            Edit Task
           </Button>
           <div v-else class="flex space-x-2">
             <Button 
@@ -248,6 +408,29 @@ const cancelEditing = () => {
           </CardContent>
         </Card>
 
+        <!-- Long Description -->
+        <Card>
+          <CardHeader>
+            <CardTitle class="flex items-center">
+              <Icon name="file-text" class="h-5 w-5 mr-2" />
+              Detailed Description
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div v-if="!isEditing">
+              <p class="text-gray-700 dark:text-gray-300">{{ task.long_description }}</p>
+            </div>
+            <div v-else>
+              <textarea 
+                v-model="form.long_description"
+                rows="6"
+                class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter detailed description..."
+              ></textarea>
+            </div>
+          </CardContent>
+        </Card>
+
         <!-- Task Details -->
         <Card>
           <CardHeader>
@@ -288,6 +471,7 @@ const cancelEditing = () => {
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
                     <option value="high">High</option>
+                    <option value="critical">Critical</option>
                   </select>
                 </div>
               </div>
@@ -307,6 +491,47 @@ const cancelEditing = () => {
                     <option value="fixes">Fixes</option>
                     <option value="testing">Testing</option>
                     <option value="documentation">Documentation</option>
+                    <option value="database">Database</option>
+                    <option value="api">API</option>
+                    <option value="security">Security</option>
+                    <option value="performance">Performance</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div>
+                <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Task Type</label>
+                <div class="mt-1">
+                  <div v-if="!isEditing">
+                    <span :class="`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTaskTypeColor(task.task_type || 'feature')}`">
+                      {{ task.task_type || 'feature' }}
+                    </span>
+                  </div>
+                  <select v-else v-model="form.task_type" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                    <option value="feature">New Feature</option>
+                    <option value="bugfix">Bug Fix</option>
+                    <option value="improvement">Improvement</option>
+                    <option value="refactor">Refactor</option>
+                    <option value="documentation">Documentation</option>
+                    <option value="testing">Testing</option>
+                    <option value="research">Research</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div>
+                <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Complexity Level</label>
+                <div class="mt-1">
+                  <div v-if="!isEditing">
+                    <span :class="`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getComplexityColor(task.complexity_level || 'medium')}`">
+                      {{ task.complexity_level || 'medium' }}
+                    </span>
+                  </div>
+                  <select v-else v-model="form.complexity_level" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="expert">Expert</option>
                   </select>
                 </div>
               </div>
@@ -330,12 +555,15 @@ const cancelEditing = () => {
               </div>
               
               <div>
-                <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Estimated Hours</label>
+                <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Estimated Time</label>
                 <div class="mt-1">
                   <div v-if="!isEditing">
-                    <p class="text-sm text-gray-900 dark:text-white">{{ task.estimated_hours }}h</p>
+                    <p class="text-sm text-gray-900 dark:text-white">{{ task.estimated_hours }}h {{ task.estimated_minutes || 0 }}m</p>
                   </div>
-                  <input v-else v-model="form.estimated_hours" type="number" min="1" max="40" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <div v-else class="flex space-x-2">
+                    <input v-model="form.estimated_hours" type="number" min="0" max="40" class="w-1/2 border border-gray-300 rounded-md px-3 py-2" placeholder="Hours">
+                    <input v-model="form.estimated_minutes" type="number" min="0" max="59" class="w-1/2 border border-gray-300 rounded-md px-3 py-2" placeholder="Minutes">
+                  </div>
                 </div>
               </div>
               
@@ -359,6 +587,109 @@ const cancelEditing = () => {
           </CardContent>
         </Card>
 
+        <!-- Acceptance Criteria -->
+        <Card>
+          <CardHeader>
+            <CardTitle class="flex items-center">
+              <Icon name="check-circle" class="h-5 w-5 mr-2" />
+              Acceptance Criteria
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div v-if="!isEditing">
+              <p class="text-gray-700 dark:text-gray-300">{{ task.acceptance_criteria }}</p>
+            </div>
+            <div v-else>
+              <textarea 
+                v-model="form.acceptance_criteria"
+                rows="4"
+                class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter acceptance criteria..."
+              ></textarea>
+            </div>
+          </CardContent>
+        </Card>
+
+        <!-- Technical Notes -->
+        <Card>
+          <CardHeader>
+            <CardTitle class="flex items-center">
+              <Icon name="code" class="h-5 w-5 mr-2" />
+              Technical Notes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div v-if="!isEditing">
+              <p class="text-gray-700 dark:text-gray-300">{{ task.technical_notes }}</p>
+            </div>
+            <div v-else>
+              <textarea 
+                v-model="form.technical_notes"
+                rows="4"
+                class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter technical notes..."
+              ></textarea>
+            </div>
+          </CardContent>
+        </Card>
+
+        <!-- Tags -->
+        <Card>
+          <CardHeader>
+            <CardTitle class="flex items-center">
+              <Icon name="tag" class="h-5 w-5 mr-2" />
+              Tags
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div v-if="!isEditing">
+              <div class="flex flex-wrap gap-2">
+                <span
+                  v-for="tag in task.tags?.split(',')"
+                  :key="tag"
+                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                >
+                  {{ tag.trim() }}
+                </span>
+              </div>
+            </div>
+            <div v-else>
+              <input 
+                v-model="form.tags"
+                type="text"
+                class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter tags separated by commas..."
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <!-- Attachments -->
+        <Card>
+          <CardHeader>
+            <CardTitle class="flex items-center">
+              <Icon name="paperclip" class="h-5 w-5 mr-2" />
+              Attachments
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div
+                v-for="(attachment, index) in task.attachments"
+                :key="index"
+                class="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                @click="openAttachment(attachment)"
+              >
+                <Icon name="file" class="w-8 h-8 text-gray-400 mr-3" />
+                <div>
+                  <p class="text-sm font-medium text-gray-900">{{ getFileName(attachment) }}</p>
+                  <p class="text-xs text-gray-500">{{ formatFileSize(attachment.size) }}</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <!-- Dates -->
         <Card>
           <CardHeader>
@@ -370,22 +701,22 @@ const cancelEditing = () => {
           <CardContent>
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Estimated Start</label>
+                <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Actual Start</label>
                 <div class="mt-1">
                   <div v-if="!isEditing">
-                    <p class="text-sm text-gray-900 dark:text-white">{{ formatDate(task.estimated_start) }}</p>
+                    <p class="text-sm text-gray-900 dark:text-white">{{ formatDate(task.actual_start) }}</p>
                   </div>
-                  <input v-else v-model="form.estimated_start" type="date" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <input v-else v-model="form.actual_start" type="date" class="w-full border border-gray-300 rounded-md px-3 py-2">
                 </div>
               </div>
               
               <div>
-                <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Estimated Finish</label>
+                <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Actual Finish</label>
                 <div class="mt-1">
                   <div v-if="!isEditing">
-                    <p class="text-sm text-gray-900 dark:text-white">{{ formatDate(task.estimated_finish) }}</p>
+                    <p class="text-sm text-gray-900 dark:text-white">{{ formatDate(task.actual_finish) }}</p>
                   </div>
-                  <input v-else v-model="form.estimated_finish" type="date" :min="form.estimated_start" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                  <input v-else v-model="form.actual_finish" type="date" :min="form.actual_start" class="w-full border border-gray-300 rounded-md px-3 py-2">
                 </div>
               </div>
             </div>
@@ -395,6 +726,193 @@ const cancelEditing = () => {
 
       <!-- Sidebar -->
       <div class="space-y-6">
+        <!-- Time Tracking -->
+        <Card>
+          <CardHeader>
+            <CardTitle class="flex items-center">
+              <Icon name="clock" class="h-5 w-5 mr-2" />
+              Time Tracking
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Estimated</span>
+                <span class="text-sm text-gray-900 dark:text-white">
+                  {{ task.estimated_hours }}h {{ task.estimated_minutes || 0 }}m
+                </span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Actual</span>
+                <span class="text-sm text-gray-900 dark:text-white">
+                  {{ task.actual_hours || 0 }}h {{ task.actual_minutes || 0 }}m
+                </span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Time</span>
+                                 <span class="text-sm text-gray-900 dark:text-white">
+                   {{ formatTime(task.total_time_seconds || null) }}
+                 </span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Status</span>
+                <span
+                  :class="{
+                    'text-green-600': task.is_working,
+                    'text-gray-600': !task.is_working
+                  }"
+                  class="text-sm font-medium"
+                >
+                  {{ task.is_working ? 'Working' : 'Not Working' }}
+                </span>
+              </div>
+              <div v-if="task.work_started_at" class="flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Started At</span>
+                <span class="text-sm text-gray-900 dark:text-white">
+                  {{ formatDateTime(task.work_started_at || null) }}
+                </span>
+              </div>
+              <div v-if="task.work_paused_at" class="flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Paused At</span>
+                <span class="text-sm text-gray-900 dark:text-white">
+                  {{ formatDateTime(task.work_paused_at || null) }}
+                </span>
+              </div>
+              <div v-if="task.work_finished_at" class="flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Finished At</span>
+                <span class="text-sm text-gray-900 dark:text-white">
+                  {{ formatDateTime(task.work_finished_at || null) }}
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <!-- Action Buttons -->
+        <Card>
+          <CardHeader>
+            <CardTitle class="flex items-center">
+              <Icon name="play" class="h-5 w-5 mr-2" />
+              Actions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div class="space-y-3">
+              <!-- Start Work Button -->
+              <Button
+                v-if="task.user_id && (task.status === 'to do' || (task.status === 'in progress' && !task.is_working && task.total_time_seconds === 0)) && !task.is_working"
+                @click="handleStartWork"
+                class="w-full bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Icon name="play" class="w-4 h-4 mr-2" />
+                Start Work
+              </Button>
+
+              <!-- Pause Work Button -->
+              <Button
+                v-if="task.is_working"
+                @click="handlePauseWork"
+                class="w-full bg-yellow-600 hover:bg-yellow-700 text-white"
+              >
+                <Icon name="pause" class="w-4 h-4 mr-2" />
+                Pause Work
+              </Button>
+
+              <!-- Resume Work Button -->
+              <Button
+                v-if="task.status === 'in progress' && !task.is_working && task.total_time_seconds && task.total_time_seconds > 0"
+                @click="handleResumeWork"
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Icon name="play" class="w-4 h-4 mr-2" />
+                Resume Work
+              </Button>
+
+              <!-- Finish Work Button -->
+              <Button
+                v-if="task.status === 'in progress' && task.is_working"
+                @click="handleFinishWork"
+                class="w-full bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Icon name="check" class="w-4 h-4 mr-2" />
+                Finish Work
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <!-- Assignment Info -->
+        <Card>
+          <CardHeader>
+            <CardTitle class="flex items-center">
+              <Icon name="user" class="h-5 w-5 mr-2" />
+              Assignment
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div class="space-y-3">
+              <div>
+                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Assigned To</span>
+                <p class="text-sm text-gray-900 dark:text-white mt-1">
+                  {{ task.user?.name || 'Unassigned' }}
+                </p>
+              </div>
+              <div v-if="task.assigned_by_user">
+                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Assigned By</span>
+                <p class="text-sm text-gray-900 dark:text-white mt-1">
+                  {{ task.assigned_by_user.name }}
+                </p>
+              </div>
+                             <div v-if="task.assigned_at">
+                 <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Assigned Date</span>
+                 <p class="text-sm text-gray-900 dark:text-white mt-1">
+                   {{ formatDateTime(task.assigned_at || null) }}
+                 </p>
+               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <!-- Approval Status -->
+        <Card v-if="task.approval_status">
+          <CardHeader>
+            <CardTitle class="flex items-center">
+              <Icon name="shield" class="h-5 w-5 mr-2" />
+              Approval Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div class="space-y-3">
+              <div>
+                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Status</span>
+                <div class="mt-1">
+                  <span :class="`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getApprovalStatusColor(task.approval_status)}`">
+                    {{ task.approval_status }}
+                  </span>
+                </div>
+              </div>
+              <div v-if="task.rejection_reason">
+                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Rejection Reason</span>
+                <p class="text-sm text-gray-900 dark:text-white mt-1">
+                  {{ task.rejection_reason }}
+                </p>
+              </div>
+              <div v-if="task.reviewed_by_user">
+                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Reviewed By</span>
+                <p class="text-sm text-gray-900 dark:text-white mt-1">
+                  {{ task.reviewed_by_user.name }}
+                </p>
+              </div>
+                             <div v-if="task.reviewed_at">
+                 <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Reviewed At</span>
+                 <p class="text-sm text-gray-900 dark:text-white mt-1">
+                   {{ formatDateTime(task.reviewed_at || null) }}
+                 </p>
+               </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <!-- Project & Sprint Info -->
         <Card>
           <CardHeader>

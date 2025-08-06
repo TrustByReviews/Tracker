@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\Sprint;
 use App\Services\TaskAssignmentService;
 use App\Services\TaskTimeTrackingService;
+use App\Services\DeveloperActivityTrackingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,69 +22,139 @@ class TaskController extends Controller
 {
     public function __construct(
         private TaskAssignmentService $taskAssignmentService,
-        private TaskTimeTrackingService $taskTimeTrackingService
+        private TaskTimeTrackingService $taskTimeTrackingService,
+        private DeveloperActivityTrackingService $activityTrackingService
     ) {
     }
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
         $authUser = Auth::user();
         
         if (!$authUser) {
-            abort(401, 'Unauthorized');
+            return redirect()->route('login');
         }
-
-        // TEMPORARILY DISABLED - Login as User functionality
-        // Verificar si está en sesión de impersonación
-        // $adminOriginalUserId = session('admin_original_user_id');
-        // $isImpersonating = !empty($adminOriginalUserId);
         
-        // Determinar el usuario efectivo (el que está siendo impersonado o el actual)
-        $effectiveUser = $authUser;
-        
-        // Obtener el rol del usuario efectivo
-        $role = $effectiveUser->roles;
+        $role = $authUser->roles;
         $permissions = 'developer'; // Default permission
 
-        if ($role->count() > 0) {
+        if ($role && $role->count() > 0) {
             $permissions = $role->first()->name;
         }
 
-        $tasks = [];
+        $tasksQuery = null;
         $projects = [];
         $sprints = [];
 
         if ($permissions === 'admin') {
             // Admin ve todo
-            $tasks = Task::with(['user', 'sprint', 'project'])->orderBy('created_at', 'desc')->get();
+            $tasksQuery = Task::with(['user', 'sprint', 'project']);
             $projects = Project::orderBy('name')->get();
             $sprints = Sprint::with('project')->orderBy('start_date', 'desc')->get();
         } elseif ($permissions === 'team_leader') {
             // Team leader ve tareas de sus proyectos
-            $tasks = Task::whereHas('sprint.project.users', function ($query) use ($effectiveUser) {
-                $query->where('users.id', $effectiveUser->id);
-            })->with(['user', 'sprint', 'project'])->orderBy('created_at', 'desc')->get();
-            $projects = $effectiveUser->projects()->orderBy('name')->get();
-            $sprints = Sprint::whereHas('project.users', function ($query) use ($effectiveUser) {
-                $query->where('users.id', $effectiveUser->id);
+            $tasksQuery = Task::whereHas('sprint.project.users', function ($query) use ($authUser) {
+                $query->where('users.id', $authUser->id);
+            })->with(['user', 'sprint', 'project']);
+            $projects = $authUser->projects()->orderBy('name')->get();
+            $sprints = Sprint::whereHas('project.users', function ($query) use ($authUser) {
+                $query->where('users.id', $authUser->id);
             })->with('project')->orderBy('start_date', 'desc')->get();
         } elseif ($permissions === 'developer') {
             // Developer ve solo sus tareas asignadas
-            $tasks = Task::where('user_id', $effectiveUser->id)
-                ->with(['user', 'sprint', 'project'])
-                ->orderBy('created_at', 'desc')
-                ->get();
-            $projects = $effectiveUser->projects()->orderBy('name')->get();
-            $sprints = Sprint::whereHas('project.users', function ($query) use ($effectiveUser) {
-                $query->where('users.id', $effectiveUser->id);
+            $tasksQuery = Task::where('user_id', $authUser->id)
+                ->with(['user', 'sprint', 'project']);
+            $projects = $authUser->projects()->orderBy('name')->get();
+            $sprints = Sprint::whereHas('project.users', function ($query) use ($authUser) {
+                $query->where('users.id', $authUser->id);
             })->with('project')->orderBy('start_date', 'desc')->get();
         }
 
+        // Aplicar filtros
+        $filters = $request->only(['project_id', 'sprint_id', 'status', 'priority', 'assigned_user_id', 'sort_by', 'sort_order']);
 
+        // Filtro por proyecto
+        if (!empty($filters['project_id'])) {
+            $tasksQuery->whereHas('sprint.project', function ($query) use ($filters) {
+                $query->where('id', $filters['project_id']);
+            });
+        }
+
+        // Filtro por sprint
+        if (!empty($filters['sprint_id'])) {
+            $tasksQuery->where('sprint_id', $filters['sprint_id']);
+        }
+
+        // Filtro por estado
+        if (!empty($filters['status'])) {
+            $tasksQuery->where('status', $filters['status']);
+        }
+
+        // Filtro por prioridad
+        if (!empty($filters['priority'])) {
+            $tasksQuery->where('priority', $filters['priority']);
+        }
+
+        // Filtro por usuario asignado
+        if (!empty($filters['assigned_user_id'])) {
+            if ($filters['assigned_user_id'] === 'unassigned') {
+                $tasksQuery->whereNull('user_id');
+            } else {
+                $tasksQuery->where('user_id', $filters['assigned_user_id']);
+            }
+        }
+
+        $tasks = $tasksQuery->get();
+
+        // Aplicar ordenamiento personalizado
+        if (!empty($filters['sort_by'])) {
+            $tasks = $tasks->sortBy(function ($task) use ($filters) {
+                switch ($filters['sort_by']) {
+                    case 'priority':
+                        $priorityOrder = ['high' => 3, 'medium' => 2, 'low' => 1];
+                        return $priorityOrder[$task->priority] ?? 0;
+                    case 'status':
+                        $statusOrder = ['to do' => 1, 'in progress' => 2, 'done' => 3];
+                        return $statusOrder[$task->status] ?? 0;
+                    case 'story_points':
+                        return $task->story_points;
+                    case 'estimated_hours':
+                        return $task->estimated_hours;
+                    case 'actual_hours':
+                        return $task->actual_hours ?? 0;
+                    case 'completion_percentage':
+                        return $task->actual_hours && $task->estimated_hours 
+                            ? ($task->actual_hours / $task->estimated_hours) * 100 
+                            : 0;
+                    case 'due_date':
+                        return $task->estimated_finish ?? '9999-12-31';
+                    case 'assigned_user':
+                        return $task->user ? $task->user->name : '';
+                    case 'project':
+                        return $task->sprint && $task->sprint->project ? $task->sprint->project->name : '';
+                    case 'sprint':
+                        return $task->sprint ? $task->sprint->name : '';
+                    case 'recent':
+                        return $task->created_at;
+                    default:
+                        return $task->created_at;
+                }
+            });
+
+            // Aplicar orden
+            if ($filters['sort_order'] === 'desc') {
+                $tasks = $tasks->reverse();
+            }
+        }
+
+        // Agregar información de sesiones pausadas a las tareas
+        $tasks->each(function ($task) {
+            $task->has_paused_sessions = $task->hasPausedSessions();
+        });
 
         // Obtener desarrolladores para el modal de creación de tareas
         $developers = User::with('roles')->whereHas('roles', function ($query) {
-            $query->whereIn('value', ['developer', 'team_leader']);
+            $query->whereIn('name', ['developer', 'team_leader']);
         })->orderBy('name')->get();
 
         return Inertia::render('Task/Index', [
@@ -92,16 +163,22 @@ class TaskController extends Controller
             'projects' => $projects,
             'sprints' => $sprints,
             'developers' => $developers,
+            'filters' => $filters,
         ]);
     }
 
     public function show($id): Response
     {
-        $authUser = User::find(Auth::id());
+        $authUser = Auth::user();
+        
+        if (!$authUser) {
+            return redirect()->route('login');
+        }
+        
         $role = $authUser->roles;
         $permissions = 'developer'; // Default permission
 
-        if ($role->count() > 0) {
+        if ($role && $role->count() > 0) {
             $permissions = $role->first()->name;
         }
 
@@ -110,8 +187,14 @@ class TaskController extends Controller
         // Verificar permisos
         if ($permissions === 'developer') {
             // Verificar que el usuario tenga acceso a la tarea
-            $hasAccess = $task->sprint && $task->sprint->project && 
-                        $task->sprint->project->users()->where('users.id', $authUser->id)->exists();
+            // El usuario puede ver la tarea si:
+            // 1. Está asignado a la tarea específica, O
+            // 2. Está asignado al proyecto de la tarea
+            $isAssignedToTask = $task->user_id === $authUser->id;
+            $isAssignedToProject = $task->sprint && $task->sprint->project && 
+                                 $task->sprint->project->users()->where('users.id', $authUser->id)->exists();
+            
+            $hasAccess = $isAssignedToTask || $isAssignedToProject;
             
             if (!$hasAccess) {
                 abort(403, 'Access denied');
@@ -429,6 +512,9 @@ class TaskController extends Controller
 
             $this->taskTimeTrackingService->startWork($task, $user);
 
+            // Log activity for tracking
+            $this->activityTrackingService->logActivity($user, 'task_start', $task);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Trabajo iniciado correctamente',
@@ -459,6 +545,9 @@ class TaskController extends Controller
             $user = Auth::user();
 
             $this->taskTimeTrackingService->pauseWork($task, $user);
+
+            // Log activity for tracking
+            $this->activityTrackingService->logActivity($user, 'task_pause', $task);
 
             return response()->json([
                 'success' => true,
@@ -491,6 +580,9 @@ class TaskController extends Controller
 
             $this->taskTimeTrackingService->resumeWork($task, $user);
 
+            // Log activity for tracking
+            $this->activityTrackingService->logActivity($user, 'task_resume', $task);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Trabajo reanudado correctamente',
@@ -521,6 +613,9 @@ class TaskController extends Controller
             $user = Auth::user();
 
             $this->taskTimeTrackingService->finishWork($task, $user);
+
+            // Log activity for tracking
+            $this->activityTrackingService->logActivity($user, 'task_finish', $task);
 
             return response()->json([
                 'success' => true,
@@ -649,5 +744,117 @@ class TaskController extends Controller
                 'message' => 'Error al obtener tareas pausadas'
             ], 500);
         }
+    }
+
+    /**
+     * Reanudar tarea auto-pausada
+     */
+    public function resumeAutoPausedTask(Request $request, $taskId): JsonResponse
+    {
+        try {
+            $task = Task::findOrFail($taskId);
+            $user = Auth::user();
+
+            $this->taskTimeTrackingService->resumeAutoPausedTask($task, $user);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Tarea auto-pausada reanudada correctamente',
+                'task' => $task->fresh(['user', 'sprint', 'project'])
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al reanudar tarea auto-pausada', [
+                'error' => $e->getMessage(),
+                'task_id' => $taskId,
+                'user_id' => Auth::id()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Obtener tareas auto-pausadas del usuario
+     */
+    public function getAutoPausedTasks(): JsonResponse
+    {
+        try {
+            $user = Auth::user();
+            $autoPausedTasks = $this->taskTimeTrackingService->getAutoPausedTasksForUser($user);
+
+            return response()->json([
+                'success' => true,
+                'auto_paused_tasks' => $autoPausedTasks
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener tareas auto-pausadas', [
+                'error' => $e->getMessage(),
+                'user_id' => Auth::id()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener tareas auto-pausadas'
+            ], 500);
+        }
+    }
+
+    /**
+     * Buscar tareas por nombre, sprint o proyecto
+     */
+    public function search(Request $request): JsonResponse
+    {
+        $authUser = Auth::user();
+        
+        if (!$authUser) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+        
+        $query = $request->get('q', '');
+        
+        if (strlen($query) < 2) {
+            return response()->json([]);
+        }
+        
+        $role = $authUser->roles;
+        $permissions = 'developer'; // Default permission
+
+        if ($role && $role->count() > 0) {
+            $permissions = $role->first()->name;
+        }
+
+        $tasksQuery = null;
+
+        if ($permissions === 'admin') {
+            // Admin puede buscar en todas las tareas
+            $tasksQuery = Task::with(['user', 'sprint', 'project']);
+        } elseif ($permissions === 'team_leader') {
+            // Team leader busca en tareas de sus proyectos
+            $tasksQuery = Task::whereHas('sprint.project.users', function ($query) use ($authUser) {
+                $query->where('users.id', $authUser->id);
+            })->with(['user', 'sprint', 'project']);
+        } elseif ($permissions === 'developer') {
+            // Developer busca en sus tareas asignadas
+            $tasksQuery = Task::where('user_id', $authUser->id)
+                ->with(['user', 'sprint', 'project']);
+        }
+
+        $tasks = $tasksQuery->where(function ($q) use ($query) {
+            $q->where('name', 'ilike', "%{$query}%")
+              ->orWhere('description', 'ilike', "%{$query}%")
+              ->orWhereHas('sprint', function ($sprintQuery) use ($query) {
+                  $sprintQuery->where('name', 'ilike', "%{$query}%");
+              });
+        })
+        ->orderBy('name')
+        ->limit(10)
+        ->get(['id', 'name', 'description', 'status', 'priority', 'sprint_id', 'project_id']);
+
+        return response()->json($tasks);
     }
 }

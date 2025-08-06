@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ReportController;
@@ -81,6 +82,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('tasks/{task}/time-logs', [TaskController::class, 'getTaskTimeLogs'])->name('tasks.time-logs');
     Route::get('tasks/active', [TaskController::class, 'getActiveTasks'])->name('tasks.active');
     Route::get('tasks/paused', [TaskController::class, 'getPausedTasks'])->name('tasks.paused');
+    Route::get('tasks/auto-paused', [TaskController::class, 'getAutoPausedTasks'])->name('tasks.auto-paused');
+    Route::post('tasks/{task}/resume-auto-paused', [TaskController::class, 'resumeAutoPausedTask'])->name('tasks.resume-auto-paused');
 
     // Team Leader routes with permissions
     Route::prefix('team-leader')->name('team-leader.')->middleware('permission:team-leader.dashboard')->group(function () {
@@ -105,7 +108,11 @@ Route::middleware(['auth'])->group(function () {
 
     // Admin routes with permissions
     Route::prefix('admin')->name('admin.')->middleware('permission:admin.dashboard')->group(function () {
-        Route::get('dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
+        // Redirect admin dashboard to main dashboard
+        Route::get('dashboard', function () {
+            return redirect('/dashboard');
+        })->name('dashboard');
+        
         Route::get('in-progress-tasks', [AdminController::class, 'inProgressTasks'])->name('in-progress-tasks');
         Route::get('developer-metrics', [AdminController::class, 'developerMetrics'])->name('developer-metrics');
         Route::get('project-metrics', [AdminController::class, 'projectMetrics'])->name('project-metrics');
@@ -130,7 +137,11 @@ Route::middleware(['auth'])->group(function () {
         Route::get('tasks/requiring-attention', [AdminController::class, 'getTasksRequiringAttention'])->name('tasks.requiring-attention');
         Route::get('projects/active-summary', [AdminController::class, 'getActiveProjectsSummary'])->name('projects.active-summary');
         Route::get('developers/active-summary', [AdminController::class, 'getActiveDevelopersSummary'])->name('developers.active-summary');
+        
+
     });
+
+
 
     // Reports routes with permissions
     Route::middleware('permission:reports.view')->group(function () {
@@ -143,32 +154,48 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/reports/generate', [ReportController::class, 'generate'])->name('reports.generate');
     });
 
-    // Payment routes
-    Route::prefix('payments')->name('payments.')->group(function () {
-        // Dashboard para usuarios normales
-        Route::get('dashboard', [PaymentController::class, 'dashboard'])->name('dashboard');
-        
-        // Rutas para admins
-        Route::middleware('permission:payment-reports.view')->group(function () {
-            Route::get('admin', [PaymentController::class, 'adminDashboard'])->name('admin');
-            Route::get('reports', [PaymentController::class, 'index'])->name('reports');
-            Route::get('reports/{paymentReport}', [PaymentController::class, 'show'])->name('reports.show');
-            Route::get('export', [PaymentController::class, 'export'])->name('export');
-        });
-        
-        Route::middleware('permission:payment-reports.generate')->group(function () {
-            Route::post('generate', [PaymentController::class, 'generate'])->name('generate');
-        });
-        
-        Route::middleware('permission:payment-reports.approve')->group(function () {
-            Route::post('reports/{paymentReport}/approve', [PaymentController::class, 'approve'])->name('reports.approve');
-            Route::post('reports/{paymentReport}/mark-paid', [PaymentController::class, 'markAsPaid'])->name('reports.mark-paid');
-        });
+    // Payment routes (unified)
+Route::prefix('payments')->name('payments.')->group(function () {
+    // Dashboard unificado (redirige a /payments)
+    Route::get('/', [PaymentController::class, 'adminDashboard'])->name('dashboard');
+    
+    // Dashboard para usuarios normales (redirige a /payments)
+    Route::get('dashboard', function () {
+        return redirect('/payments');
+    })->name('user-dashboard');
+    
+    // Rutas para admins
+    Route::middleware('permission:payment-reports.view')->group(function () {
+        Route::get('admin', function () {
+            return redirect('/payments');
+        })->name('admin');
+        Route::get('reports', [PaymentController::class, 'index'])->name('reports');
+        Route::get('reports/{paymentReport}', [PaymentController::class, 'show'])->name('reports.show');
+        Route::get('export', [PaymentController::class, 'export'])->name('export');
     });
+    
+    Route::middleware('permission:payment-reports.generate')->group(function () {
+        Route::post('generate', [PaymentController::class, 'generate'])->name('generate');
+        Route::post('generate-detailed', [PaymentController::class, 'generateDetailedReport'])->name('generate-detailed');
+    });
+    
+    Route::middleware('permission:payment-reports.approve')->group(function () {
+        Route::post('reports/{paymentReport}/approve', [PaymentController::class, 'approve'])->name('reports.approve');
+        Route::post('reports/{paymentReport}/mark-paid', [PaymentController::class, 'markAsPaid'])->name('reports.mark-paid');
+    });
+});
 
-    // Payment Reports routes (legacy)
-    Route::get('/payment-reports', [App\Http\Controllers\PaymentReportController::class, 'index'])->name('payment-reports.index');
-    Route::post('/payment-reports/generate', [App\Http\Controllers\PaymentReportController::class, 'generate'])->name('payment-reports.generate');
+
+
+// Payment Reports routes (legacy - redirigen a /payments)
+Route::get('/payment-reports', function () {
+    return redirect('/payments');
+})->name('payment-reports.index');
+Route::post('/payment-reports/generate', function () {
+    return redirect('/payments');
+})->name('payment-reports.generate');
+
+
 
     // Developer Canvas routes
     Route::get('/developer/canvas', [App\Http\Controllers\DeveloperCanvasController::class, 'index'])->name('developer.canvas');
@@ -214,6 +241,71 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/expired', [App\Http\Controllers\PermissionController::class, 'getExpiredPermissions'])->name('expired');
         Route::delete('/expired', [App\Http\Controllers\PermissionController::class, 'cleanupExpiredPermissions'])->name('cleanup');
     });
+
+    // Simultaneous Tasks Permissions routes (Admin only)
+    Route::prefix('admin/simultaneous-tasks')->name('admin.simultaneous-tasks.')->middleware('permission:admin.permissions')->group(function () {
+        Route::get('/', [PermissionController::class, 'index'])->name('index');
+        Route::post('/grant', [PermissionController::class, 'grantPermission'])->name('grant');
+        Route::post('/revoke', [PermissionController::class, 'revokePermission'])->name('revoke');
+        Route::post('/grant-team', [PermissionController::class, 'grantPermissionToTeam'])->name('grant-team');
+        Route::post('/revoke-team', [PermissionController::class, 'revokePermissionFromTeam'])->name('revoke-team');
+        Route::get('/user/{userId}/history', [PermissionController::class, 'getUserPermissionHistory'])->name('user-history');
+    });
+
+    // Bugs routes with permissions
+    Route::middleware('permission:bugs.view')->group(function () {
+        Route::get('bugs', [App\Http\Controllers\BugController::class, 'index'])->name('bugs.index');
+        Route::get('bugs/{bug}', [App\Http\Controllers\BugController::class, 'show'])->name('bugs.show');
+        Route::get('bugs/available', [App\Http\Controllers\BugController::class, 'getAvailableBugs'])->name('bugs.available');
+        Route::get('bugs/my-bugs', [App\Http\Controllers\BugController::class, 'getAssignedBugs'])->name('bugs.my-bugs');
+    });
+    
+    Route::middleware('permission:bugs.create')->group(function () {
+        Route::post('bugs', [App\Http\Controllers\BugController::class, 'store'])->name('bugs.store');
+    });
+    
+    Route::middleware('permission:bugs.edit')->group(function () {
+        Route::put('bugs/{bug}', [App\Http\Controllers\BugController::class, 'update'])->name('bugs.update');
+    });
+    
+    Route::middleware('permission:bugs.delete')->group(function () {
+        Route::delete('bugs/{bug}', [App\Http\Controllers\BugController::class, 'destroy'])->name('bugs.destroy');
+    });
+    
+    // Bug assignment routes
+    Route::middleware('permission:bugs.assign')->group(function () {
+        Route::post('bugs/{bug}/assign', [App\Http\Controllers\BugController::class, 'assignBug'])->name('bugs.assign');
+        Route::post('bugs/{bug}/self-assign', [App\Http\Controllers\BugController::class, 'selfAssignBug'])->name('bugs.self-assign');
+    });
+    
+    // Bug time tracking routes (available to all authenticated users)
+    Route::post('bugs/{bug}/start-work', [App\Http\Controllers\BugController::class, 'startWork'])->name('bugs.start-work');
+    Route::post('bugs/{bug}/pause-work', [App\Http\Controllers\BugController::class, 'pauseWork'])->name('bugs.pause-work');
+    Route::post('bugs/{bug}/resume-work', [App\Http\Controllers\BugController::class, 'resumeWork'])->name('bugs.resume-work');
+    Route::post('bugs/{bug}/finish-work', [App\Http\Controllers\BugController::class, 'finishWork'])->name('bugs.finish-work');
+    Route::get('bugs/{bug}/current-time', [App\Http\Controllers\BugController::class, 'getCurrentWorkTime'])->name('bugs.current-time');
+    Route::get('bugs/{bug}/time-logs', [App\Http\Controllers\BugController::class, 'getBugTimeLogs'])->name('bugs.time-logs');
+    Route::get('bugs/active', [App\Http\Controllers\BugController::class, 'getActiveBugs'])->name('bugs.active');
+    Route::get('bugs/paused', [App\Http\Controllers\BugController::class, 'getPausedBugs'])->name('bugs.paused');
+    
+    // Bug resolution routes
+    Route::middleware('permission:bugs.resolve')->group(function () {
+        Route::post('bugs/{bug}/resolve', [App\Http\Controllers\BugController::class, 'resolveBug'])->name('bugs.resolve');
+        Route::post('bugs/{bug}/verify', [App\Http\Controllers\BugController::class, 'verifyBug'])->name('bugs.verify');
+        Route::post('bugs/{bug}/close', [App\Http\Controllers\BugController::class, 'closeBug'])->name('bugs.close');
+        Route::post('bugs/{bug}/reopen', [App\Http\Controllers\BugController::class, 'reopenBug'])->name('bugs.reopen');
+    });
+    
+    // Bug comments routes
+    Route::middleware('permission:bugs.comment')->group(function () {
+        Route::post('bugs/{bug}/comments', [App\Http\Controllers\BugController::class, 'addComment'])->name('bugs.add-comment');
+    });
+
+    // Developer Activity Dashboard (dentro del grupo auth)
+    Route::get('developer-activity', [App\Http\Controllers\Admin\DeveloperActivityController::class, 'index'])->name('developer-activity');
+    Route::get('developer-activity/data', [App\Http\Controllers\Admin\DeveloperActivityController::class, 'getDeveloperActivity'])->name('developer-activity.data');
+    Route::get('developer-activity/team', [App\Http\Controllers\Admin\DeveloperActivityController::class, 'getTeamActivity'])->name('developer-activity.team');
+    Route::post('developer-activity/export', [App\Http\Controllers\Admin\DeveloperActivityController::class, 'exportReport'])->name('developer-activity.export');
 });
 
 require __DIR__.'/settings.php';

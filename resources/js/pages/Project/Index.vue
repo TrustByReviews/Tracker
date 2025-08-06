@@ -7,8 +7,11 @@ import ProjectCreateModal from '@/components/CreateProjectModal.vue'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
 import Badge from '@/components/ui/badge/Badge.vue'
 import Icon from '@/components/Icon.vue'
+import { ref, computed } from 'vue'
 // import { useToast } from '@/composables/useToast'
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -26,11 +29,50 @@ const props = defineProps<{
     total: number,
     active: number,
     completed: number,
-    paused: number
-  }
+    paused: number,
+    cancelled: number
+  },
+  filters?: any
 }>()
 
+// Estado reactivo para filtros
+const filters = ref({
+    status: props.filters?.status || '',
+    assigned_user_id: props.filters?.assigned_user_id || '',
+    sort_by: props.filters?.sort_by || 'created_at',
+    sort_order: props.filters?.sort_order || 'desc',
+    search: props.filters?.search || ''
+})
+
 // const { success } = useToast()
+
+// Funciones de filtrado
+const applyFilters = () => {
+    router.get('/projects', filters.value, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true
+    })
+}
+
+const clearFilters = () => {
+    filters.value = {
+        status: '',
+        assigned_user_id: '',
+        sort_by: 'created_at',
+        sort_order: 'desc',
+        search: ''
+    }
+    applyFilters()
+}
+
+const hasActiveFilters = computed(() => {
+    return filters.value.status || 
+           filters.value.assigned_user_id || 
+           filters.value.search ||
+           filters.value.sort_by !== 'created_at' ||
+           filters.value.sort_order !== 'desc'
+})
 
 const getStatusClass = (status: string) => {
   switch (status) {
@@ -104,6 +146,39 @@ const getProjectStats = (project: Project) => {
   
   return { tasks, completed, inProgress, pending }
 }
+
+// Funciones helper adicionales
+const getProjectStatus = (status: string) => {
+  switch (status) {
+    case 'active':
+      return { label: 'Active', color: 'bg-green-100 text-green-800' }
+    case 'completed':
+      return { label: 'Completed', color: 'bg-blue-100 text-blue-800' }
+    case 'paused':
+      return { label: 'Paused', color: 'bg-yellow-100 text-yellow-800' }
+    case 'cancelled':
+      return { label: 'Cancelled', color: 'bg-red-100 text-red-800' }
+    case 'inactive':
+      return { label: 'Inactive', color: 'bg-gray-100 text-gray-800' }
+    default:
+      return { label: status, color: 'bg-gray-100 text-gray-800' }
+  }
+}
+
+const getBorderColor = (project: Project) => {
+  switch (project.status) {
+    case 'active':
+      return 'border-green-500'
+    case 'completed':
+      return 'border-blue-500'
+    case 'paused':
+      return 'border-yellow-500'
+    case 'cancelled':
+      return 'border-red-500'
+    default:
+      return 'border-gray-300'
+  }
+}
 </script>
 
 <template>
@@ -122,6 +197,109 @@ const getProjectStats = (project: Project) => {
         
         <div class="flex items-center gap-2" v-if="props.permissions === 'admin'">
           <ProjectCreateModal :developers="props.developers" />
+        </div>
+      </div>
+
+      <!-- Filtros Avanzados -->
+      <div class="p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-medium text-gray-900 dark:text-white">Filtros Avanzados</h3>
+          <Button 
+            v-if="hasActiveFilters" 
+            @click="clearFilters" 
+            variant="outline" 
+            size="sm"
+          >
+            <Icon name="x" class="h-4 w-4 mr-2" />
+            Limpiar Filtros
+          </Button>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <!-- Filtro por Estado -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Estado</label>
+            <Select v-model="filters.status" @update:model-value="applyFilters">
+              <SelectTrigger>
+                <SelectValue placeholder="Todos los estados" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todos los estados</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="paused">Paused</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <!-- Filtro por Usuario Asignado -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Usuario Asignado</label>
+            <Select v-model="filters.assigned_user_id" @update:model-value="applyFilters">
+              <SelectTrigger>
+                <SelectValue placeholder="Todos los usuarios" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todos los usuarios</SelectItem>
+                <SelectItem 
+                  v-for="developer in developers" 
+                  :key="developer.id" 
+                  :value="developer.id"
+                >
+                  {{ developer.name }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <!-- Búsqueda por Nombre -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Buscar Proyecto</label>
+            <Input 
+              v-model="filters.search" 
+              placeholder="Buscar por nombre..."
+              @input="applyFilters"
+            />
+          </div>
+
+          <!-- Ordenar por -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Ordenar por</label>
+            <Select v-model="filters.sort_by" @update:model-value="applyFilters">
+              <SelectTrigger>
+                <SelectValue placeholder="Ordenar por" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="created_at">Fecha de creación</SelectItem>
+                <SelectItem value="name">Nombre</SelectItem>
+                <SelectItem value="status">Estado</SelectItem>
+                <SelectItem value="completion_rate">Porcentaje completado</SelectItem>
+                <SelectItem value="total_tasks">Total de tareas</SelectItem>
+                <SelectItem value="completed_tasks">Tareas completadas</SelectItem>
+                <SelectItem value="team_members">Miembros del equipo</SelectItem>
+                <SelectItem value="sprints_count">Número de sprints</SelectItem>
+                <SelectItem value="updated_at">Última actualización</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <!-- Orden -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Orden</label>
+            <Select v-model="filters.sort_order" @update:model-value="applyFilters">
+              <SelectTrigger>
+                <SelectValue placeholder="Orden" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="asc">Ascendente</SelectItem>
+                <SelectItem value="desc">Descendente</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
@@ -164,6 +342,16 @@ const getProjectStats = (project: Project) => {
           </CardHeader>
           <CardContent>
             <div class="text-2xl font-bold text-yellow-600">{{ props.stats.paused }}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle class="text-sm font-medium">Cancelled</CardTitle>
+            <Icon name="x" class="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div class="text-2xl font-bold text-red-600">{{ props.stats.cancelled }}</div>
           </CardContent>
         </Card>
       </div>
@@ -258,12 +446,28 @@ const getProjectStats = (project: Project) => {
         <template v-else>
           <div class="col-span-full text-center py-12">
             <Icon name="folder" class="mx-auto h-12 w-12 text-muted-foreground" />
-            <h3 class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">No projects</h3>
+            <h3 class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
+              {{ hasActiveFilters ? 'No projects found with current filters' : 'No projects' }}
+            </h3>
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Get started by creating a new project.
+              {{ hasActiveFilters 
+                ? 'Try adjusting your filters or clear them to see all projects.' 
+                : 'Get started by creating a new project.' 
+              }}
             </p>
-            <div class="mt-6" v-if="props.permissions === 'admin'">
-              <ProjectCreateModal :developers="props.developers" />
+            <div class="mt-6 flex justify-center gap-4">
+              <Button 
+                v-if="hasActiveFilters" 
+                @click="clearFilters" 
+                variant="outline"
+              >
+                <Icon name="x" class="h-4 w-4 mr-2" />
+                Limpiar Filtros
+              </Button>
+              <ProjectCreateModal 
+                v-if="props.permissions === 'admin'" 
+                :developers="props.developers" 
+              />
             </div>
           </div>
         </template>

@@ -15,13 +15,18 @@ use Inertia\Response;
 
 class SprintController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
-        $authUser = User::find(Auth::id());
+        $authUser = Auth::user();
+        
+        if (!$authUser) {
+            return redirect()->route('login');
+        }
+        
         $role = $authUser->roles;
         $permissions = 'developer'; // Default permission
 
-        if ($role->count() > 0) {
+        if ($role && $role->count() > 0) {
             $permissions = $role->first()->name;
         }
 
@@ -29,23 +34,99 @@ class SprintController extends Controller
         $projects = [];
 
         if ($permissions === 'admin') {
-            $sprints = Sprint::with(['tasks', 'project'])->get();
+            $sprintsQuery = Sprint::with(['tasks', 'bugs', 'project']);
             $projects = Project::all();
         } elseif ($permissions === 'developer') {
-            $sprints = Sprint::whereHas('project.users', function ($query) use ($authUser) {
+            $sprintsQuery = Sprint::whereHas('project.users', function ($query) use ($authUser) {
                 $query->where('users.id', $authUser->id);
-            })->with(['tasks', 'project'])->get();
+            })->with(['tasks', 'bugs', 'project']);
             $projects = $authUser->projects;
         }
-        
 
+        // Aplicar filtros
+        $filters = $request->only(['project_id', 'sort_by', 'sort_order', 'status', 'item_type']);
 
+        // Filtro por proyecto
+        if (!empty($filters['project_id'])) {
+            $sprintsQuery->where('project_id', $filters['project_id']);
+        }
 
+        // Filtro por tipo de elemento
+        if (!empty($filters['item_type']) && $filters['item_type'] !== 'all') {
+            if ($filters['item_type'] === 'tasks') {
+                $sprintsQuery->whereHas('tasks');
+            } elseif ($filters['item_type'] === 'bugs') {
+                $sprintsQuery->whereHas('bugs');
+            }
+        }
+
+        // Filtro por estado
+        if (!empty($filters['status'])) {
+            $today = now();
+            switch ($filters['status']) {
+                case 'active':
+                    $sprintsQuery->where('start_date', '<=', $today)
+                                ->where('end_date', '>=', $today);
+                    break;
+                case 'upcoming':
+                    $sprintsQuery->where('start_date', '>', $today);
+                    break;
+                case 'completed':
+                    $sprintsQuery->where('end_date', '<', $today);
+                    break;
+            }
+        }
+
+        $sprints = $sprintsQuery->get();
+
+        // Aplicar ordenamiento personalizado
+        if (!empty($filters['sort_by'])) {
+            $sprints = $sprints->sortBy(function ($sprint) use ($filters) {
+                switch ($filters['sort_by']) {
+                    case 'task_count':
+                        return $sprint->tasks->count() + $sprint->bugs->count();
+                    case 'completed_tasks':
+                        $completedTasks = $sprint->tasks->where('status', 'done')->count();
+                        $completedBugs = $sprint->bugs->whereIn('status', ['resolved', 'verified', 'closed'])->count();
+                        return $completedTasks + $completedBugs;
+                    case 'pending_tasks':
+                        $pendingTasks = $sprint->tasks->whereNotIn('status', ['done'])->count();
+                        $pendingBugs = $sprint->bugs->whereNotIn('status', ['resolved', 'verified', 'closed'])->count();
+                        return $pendingTasks + $pendingBugs;
+                    case 'completion_rate':
+                        $totalTasks = $sprint->tasks->count();
+                        $completedTasks = $sprint->tasks->where('status', 'done')->count();
+                        $totalBugs = $sprint->bugs->count();
+                        $completedBugs = $sprint->bugs->whereIn('status', ['resolved', 'verified', 'closed'])->count();
+                        $total = $totalTasks + $totalBugs;
+                        return $total > 0 ? (($completedTasks + $completedBugs) / $total) * 100 : 0;
+                    case 'days_to_end':
+                        return now()->diffInDays($sprint->end_date, false);
+                    case 'priority_score':
+                        // Calcular prioridad basada en tareas y bugs pendientes vs días restantes
+                        $pendingTasks = $sprint->tasks->whereNotIn('status', ['done'])->count();
+                        $pendingBugs = $sprint->bugs->whereNotIn('status', ['resolved', 'verified', 'closed'])->count();
+                        $pendingItems = $pendingTasks + $pendingBugs;
+                        $daysToEnd = max(1, now()->diffInDays($sprint->end_date, false));
+                        return $pendingItems / $daysToEnd;
+                    case 'recent':
+                        return $sprint->created_at;
+                    default:
+                        return $sprint->created_at;
+                }
+            });
+
+            // Aplicar orden
+            if ($filters['sort_order'] === 'desc') {
+                $sprints = $sprints->reverse();
+            }
+        }
 
         return Inertia::render('Sprint/Index', [
             'sprints' => $sprints,
             'permissions' => $permissions,
             'projects' => $projects,
+            'filters' => $filters,
         ]);
     }
 
@@ -65,16 +146,22 @@ class SprintController extends Controller
             abort(400, 'Invalid sprint ID');
         }
         
-        $authUser = User::find(Auth::id());
+        $authUser = Auth::user();
+        
+        if (!$authUser) {
+            return redirect()->route('login');
+        }
+        
         $role = $authUser->roles;
         $permissions = 'developer'; // Default permission
         
-        if ($role->count() > 0) {
+        if ($role && $role->count() > 0) {
             $permissions = $role->first()->name;
         }
         
-        $sprint = Sprint::with(['tasks.user'])->findOrFail($sprint_id);
+        $sprint = Sprint::with(['tasks.user', 'bugs.user'])->findOrFail($sprint_id);
         $tasks = $sprint->tasks;
+        $bugs = $sprint->bugs;
         
         // Get developers from the project
         $project = \App\Models\Project::findOrFail($project_id);
@@ -83,6 +170,7 @@ class SprintController extends Controller
         return Inertia::render('Sprint/Show', [
             'sprint' => $sprint,
             'tasks' => $tasks,
+            'bugs' => $bugs,
             'permissions' => $permissions,
             'project_id' => $project_id,
             'developers' => $developers,

@@ -11,7 +11,7 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 // import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid, Users, Calendar, CheckSquare, Shield, BarChart3, Settings } from 'lucide-vue-next';
+import { BookOpen, Folder, LayoutGrid, Users, Calendar, CheckSquare, Shield, BarChart3, Key, Activity, Bug } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 import { usePermissions } from '@/composables/usePermissions';
 import { computed } from 'vue';
@@ -21,12 +21,14 @@ const { hasPermission, canAccessModule } = usePermissions();
 const mainNavItems = computed<NavItem[]>(() => {
     const items: NavItem[] = [];
 
-    // Admin Dashboard (para admins)
-    if (hasPermission('admin.dashboard')) {
+
+
+    // Simultaneous Tasks Permissions (para admins)
+    if (hasPermission('admin.permissions')) {
         items.push({
-            title: 'Admin Panel',
-            href: '/admin/dashboard',
-            icon: Settings,
+            title: 'Permisos Tareas',
+            href: '/admin/simultaneous-tasks',
+            icon: Key,
         });
     }
 
@@ -66,12 +68,30 @@ const mainNavItems = computed<NavItem[]>(() => {
         });
     }
 
+    // Bugs
+    if (canAccessModule('bugs')) {
+        items.push({
+            title: 'Bugs',
+            href: '/bugs',
+            icon: Bug,
+        });
+    }
+
     // Payments (for all users) - Main section
     if (hasPermission('payments.view')) {
         items.push({
-            title: 'Payment Reports',
-            href: '/payments/dashboard',
+            title: 'Payments & Reports',
+            href: '/payments',
             icon: BarChart3,
+        });
+    }
+
+    // Developer Activity Dashboard
+    if (hasPermission('developer-activity.view')) {
+        items.push({
+            title: 'Developer Activity',
+            href: '/developer-activity',
+            icon: Activity,
         });
     }
 

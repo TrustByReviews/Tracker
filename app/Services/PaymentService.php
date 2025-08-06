@@ -42,10 +42,29 @@ class PaymentService
             })
             ->get();
 
+        // Obtener bugs resueltos en el período
+        $completedBugs = $user->bugs()
+            ->whereIn('status', ['resolved', 'verified', 'closed'])
+            ->whereBetween('resolved_at', [$startDate, $endDate])
+            ->get();
+
+        // Obtener bugs en progreso con horas registradas
+        $inProgressBugs = $user->bugs()
+            ->whereIn('status', ['assigned', 'in progress'])
+            ->where('total_time_seconds', '>', 0)
+            ->where(function ($query) use ($startDate, $endDate) {
+                $query->whereBetween('assigned_at', [$startDate, $endDate])
+                      ->orWhereBetween('updated_at', [$startDate, $endDate]);
+            })
+            ->get();
+
         // Calcular horas totales
-        $completedHours = $completedTasks->sum('actual_hours');
-        $inProgressHours = $inProgressTasks->sum('actual_hours');
-        $totalHours = $completedHours + $inProgressHours;
+        $completedTaskHours = $completedTasks->sum('actual_hours');
+        $inProgressTaskHours = $inProgressTasks->sum('actual_hours');
+        $completedBugHours = $completedBugs->sum('actual_hours');
+        $inProgressBugHours = $inProgressBugs->sum('actual_hours');
+        
+        $totalHours = $completedTaskHours + $inProgressTaskHours + $completedBugHours + $inProgressBugHours;
 
         // Calcular pago total
         $totalPayment = $totalHours * $user->hour_value;
@@ -56,6 +75,7 @@ class PaymentService
                 return [
                     'id' => $task->id,
                     'name' => $task->name,
+                    'type' => 'task',
                     'project' => $task->sprint->project->name ?? 'N/A',
                     'hours' => $task->actual_hours ?? 0,
                     'payment' => ($task->actual_hours ?? 0) * $user->hour_value,
@@ -66,12 +86,49 @@ class PaymentService
                 return [
                     'id' => $task->id,
                     'name' => $task->name,
+                    'type' => 'task',
                     'project' => $task->sprint->project->name ?? 'N/A',
                     'hours' => $task->actual_hours ?? 0,
                     'payment' => ($task->actual_hours ?? 0) * $user->hour_value,
                     'last_updated' => $task->updated_at,
                 ];
             }),
+        ];
+
+        // Preparar detalles de bugs
+        $bugDetails = [
+            'completed' => $completedBugs->map(function ($bug) use ($user) {
+                return [
+                    'id' => $bug->id,
+                    'name' => $bug->title,
+                    'type' => 'bug',
+                    'project' => $bug->project->name ?? 'N/A',
+                    'hours' => $bug->actual_hours ?? 0,
+                    'payment' => ($bug->actual_hours ?? 0) * $user->hour_value,
+                    'completed_at' => $bug->resolved_at,
+                    'importance' => $bug->importance,
+                    'bug_type' => $bug->bug_type,
+                ];
+            }),
+            'in_progress' => $inProgressBugs->map(function ($bug) use ($user) {
+                return [
+                    'id' => $bug->id,
+                    'name' => $bug->title,
+                    'type' => 'bug',
+                    'project' => $bug->project->name ?? 'N/A',
+                    'hours' => $bug->actual_hours ?? 0,
+                    'payment' => ($bug->actual_hours ?? 0) * $user->hour_value,
+                    'last_updated' => $bug->updated_at,
+                    'importance' => $bug->importance,
+                    'bug_type' => $bug->bug_type,
+                ];
+            }),
+        ];
+
+        // Combinar detalles de tareas y bugs
+        $allDetails = [
+            'tasks' => $taskDetails,
+            'bugs' => $bugDetails,
         ];
 
         // Crear o actualizar reporte
@@ -85,9 +142,9 @@ class PaymentService
                 'total_hours' => $totalHours,
                 'hourly_rate' => $user->hour_value,
                 'total_payment' => $totalPayment,
-                'completed_tasks_count' => $completedTasks->count(),
-                'in_progress_tasks_count' => $inProgressTasks->count(),
-                'task_details' => $taskDetails,
+                'completed_tasks_count' => $completedTasks->count() + $completedBugs->count(),
+                'in_progress_tasks_count' => $inProgressTasks->count() + $inProgressBugs->count(),
+                'task_details' => $allDetails,
                 'status' => 'pending',
             ]
         );

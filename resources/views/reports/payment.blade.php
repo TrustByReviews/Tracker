@@ -6,207 +6,263 @@
     <title>Payment Report</title>
     <style>
         body {
-            font-family: 'Arial', sans-serif;
+            font-family: Arial, sans-serif;
             margin: 0;
-            padding: 20px;
+            padding: 15px;
             color: #333;
+            font-size: 10px;
+            line-height: 1.3;
         }
         .header {
             text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 2px solid #3b82f6;
-            padding-bottom: 20px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 15px;
         }
         .header h1 {
-            color: #1e40af;
+            color: #2c3e50;
             margin: 0;
-            font-size: 28px;
+            font-size: 18px;
         }
         .header p {
-            color: #6b7280;
-            margin: 5px 0 0 0;
+            color: #7f8c8d;
+            margin: 3px 0;
+            font-size: 10px;
         }
         .summary {
-            background: #f8fafc;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
+        }
+        .summary h2 {
+            color: #2c3e50;
+            border-bottom: 1px solid #bdc3c7;
+            padding-bottom: 5px;
+            font-size: 14px;
+            margin-bottom: 10px;
         }
         .summary-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
+            gap: 10px;
+            margin-top: 10px;
         }
         .summary-item {
             text-align: center;
+            padding: 8px;
+            background-color: #f8f9fa;
+            border-radius: 3px;
         }
         .summary-item h3 {
             margin: 0;
-            color: #1e40af;
-            font-size: 24px;
+            color: #7f8c8d;
+            font-size: 9px;
         }
         .summary-item p {
-            margin: 5px 0 0 0;
-            color: #6b7280;
-            font-size: 14px;
+            margin: 3px 0 0 0;
+            font-size: 16px;
+            font-weight: bold;
+            color: #2c3e50;
         }
-        .developer-section {
-            margin-bottom: 30px;
-        }
-        .developer-header {
-            background: #3b82f6;
-            color: white;
-            padding: 15px;
-            border-radius: 8px 8px 0 0;
-        }
-        .developer-header h2 {
-            margin: 0;
-            font-size: 20px;
-        }
-        .developer-info {
-            background: #f1f5f9;
-            padding: 15px;
-            border-left: 4px solid #3b82f6;
-        }
-        .developer-stats {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        .stat-item {
-            text-align: center;
-        }
-        .stat-item h4 {
-            margin: 0;
-            color: #1e40af;
-            font-size: 18px;
-        }
-        .stat-item p {
-            margin: 5px 0 0 0;
-            color: #6b7280;
-            font-size: 12px;
+        .summary-item .amount {
+            color: #27ae60;
         }
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 15px;
-        }
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #e5e7eb;
+            margin-bottom: 20px;
+            font-size: 9px;
         }
         th {
-            background: #f9fafb;
-            font-weight: 600;
-            color: #374151;
+            background-color: #3498db;
+            color: white;
+            padding: 6px 4px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 9px;
         }
-        .total-row {
-            background: #f0f9ff;
-            font-weight: 600;
+        td {
+            padding: 4px;
+            border-bottom: 1px solid #ecf0f1;
+            font-size: 8px;
         }
-        .footer {
-            margin-top: 40px;
-            text-align: center;
-            color: #6b7280;
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        .efficiency-positive {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        .efficiency-negative {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .efficiency-neutral {
+            color: #f39c12;
+            font-weight: bold;
+        }
+        .currency {
+            text-align: right;
+        }
+        .page-break {
+            page-break-before: always;
+        }
+        .notes {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #ecf0f1;
+            border-radius: 3px;
+            font-size: 9px;
+        }
+        .notes h3 {
+            margin-top: 0;
+            color: #2c3e50;
+            font-size: 11px;
+        }
+        .notes ul {
+            margin: 5px 0;
+            padding-left: 15px;
+        }
+        .notes li {
+            margin-bottom: 3px;
+        }
+        .developer-name {
+            font-weight: bold;
+            font-size: 9px;
+        }
+        .email {
+            font-size: 8px;
+            color: #7f8c8d;
+        }
+        .section-title {
             font-size: 12px;
-            border-top: 1px solid #e5e7eb;
-            padding-top: 20px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 15px 0 10px 0;
+            border-bottom: 1px solid #bdc3c7;
+            padding-bottom: 5px;
+        }
+        .no-data {
+            text-align: center;
+            color: #7f8c8d;
+            font-style: italic;
+            padding: 20px;
+            font-size: 10px;
+        }
+        @media print {
+            body {
+                font-size: 9px;
+            }
+            table {
+                font-size: 8px;
+            }
+            th, td {
+                padding: 3px 2px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>Payment Report</h1>
-        <p>Generated on {{ $generated_at }}</p>
+        <h1>PAYMENT REPORT - TASK TRACKING SYSTEM</h1>
+        <p>Generated on: {{ $generated_at }}</p>
         @if($period['start'] && $period['end'])
             <p>Period: {{ $period['start'] }} to {{ $period['end'] }}</p>
+        @else
+            <p>Period: All available data</p>
         @endif
     </div>
 
     <div class="summary">
+        <h2>General Summary</h2>
         <div class="summary-grid">
             <div class="summary-item">
-                <h3>{{ count($developers) }}</h3>
-                <p>Developers</p>
+                <h3>Total Developers</h3>
+                <p>{{ count($developers) }}</p>
             </div>
             <div class="summary-item">
-                <h3>${{ number_format($totalEarnings, 2) }}</h3>
-                <p>Total Earnings</p>
+                <h3>Total Hours</h3>
+                <p>{{ number_format($totalHours, 2) }}</p>
             </div>
             <div class="summary-item">
-                <h3>{{ $totalHours }}h</h3>
-                <p>Total Hours</p>
+                <h3>Total Paid</h3>
+                <p class="amount">${{ number_format($totalEarnings, 2) }}</p>
             </div>
         </div>
     </div>
 
-    @foreach($developers as $developer)
-    <div class="developer-section">
-        <div class="developer-header">
-            <h2>{{ $developer['name'] }}</h2>
-        </div>
+    <div class="section-title">Developer Summary</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Developer</th>
+                <th>Hourly Rate</th>
+                <th>Tasks</th>
+                <th>Hours</th>
+                <th>Total Earned</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($developers as $developer)
+                <tr>
+                    <td>
+                        <div class="developer-name">{{ $developer['name'] }}</div>
+                        <div class="email">{{ $developer['email'] }}</div>
+                    </td>
+                    <td class="currency">${{ number_format($developer['hour_value'], 2) }}</td>
+                    <td>{{ $developer['completed_tasks'] + $developer['in_progress_tasks'] }}</td>
+                    <td>{{ number_format($developer['total_hours'], 2) }}</td>
+                    <td class="currency">${{ number_format($developer['total_earnings'], 2) }}</td>
+                </tr>
+            @endforeach
+        </tbody>
+    </table>
+
+    @if(collect($developers)->some(fn($dev) => count($dev['tasks']) > 0))
+        <div class="page-break"></div>
         
-        <div class="developer-info">
-            <div class="developer-stats">
-                <div class="stat-item">
-                    <h4>${{ $developer['hour_value'] }}/hr</h4>
-                    <p>Hour Rate</p>
-                </div>
-                <div class="stat-item">
-                    <h4>{{ $developer['completed_tasks'] }}</h4>
-                    <p>Completed Tasks</p>
-                </div>
-                <div class="stat-item">
-                    <h4>{{ $developer['total_hours'] }}h</h4>
-                    <p>Total Hours</p>
-                </div>
-                <div class="stat-item">
-                    <h4>${{ number_format($developer['total_earnings'], 2) }}</h4>
-                    <p>Total Earnings</p>
-                </div>
-            </div>
-
-            @if(count($developer['tasks']) > 0)
-            <table>
-                <thead>
-                    <tr>
-                        <th>Task</th>
-                        <th>Project</th>
-                        <th>Hours</th>
-                        <th>Earnings</th>
-                        <th>Completed</th>
-                    </tr>
-                </thead>
-                <tbody>
+        <div class="section-title">Task Details</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Developer</th>
+                    <th>Task</th>
+                    <th>Project</th>
+                    <th>Status</th>
+                    <th>Hours</th>
+                    <th>Payment</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($developers as $developer)
                     @foreach($developer['tasks'] as $task)
-                    <tr>
-                        <td>{{ $task['name'] }}</td>
-                        <td>{{ $task['project'] }}</td>
-                        <td>{{ $task['hours'] }}h</td>
-                        <td>${{ number_format($task['earnings'], 2) }}</td>
-                        <td>{{ $task['completed_at'] ? \Carbon\Carbon::parse($task['completed_at'])->format('M d, Y') : 'N/A' }}</td>
-                    </tr>
+                        <tr>
+                            <td>{{ $developer['name'] }}</td>
+                            <td>{{ $task['name'] }}</td>
+                            <td>{{ $task['project'] }}</td>
+                            <td>{{ ucfirst(str_replace('_', ' ', $task['status'])) }}</td>
+                            <td>{{ number_format($task['actual_hours'], 2) }}</td>
+                            <td class="currency">${{ number_format($task['earnings'], 2) }}</td>
+                            <td>{{ $task['completed_at'] ? date('Y-m-d', strtotime($task['completed_at'])) : ($task['created_at'] ? date('Y-m-d', strtotime($task['created_at'])) : 'N/A') }}</td>
+                        </tr>
                     @endforeach
-                    <tr class="total-row">
-                        <td colspan="2"><strong>Total</strong></td>
-                        <td><strong>{{ $developer['total_hours'] }}h</strong></td>
-                        <td><strong>${{ number_format($developer['total_earnings'], 2) }}</strong></td>
-                        <td></td>
-                    </tr>
-                </tbody>
-            </table>
-            @else
-            <p style="text-align: center; color: #6b7280; font-style: italic;">No completed tasks in this period</p>
-            @endif
+                @endforeach
+            </tbody>
+        </table>
+    @else
+        <div class="no-data">
+            No tasks found in the specified period
         </div>
-    </div>
-    @endforeach
+    @endif
 
-    <div class="footer">
-        <p>This report was generated automatically by Tracker System</p>
-        <p>For questions or support, please contact your administrator</p>
+    <div class="notes">
+        <h3>Important Notes:</h3>
+        <ul>
+            <li>This report includes both completed and in-progress tasks in the specified period</li>
+            <li>For in-progress tasks, hours are calculated based on work time until the report generation date</li>
+            <li>Monetary values are in US dollars</li>
+            <li>Hours are calculated based on actual recorded time for completed tasks and estimated progress for in-progress tasks</li>
+            <li>This report is automatically generated by the system</li>
+        </ul>
     </div>
 </body>
 </html> 

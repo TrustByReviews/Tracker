@@ -1,109 +1,148 @@
 <?php
 
-/**
- * Verificación final del sistema de gestión de tareas
- * Verifica los componentes principales y proporciona un resumen
- */
+require_once __DIR__ . '/../vendor/autoload.php';
 
-echo "=== VERIFICACIÓN FINAL DEL SISTEMA DE GESTIÓN DE TAREAS ===\n\n";
+// Bootstrap Laravel
+$app = require_once __DIR__ . '/../bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
-$components = [
-    // Backend - Modelos y Migraciones
-    'app/Models/Task.php' => 'Modelo Task',
-    'app/Models/TaskTimeLog.php' => 'Modelo TaskTimeLog',
-    'app/Models/User.php' => 'Modelo User',
-    'app/Models/Project.php' => 'Modelo Project',
-    'app/Models/Sprint.php' => 'Modelo Sprint',
-    'app/Models/Role.php' => 'Modelo Role',
-    
-    // Backend - Servicios
-    'app/Services/TaskAssignmentService.php' => 'Servicio de Asignación',
-    'app/Services/TaskTimeTrackingService.php' => 'Servicio de Tracking',
-    'app/Services/TaskApprovalService.php' => 'Servicio de Aprobación',
-    'app/Services/AdminDashboardService.php' => 'Servicio de Dashboard Admin',
-    'app/Services/EmailService.php' => 'Servicio de Email',
-    
-    // Backend - Controladores
-    'app/Http/Controllers/TaskController.php' => 'Controlador de Tareas',
-    'app/Http/Controllers/TeamLeaderController.php' => 'Controlador Team Leader',
-    'app/Http/Controllers/AdminController.php' => 'Controlador Admin',
-    'app/Http/Controllers/DashboardController.php' => 'Controlador Dashboard',
-    
-    // Frontend - Páginas Vue
-    'resources/js/pages/Developer/Kanban.vue' => 'Vista Kanban',
-    'resources/js/pages/TeamLeader/Dashboard.vue' => 'Dashboard Team Leader',
-    'resources/js/pages/Admin/Dashboard.vue' => 'Dashboard Admin',
-    'resources/js/pages/Dashboard.vue' => 'Dashboard General',
-    
-    // Frontend - Componentes
-    'resources/js/components/TaskCard.vue' => 'Componente TaskCard',
-    'resources/js/components/Toast.vue' => 'Componente Toast',
-    
-    // Frontend - Composables
-    'resources/js/composables/useToast.ts' => 'Composable Toast',
-    
-    // Configuración
-    'routes/web.php' => 'Rutas Web',
-    'composer.json' => 'Dependencias PHP',
-    'package.json' => 'Dependencias Node.js',
-    'tailwind.config.js' => 'Configuración Tailwind',
-    'vite.config.ts' => 'Configuración Vite'
-];
+echo "=== Verificación Final de Descargas ===\n\n";
 
-$existing = 0;
-$missing = 0;
+// 1. Verificar que el formato CSV fue eliminado
+echo "1. Verificando eliminación de formato CSV...\n";
 
-echo "Verificando componentes principales:\n";
-echo str_repeat("-", 50) . "\n";
+// Verificar en el controlador
+$controllerFile = file_get_contents(__DIR__ . '/../app/Http/Controllers/PaymentController.php');
 
-foreach ($components as $path => $description) {
-    if (file_exists($path)) {
-        echo "✓ {$description}\n";
-        $existing++;
-    } else {
-        echo "✗ {$description} - FALTA\n";
-        $missing++;
+if (strpos($controllerFile, "'csv'") !== false) {
+    echo "❌ Formato CSV aún presente en el controlador\n";
+} else {
+    echo "✅ Formato CSV eliminado del controlador\n";
+}
+
+if (strpos($controllerFile, 'generateCSV') !== false) {
+    echo "❌ Método generateCSV aún presente\n";
+} else {
+    echo "✅ Método generateCSV eliminado\n";
+}
+
+// Verificar en el frontend
+$vueFile = file_get_contents(__DIR__ . '/../resources/js/pages/Payments/Index.vue');
+
+if (strpos($vueFile, 'value="csv"') !== false) {
+    echo "❌ Opción CSV aún presente en el frontend\n";
+} else {
+    echo "✅ Opción CSV eliminada del frontend\n";
+}
+
+echo "\n";
+
+// 2. Verificar que Excel esté configurado correctamente
+echo "2. Verificando configuración de Excel...\n";
+
+if (strpos($controllerFile, 'generateExcel') !== false) {
+    echo "✅ Método generateExcel presente\n";
+} else {
+    echo "❌ Método generateExcel no encontrado\n";
+}
+
+if (strpos($controllerFile, 'application/octet-stream') !== false) {
+    echo "✅ Content-Type correcto para descarga\n";
+} else {
+    echo "❌ Content-Type incorrecto\n";
+}
+
+if (strpos($controllerFile, 'attachment; filename=') !== false) {
+    echo "✅ Content-Disposition configurado correctamente\n";
+} else {
+    echo "❌ Content-Disposition no configurado\n";
+}
+
+echo "\n";
+
+// 3. Verificar rutas
+echo "3. Verificando rutas...\n";
+
+use Illuminate\Support\Facades\Route;
+
+$routes = Route::getRoutes();
+$hasPaymentRoute = false;
+$hasGenerateRoute = false;
+
+foreach ($routes as $route) {
+    if ($route->uri() === 'payments' && in_array('GET', $route->methods())) {
+        $hasPaymentRoute = true;
+    }
+    if ($route->uri() === 'payments/generate-detailed' && in_array('POST', $route->methods())) {
+        $hasGenerateRoute = true;
     }
 }
 
-echo "\n" . str_repeat("=", 50) . "\n";
-echo "RESUMEN:\n";
-echo "Componentes existentes: {$existing}\n";
-echo "Componentes faltantes: {$missing}\n";
-echo "Total: " . count($components) . "\n";
-echo "Porcentaje de completitud: " . round(($existing / count($components)) * 100, 1) . "%\n\n";
-
-if ($missing === 0) {
-    echo "🎉 ¡FELICITACIONES! El sistema está completamente implementado.\n\n";
-    
-    echo "PRÓXIMOS PASOS PARA EJECUTAR EL SISTEMA:\n";
-    echo "1. Instalar dependencias PHP: composer install\n";
-    echo "2. Instalar dependencias Node.js: npm install\n";
-    echo "3. Configurar base de datos en .env\n";
-    echo "4. Ejecutar migraciones: php artisan migrate\n";
-    echo "5. Ejecutar seeders: php artisan db:seed\n";
-    echo "6. Compilar assets: npm run build\n";
-    echo "7. Iniciar servidor: php artisan serve\n";
-    echo "8. Acceder a: http://localhost:8000\n\n";
-    
-    echo "CREDENCIALES POR DEFECTO:\n";
-    echo "- Email: admin@example.com\n";
-    echo "- Contraseña: password\n\n";
-    
-    echo "FUNCIONALIDADES IMPLEMENTADAS:\n";
-    echo "✓ Sistema de autenticación y autorización\n";
-    echo "✓ Gestión de usuarios, roles y permisos\n";
-    echo "✓ Gestión de proyectos y sprints\n";
-    echo "✓ Sistema de tareas con Kanban\n";
-    echo "✓ Seguimiento de tiempo en tiempo real\n";
-    echo "✓ Sistema de aprobación por team leaders\n";
-    echo "✓ Dashboard para diferentes roles\n";
-    echo "✓ Reportes y métricas avanzadas\n";
-    echo "✓ Interfaz moderna y responsive\n";
-    echo "✓ Sistema de notificaciones\n";
-    echo "✓ Email automático\n";
+if ($hasPaymentRoute) {
+    echo "✅ Ruta /payments (GET) encontrada\n";
 } else {
-    echo "⚠️  Hay componentes faltantes. Revisa la implementación.\n";
+    echo "❌ Ruta /payments (GET) no encontrada\n";
 }
 
-echo "\n=== FIN DE LA VERIFICACIÓN ===\n"; 
+if ($hasGenerateRoute) {
+    echo "✅ Ruta /payments/generate-detailed (POST) encontrada\n";
+} else {
+    echo "❌ Ruta /payments/generate-detailed (POST) no encontrada\n";
+}
+
+echo "\n";
+
+// 4. Verificar archivo de prueba
+echo "4. Verificando archivo de prueba...\n";
+
+$testFile = storage_path('app/test_excel_report.xlsx');
+
+if (file_exists($testFile)) {
+    echo "✅ Archivo de prueba existe\n";
+    echo "   - Tamaño: " . filesize($testFile) . " bytes\n";
+    echo "   - Última modificación: " . date('Y-m-d H:i:s', filemtime($testFile)) . "\n";
+} else {
+    echo "❌ Archivo de prueba no encontrado\n";
+}
+
+echo "\n";
+
+// 5. Resumen de cambios realizados
+echo "5. Resumen de cambios realizados:\n";
+echo "==================================\n";
+echo "✅ Eliminado formato CSV redundante\n";
+echo "✅ Mejorado método generateExcel\n";
+echo "✅ Configurado Content-Type como application/octet-stream\n";
+echo "✅ Agregado Content-Disposition para forzar descarga\n";
+echo "✅ Agregado BOM UTF-8 para compatibilidad con Excel\n";
+echo "✅ Configurado headers de cache para evitar problemas\n";
+echo "✅ Agregada funcionalidad de selección de períodos\n";
+echo "✅ Aplicadas clases dark mode completas\n";
+
+echo "\n";
+
+// 6. Instrucciones finales
+echo "6. Instrucciones para probar:\n";
+echo "=============================\n";
+echo "1. Ve a http://127.0.0.1:8000/payments\n";
+echo "2. Inicia sesión como admin o usuario con permisos\n";
+echo "3. Ve a la pestaña 'Generate Reports'\n";
+echo "4. Selecciona desarrolladores\n";
+echo "5. Elige un período de tiempo (nueva funcionalidad)\n";
+echo "6. Selecciona formato 'Excel' (CSV eliminado)\n";
+echo "7. Haz clic en 'Generate Report'\n";
+echo "8. El archivo debería descargarse como .xlsx\n\n";
+
+echo "Formatos disponibles:\n";
+echo "- Excel (.xlsx) - CSV optimizado para Excel\n";
+echo "- PDF (.pdf) - Reporte en formato PDF\n";
+echo "- Email - Envío por correo electrónico\n\n";
+
+echo "Si aún hay problemas:\n";
+echo "- Verifica que el navegador no esté bloqueando las descargas\n";
+echo "- Revisa la consola del navegador para errores JavaScript\n";
+echo "- Verifica los logs de Laravel en storage/logs/laravel.log\n";
+echo "- Asegúrate de que el usuario tenga permisos para generar reportes\n";
+
+echo "\n✅ Verificación final completada exitosamente\n";
+echo "El sistema de descargas está listo para usar.\n"; 

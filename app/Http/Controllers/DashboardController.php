@@ -5,16 +5,27 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
+use App\Models\Bug;
+use App\Services\AdminDashboardService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
+    public function __construct(
+        private AdminDashboardService $adminDashboardService
+    ) {}
+
     public function index()
     {
         $user = Auth::user();
-        $isAdmin = $user->roles()->where('value', 'admin')->exists();
+        
+        if (!$user) {
+            return redirect()->route('login');
+        }
+        
+        $isAdmin = $user->roles()->where('name', 'admin')->exists();
 
         if ($isAdmin) {
             return $this->adminDashboard();
@@ -56,6 +67,21 @@ class DashboardController extends Controller
             return ($task->actual_hours ?? 0) * $user->hour_value;
         });
 
+        // Bugs del desarrollador
+        $myBugs = $user->bugs()
+            ->with(['sprint.project'])
+            ->orderBy('created_at', 'desc')
+            ->limit(5)
+            ->get();
+
+        // Estadísticas de bugs
+        $bugStats = [
+            'total_bugs' => $user->bugs()->count(),
+            'bugs_in_progress' => $user->bugs()->where('status', 'in progress')->count(),
+            'bugs_resolved' => $user->bugs()->where('status', 'resolved')->count(),
+            'high_priority_bugs' => $user->bugs()->whereIn('importance', ['high', 'critical'])->count(),
+        ];
+
         // Estadísticas generales
         $stats = [
             'total_projects' => $assignedProjects->count(),
@@ -72,12 +98,32 @@ class DashboardController extends Controller
             'completedTasks' => $completedTasks,
             'highPriorityUnassignedTasks' => $highPriorityUnassignedTasks,
             'stats' => $stats,
+            'bugs' => $myBugs,
+            'bugStats' => $bugStats,
             'isAdmin' => false,
         ]);
     }
 
     private function adminDashboard()
     {
+        // Obtener estadísticas del sistema usando el servicio
+        $systemStats = $this->adminDashboardService->getSystemStats();
+        $tasksRequiringAttention = $this->adminDashboardService->getTasksRequiringAttention();
+        $activeProjectsSummary = $this->adminDashboardService->getActiveProjectsSummary();
+        $developerMetrics = $this->adminDashboardService->getDeveloperPerformanceMetrics();
+
+        // Transformar systemStats para que coincida con lo que espera AdminStats
+        $transformedStats = [
+            'total_projects' => $systemStats['projects']['total'],
+            'total_users' => $systemStats['users']['total'],
+            'total_tasks' => $systemStats['tasks']['total'],
+            'completed_tasks' => $systemStats['tasks']['completed'],
+            'in_progress_tasks' => $systemStats['tasks']['in_progress'],
+            'pending_tasks' => $systemStats['tasks']['total'] - $systemStats['tasks']['completed'] - $systemStats['tasks']['in_progress'],
+            'high_priority_tasks' => \App\Models\Task::where('priority', 'high')->count(),
+            'unassigned_tasks' => \App\Models\Task::whereNull('user_id')->count(),
+        ];
+
         // Todos los proyectos con estadísticas
         $projects = Project::with(['sprints.tasks', 'users'])
             ->get()
@@ -89,21 +135,21 @@ class DashboardController extends Controller
                     'name' => $project->name,
                     'description' => $project->description,
                     'status' => $project->status,
-                                    'total_tasks' => $allTasks->count(),
-                'completed_tasks' => $allTasks->where('status', 'done')->count(),
-                'in_progress_tasks' => $allTasks->where('status', 'in progress')->count(),
-                'pending_tasks' => $allTasks->where('status', 'to do')->count(),
-                'assigned_users' => $project->users->count(),
-                'completion_percentage' => $allTasks->count() > 0 
-                    ? round(($allTasks->where('status', 'done')->count() / $allTasks->count()) * 100, 2)
-                    : 0,
+                    'total_tasks' => $allTasks->count(),
+                    'completed_tasks' => $allTasks->where('status', 'done')->count(),
+                    'in_progress_tasks' => $allTasks->where('status', 'in progress')->count(),
+                    'pending_tasks' => $allTasks->where('status', 'to do')->count(),
+                    'assigned_users' => $project->users->count(),
+                    'completion_percentage' => $allTasks->count() > 0 
+                        ? round(($allTasks->where('status', 'done')->count() / $allTasks->count()) * 100, 2)
+                        : 0,
                 ];
             });
 
         // Rendimiento de desarrolladores
         $developers = User::with(['tasks', 'projects'])
             ->whereHas('roles', function ($query) {
-                $query->where('value', '!=', 'admin');
+                $query->where('name', '!=', 'admin');
             })
             ->get()
             ->map(function ($developer) {
@@ -128,23 +174,31 @@ class DashboardController extends Controller
                 ];
             });
 
-        // Estadísticas generales del sistema
-        $systemStats = [
-            'total_projects' => Project::count(),
-            'total_users' => User::count(),
-            'total_tasks' => Task::count(),
-            'completed_tasks' => Task::where('status', 'done')->count(),
-            'in_progress_tasks' => Task::where('status', 'in progress')->count(),
-            'pending_tasks' => Task::where('status', 'to do')->count(),
-            'high_priority_tasks' => Task::where('priority', 'high')->count(),
-            'unassigned_tasks' => Task::whereNull('user_id')->count(),
+        // Bugs recientes para el dashboard de admin
+        $recentBugs = Bug::with(['user', 'project', 'sprint'])
+            ->orderBy('created_at', 'desc')
+            ->limit(5)
+            ->get();
+
+        // Estadísticas de bugs
+        $bugStats = [
+            'total_bugs' => Bug::count(),
+            'bugs_new' => Bug::where('status', 'new')->count(),
+            'bugs_in_progress' => Bug::where('status', 'in progress')->count(),
+            'bugs_resolved' => Bug::where('status', 'resolved')->count(),
+            'high_priority_bugs' => Bug::whereIn('importance', ['high', 'critical'])->count(),
         ];
 
         return Inertia::render('Dashboard', [
             'user' => Auth::user(),
             'projects' => $projects,
             'developers' => $developers,
-            'systemStats' => $systemStats,
+            'systemStats' => $transformedStats,
+            'tasksRequiringAttention' => $tasksRequiringAttention,
+            'activeProjectsSummary' => $activeProjectsSummary,
+            'developerMetrics' => $developerMetrics,
+            'bugs' => $recentBugs,
+            'bugStats' => $bugStats,
             'isAdmin' => true,
         ]);
     }

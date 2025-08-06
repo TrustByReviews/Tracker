@@ -12,6 +12,26 @@ use Illuminate\Support\Facades\Auth;
 class TaskAssignmentService
 {
     /**
+     * Verificar el número de actividades activas de un usuario
+     */
+    private function getActiveActivitiesCount(string $userId): int
+    {
+        // Contar tareas activas
+        $activeTasks = DB::table('tasks')
+            ->where('user_id', $userId)
+            ->whereIn('status', ['to do', 'in progress'])
+            ->count();
+            
+        // Contar bugs activos
+        $activeBugs = DB::table('bugs')
+            ->where('user_id', $userId)
+            ->whereIn('status', ['new', 'assigned', 'in progress'])
+            ->count();
+            
+        return $activeTasks + $activeBugs;
+    }
+    
+    /**
      * Asignar tarea a un desarrollador por un team leader
      */
     public function assignTaskByTeamLeader(Task $task, User $developer, User $teamLeader): bool
@@ -27,6 +47,12 @@ class TaskAssignmentService
             // Verificar que el desarrollador está asignado al proyecto
             if (!$task->project->users()->where('users.id', $developer->id)->exists()) {
                 throw new \Exception('El desarrollador no está asignado a este proyecto');
+            }
+            
+            // Verificar límite de actividades activas (máximo 3)
+            $activeActivities = $this->getActiveActivitiesCount($developer->id);
+            if ($activeActivities >= 3) {
+                throw new \Exception('El desarrollador ya tiene el máximo de 3 actividades activas (tareas o bugs). Debe completar o pausar alguna actividad antes de asignar una nueva.');
             }
             
             // Verificar que la tarea no está ya asignada
@@ -77,6 +103,12 @@ class TaskAssignmentService
             // Verificar que el desarrollador está asignado al proyecto
             if (!$task->project->users()->where('users.id', $developer->id)->exists()) {
                 throw new \Exception('No tienes acceso a este proyecto');
+            }
+            
+            // Verificar límite de actividades activas (máximo 3)
+            $activeActivities = $this->getActiveActivitiesCount($developer->id);
+            if ($activeActivities >= 3) {
+                throw new \Exception('Ya tienes el máximo de 3 actividades activas (tareas o bugs). Debes completar o pausar alguna actividad antes de asignarte una nueva.');
             }
             
             // Verificar que la tarea no está ya asignada

@@ -78,6 +78,11 @@ class User extends Authenticatable
         return $this->hasMany(Task::class);
     }
 
+    public function bugs(): HasMany
+    {
+        return $this->hasMany(Bug::class);
+    }
+
     public function paymentReports(): HasMany
     {
         return $this->hasMany(PaymentReport::class);

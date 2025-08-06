@@ -90,10 +90,10 @@
       <div class="flex items-center justify-between">
         <div>
           <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Pending Tasks</p>
-          <p class="text-2xl font-semibold text-gray-600 dark:text-gray-400">{{ stats.pending_tasks }}</p>
+          <p class="text-2xl font-semibold text-orange-600 dark:text-orange-400">{{ stats.pending_tasks }}</p>
         </div>
-        <div class="p-3 rounded-full bg-gray-100 dark:bg-gray-900">
-          <svg class="w-6 h-6 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="p-3 rounded-full bg-orange-100 dark:bg-orange-900">
+          <svg class="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
         </div>

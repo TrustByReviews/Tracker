@@ -8,7 +8,9 @@ use App\Services\PaymentService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class PaymentController extends Controller
 {
@@ -51,7 +53,7 @@ class PaymentController extends Controller
     }
 
     /**
-     * Dashboard de pagos para admins
+     * Dashboard unificado de pagos (para usuarios normales y admins)
      */
     public function adminDashboard(Request $request)
     {
@@ -75,7 +77,32 @@ class PaymentController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        return Inertia::render('Payments/AdminDashboard', [
+        // Obtener datos para reportes de pago (desde PaymentReportController)
+        $developers = User::with(['tasks', 'projects'])
+            ->whereHas('roles', function ($query) {
+                $query->where('name', '!=', 'admin');
+            })
+            ->get()
+            ->map(function ($developer) {
+                $completedTasks = $developer->tasks->where('status', 'done');
+                $totalEarnings = $completedTasks->sum(function ($task) use ($developer) {
+                    return ($task->actual_hours ?? 0) * $developer->hour_value;
+                });
+
+                return [
+                    'id' => $developer->id,
+                    'name' => $developer->name,
+                    'email' => $developer->email,
+                    'hour_value' => $developer->hour_value,
+                    'total_tasks' => $developer->tasks->count(),
+                    'completed_tasks' => $completedTasks->count(),
+                    'total_hours' => $completedTasks->sum('actual_hours'),
+                    'total_earnings' => $totalEarnings,
+                    'assigned_projects' => $developer->projects->count(),
+                ];
+            });
+
+        return Inertia::render('Payments/Index', [
             'statistics' => $statistics,
             'recentReports' => $recentReports,
             'pendingReports' => $pendingReports,
@@ -83,6 +110,10 @@ class PaymentController extends Controller
                 'start_date' => $startDate,
                 'end_date' => $endDate,
             ],
+            // Datos adicionales para reportes de pago
+            'developers' => $developers,
+            'totalEarnings' => $developers->sum('total_earnings'),
+            'totalHours' => $developers->sum('total_hours'),
         ]);
     }
 
@@ -173,6 +204,79 @@ class PaymentController extends Controller
     }
 
     /**
+     * Generar reporte de pago detallado (desde PaymentReportController)
+     */
+    public function generateDetailedReport(Request $request)
+    {
+        $this->authorize('generatePaymentReports');
+
+        $request->validate([
+            'developer_ids' => 'required|array',
+            'developer_ids.*' => 'exists:users,id',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+            'format' => 'required|in:pdf,email,excel',
+        ]);
+
+        $developers = User::with(['tasks' => function ($query) use ($request) {
+            $query->where('status', 'done');
+            if ($request->start_date) {
+                $query->where('actual_finish', '>=', $request->start_date);
+            }
+            if ($request->end_date) {
+                $query->where('actual_finish', '<=', $request->end_date);
+            }
+        }, 'projects'])
+        ->whereIn('id', $request->developer_ids)
+        ->get()
+        ->map(function ($developer) {
+            $completedTasks = $developer->tasks;
+            $totalEarnings = $completedTasks->sum(function ($task) use ($developer) {
+                return ($task->actual_hours ?? 0) * $developer->hour_value;
+            });
+
+            return [
+                'id' => $developer->id,
+                'name' => $developer->name,
+                'email' => $developer->email,
+                'hour_value' => $developer->hour_value,
+                'completed_tasks' => $completedTasks->count(),
+                'total_hours' => $completedTasks->sum('actual_hours'),
+                'total_earnings' => $totalEarnings,
+                'tasks' => $completedTasks->map(function ($task) use ($developer) {
+                    return [
+                        'name' => $task->name,
+                        'project' => $task->sprint->project->name ?? 'N/A',
+                        'hours' => $task->actual_hours ?? 0,
+                        'earnings' => ($task->actual_hours ?? 0) * $developer->hour_value,
+                        'completed_at' => $task->actual_finish,
+                    ];
+                }),
+            ];
+        });
+
+        $reportData = [
+            'developers' => $developers,
+            'totalEarnings' => $developers->sum('total_earnings'),
+            'totalHours' => $developers->sum('total_hours'),
+            'generated_at' => now()->format('Y-m-d H:i:s'),
+            'period' => [
+                'start' => $request->start_date,
+                'end' => $request->end_date,
+            ],
+        ];
+
+        switch ($request->format) {
+            case 'excel':
+                return $this->generateExcel($reportData);
+            case 'pdf':
+                return $this->generatePDF($reportData);
+            case 'email':
+                return $this->sendEmail($reportData, $request);
+        }
+    }
+
+    /**
      * Aprobar un reporte
      */
     public function approve(PaymentReport $paymentReport)
@@ -212,7 +316,7 @@ class PaymentController extends Controller
         $this->authorize('viewPaymentReports');
 
         $request->validate([
-            'format' => 'required|in:csv,pdf',
+            'format' => 'required|in:pdf',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
         ]);
@@ -221,49 +325,10 @@ class PaymentController extends Controller
             ->whereBetween('week_start_date', [$request->start_date, $request->end_date])
             ->get();
 
-        if ($request->format === 'csv') {
-            return $this->exportToCsv($reports, $request->start_date, $request->end_date);
-        } else {
-            return $this->exportToPdf($reports, $request->start_date, $request->end_date);
-        }
+         return $this->exportToPdf($reports, $request->start_date, $request->end_date);
     }
 
-    /**
-     * Exportar a CSV
-     */
-    private function exportToCsv($reports, $startDate, $endDate)
-    {
-        $filename = "payment_reports_{$startDate}_to_{$endDate}.csv";
-        
-        header('Content-Type: text/csv');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
-        
-        $output = fopen('php://output', 'w');
-        
-        // Header
-        fputcsv($output, ['Payment Reports Export']);
-        fputcsv($output, ['Period: ' . $startDate . ' to ' . $endDate]);
-        fputcsv($output, ['Generated: ' . now()->format('Y-m-d H:i:s')]);
-        fputcsv($output, []);
-        
-        // Data headers
-        fputcsv($output, ['Developer', 'Week', 'Hours', 'Rate', 'Payment', 'Status', 'Created']);
-        
-        foreach ($reports as $report) {
-            fputcsv($output, [
-                $report->user->name,
-                $report->week_range,
-                $report->total_hours,
-                '$' . $report->hourly_rate,
-                '$' . number_format($report->total_payment, 2),
-                $report->status,
-                $report->created_at->format('Y-m-d'),
-            ]);
-        }
-        
-        fclose($output);
-        exit;
-    }
+
 
     /**
      * Exportar a PDF
@@ -273,5 +338,259 @@ class PaymentController extends Controller
         // Implementar exportación a PDF
         // Por ahora retornamos un mensaje
         return redirect()->back()->with('info', 'PDF export feature will be implemented soon');
+    }
+
+
+
+    /**
+     * Generar Excel para reporte detallado
+     */
+    private function generateExcel($data)
+    {
+        $filename = 'payment_report_' . date('Y-m-d_H-i-s') . '.xlsx';
+        
+        // Crear contenido CSV
+        $csvContent = '';
+        
+        // BOM para UTF-8
+        $csvContent .= chr(0xEF).chr(0xBB).chr(0xBF);
+        
+        // Crear contenido CSV
+        $csvContent .= $this->arrayToCsv(['Payment Report']) . "\n";
+        $csvContent .= $this->arrayToCsv(['Generated: ' . $data['generated_at']]) . "\n";
+        $csvContent .= $this->arrayToCsv([]) . "\n";
+        
+        // Developer summary
+        $csvContent .= $this->arrayToCsv(['Developer Summary']) . "\n";
+        $csvContent .= $this->arrayToCsv(['Name', 'Email', 'Hour Rate ($)', 'Total Hours', 'Total Earnings ($)']) . "\n";
+        
+        foreach ($data['developers'] as $developer) {
+            $csvContent .= $this->arrayToCsv([
+                $developer['name'],
+                $developer['email'],
+                number_format($developer['hour_value'], 2),
+                number_format($developer['total_hours'], 2),
+                number_format($developer['total_earnings'], 2)
+            ]) . "\n";
+        }
+        
+        // Task details
+        $csvContent .= $this->arrayToCsv([]) . "\n";
+        $csvContent .= $this->arrayToCsv(['Task Details']) . "\n";
+        $csvContent .= $this->arrayToCsv(['Developer', 'Task', 'Project', 'Hours', 'Earnings ($)', 'Completed Date']) . "\n";
+        
+        foreach ($data['developers'] as $developer) {
+            foreach ($developer['tasks'] as $task) {
+                $csvContent .= $this->arrayToCsv([
+                    $developer['name'],
+                    $task['name'],
+                    $task['project'],
+                    number_format($task['hours'], 2),
+                    number_format($task['earnings'], 2),
+                    $task['completed_at'] ? date('Y-m-d', strtotime($task['completed_at'])) : 'N/A'
+                ]) . "\n";
+            }
+        }
+        
+        // Summary
+        $csvContent .= $this->arrayToCsv([]) . "\n";
+        $csvContent .= $this->arrayToCsv(['Summary']) . "\n";
+        $csvContent .= $this->arrayToCsv(['Total Developers', 'Total Hours', 'Total Earnings ($)']) . "\n";
+        $csvContent .= $this->arrayToCsv([
+            count($data['developers']),
+            number_format($data['totalHours'], 2),
+            number_format($data['totalEarnings'], 2)
+        ]) . "\n";
+        
+        // Retornar descarga usando response() directo (método que funciona)
+        return response($csvContent)
+            ->header('Content-Type', 'application/octet-stream')
+            ->header('Content-Disposition', 'attachment; filename="' . $filename . '"')
+            ->header('Cache-Control', 'no-cache, must-revalidate')
+            ->header('Pragma', 'no-cache')
+            ->header('Expires', '0');
+    }
+    
+    /**
+     * Convertir array a CSV string
+     */
+    private function arrayToCsv($array)
+    {
+        $output = fopen('php://temp', 'w+');
+        fputcsv($output, $array);
+        rewind($output);
+        $csv = stream_get_contents($output);
+        fclose($output);
+        return rtrim($csv, "\n\r");
+    }
+
+    /**
+     * Generar PDF para reporte detallado
+     */
+    private function generatePDF($data)
+    {
+        $filename = 'payment_report_' . date('Y-m-d_H-i-s') . '.pdf';
+        
+        // Crear contenido PDF
+        $pdfContent = view('reports.payment', $data)->render();
+        
+        // Retornar descarga usando response() directo (método que funciona)
+        return response($pdfContent)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'attachment; filename="' . $filename . '"')
+            ->header('Cache-Control', 'no-cache, must-revalidate')
+            ->header('Pragma', 'no-cache')
+            ->header('Expires', '0');
+    }
+
+    /**
+     * Enviar email con reporte detallado
+     */
+    private function sendEmail($data, $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+        ]);
+
+        $pdf = PDF::loadView('reports.payment', $data);
+        $filename = 'payment_report_' . date('Y-m-d_H-i-s') . '.pdf';
+
+        Mail::send('emails.payment-report', $data, function ($message) use ($request, $pdf, $filename) {
+            $message->to($request->email)
+                    ->subject('Payment Report - ' . date('Y-m-d'))
+                    ->attachData($pdf->output(), $filename);
+        });
+
+        return redirect()->back()->with('success', 'Payment report sent to ' . $request->email);
+    }
+
+    /**
+     * Descarga directa de Excel (sin Inertia)
+     */
+    public function downloadExcel(Request $request)
+    {
+        // Validar request
+        $request->validate([
+            'developer_ids' => 'required|array',
+            'developer_ids.*' => 'exists:users,id',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+        ]);
+
+        // Preparar datos
+        $developers = User::with(['tasks' => function ($query) use ($request) {
+            $query->where('status', 'done');
+            if ($request->start_date) {
+                $query->where('actual_finish', '>=', $request->start_date);
+            }
+            if ($request->end_date) {
+                $query->where('actual_finish', '<=', $request->end_date);
+            }
+        }, 'projects'])
+        ->whereIn('id', $request->developer_ids)
+        ->get()
+        ->map(function ($developer) {
+            $completedTasks = $developer->tasks;
+            $totalEarnings = $completedTasks->sum(function ($task) use ($developer) {
+                return ($task->actual_hours ?? 0) * $developer->hour_value;
+            });
+
+            return [
+                'id' => $developer->id,
+                'name' => $developer->name,
+                'email' => $developer->email,
+                'hour_value' => $developer->hour_value,
+                'completed_tasks' => $completedTasks->count(),
+                'total_hours' => $completedTasks->sum('actual_hours'),
+                'total_earnings' => $totalEarnings,
+                'tasks' => $completedTasks->map(function ($task) use ($developer) {
+                    return [
+                        'name' => $task->name,
+                        'project' => $task->sprint->project->name ?? 'N/A',
+                        'hours' => $task->actual_hours ?? 0,
+                        'earnings' => ($task->actual_hours ?? 0) * $developer->hour_value,
+                        'completed_at' => $task->actual_finish,
+                    ];
+                }),
+            ];
+        });
+
+        $reportData = [
+            'developers' => $developers,
+            'totalEarnings' => $developers->sum('total_earnings'),
+            'totalHours' => $developers->sum('total_hours'),
+            'generated_at' => now()->format('Y-m-d H:i:s'),
+            'period' => [
+                'start' => $request->start_date,
+                'end' => $request->end_date,
+            ],
+        ];
+
+        return $this->generateExcel($reportData);
+    }
+
+    /**
+     * Descarga directa de PDF (sin Inertia)
+     */
+    public function downloadPDF(Request $request)
+    {
+        // Validar request
+        $request->validate([
+            'developer_ids' => 'required|array',
+            'developer_ids.*' => 'exists:users,id',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+        ]);
+
+        // Preparar datos (mismo código que downloadExcel)
+        $developers = User::with(['tasks' => function ($query) use ($request) {
+            $query->where('status', 'done');
+            if ($request->start_date) {
+                $query->where('actual_finish', '>=', $request->start_date);
+            }
+            if ($request->end_date) {
+                $query->where('actual_finish', '<=', $request->end_date);
+            }
+        }, 'projects'])
+        ->whereIn('id', $request->developer_ids)
+        ->get()
+        ->map(function ($developer) {
+            $completedTasks = $developer->tasks;
+            $totalEarnings = $completedTasks->sum(function ($task) use ($developer) {
+                return ($task->actual_hours ?? 0) * $developer->hour_value;
+            });
+
+            return [
+                'id' => $developer->id,
+                'name' => $developer->name,
+                'email' => $developer->email,
+                'hour_value' => $developer->hour_value,
+                'completed_tasks' => $completedTasks->count(),
+                'total_hours' => $completedTasks->sum('actual_hours'),
+                'total_earnings' => $totalEarnings,
+                'tasks' => $completedTasks->map(function ($task) use ($developer) {
+                    return [
+                        'name' => $task->name,
+                        'project' => $task->sprint->project->name ?? 'N/A',
+                        'hours' => $task->actual_hours ?? 0,
+                        'earnings' => ($task->actual_hours ?? 0) * $developer->hour_value,
+                        'completed_at' => $task->actual_finish,
+                    ];
+                }),
+            ];
+        });
+
+        $reportData = [
+            'developers' => $developers,
+            'totalEarnings' => $developers->sum('total_earnings'),
+            'totalHours' => $developers->sum('total_hours'),
+            'generated_at' => now()->format('Y-m-d H:i:s'),
+            'period' => [
+                'start' => $request->start_date,
+                'end' => $request->end_date,
+            ],
+        ];
+
+        return $this->generatePDF($reportData);
     }
 }

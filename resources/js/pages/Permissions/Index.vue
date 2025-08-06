@@ -269,111 +269,115 @@
         </div>
 
         <!-- Grant Permission Modal -->
-        <Modal v-if="showGrantModal" @close="showGrantModal = false">
-            <div class="p-6">
-                <h3 class="text-lg font-medium mb-4">Otorgar Permiso</h3>
-                <form @submit.prevent="grantPermission">
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Permiso</label>
-                            <select v-model="grantForm.permission_name" class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700">
-                                <option value="">Seleccionar permiso</option>
-                                <option v-for="permission in permissions" :key="permission.id" :value="permission.name">
-                                    {{ permission.display_name }} ({{ permission.module }})
-                                </option>
-                            </select>
+        <div v-if="showGrantModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                <div class="mt-3">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Otorgar Permiso</h3>
+                    <form @submit.prevent="grantPermission">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Permiso</label>
+                                <select v-model="grantForm.permission_name" class="w-full rounded-md border-gray-300 text-gray-900 bg-white focus:border-indigo-500 focus:ring-indigo-500">
+                                    <option value="" class="text-gray-500">Seleccionar permiso</option>
+                                    <option v-for="permission in permissions" :key="permission.id" :value="permission.name" class="text-gray-900 bg-white">
+                                        {{ permission.display_name }} ({{ permission.module }})
+                                    </option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+                                <select v-model="grantForm.type" class="w-full rounded-md border-gray-300 text-gray-900 bg-white focus:border-indigo-500 focus:ring-indigo-500">
+                                    <option value="temporary" class="text-gray-900 bg-white">Temporal</option>
+                                    <option value="permanent" class="text-gray-900 bg-white">Permanente</option>
+                                </select>
+                            </div>
+
+                            <div v-if="grantForm.type === 'temporary'">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Fecha de Expiración</label>
+                                <input
+                                    v-model="grantForm.expires_at"
+                                    type="datetime-local"
+                                    class="w-full rounded-md border-gray-300 text-gray-900 bg-white focus:border-indigo-500 focus:ring-indigo-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Razón (opcional)</label>
+                                <textarea
+                                    v-model="grantForm.reason"
+                                    rows="3"
+                                    class="w-full rounded-md border-gray-300 text-gray-900 bg-white focus:border-indigo-500 focus:ring-indigo-500"
+                                    placeholder="Razón por la que se otorga el permiso..."
+                                ></textarea>
+                            </div>
                         </div>
 
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Tipo</label>
-                            <select v-model="grantForm.type" class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700">
-                                <option value="temporary">Temporal</option>
-                                <option value="permanent">Permanente</option>
-                            </select>
+                        <div class="flex justify-end space-x-3 mt-6">
+                            <button
+                                type="button"
+                                @click="showGrantModal = false"
+                                class="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="submit"
+                                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                Otorgar
+                            </button>
                         </div>
-
-                        <div v-if="grantForm.type === 'temporary'">
-                            <label class="block text-sm font-medium mb-1">Fecha de Expiración</label>
-                            <input
-                                v-model="grantForm.expires_at"
-                                type="datetime-local"
-                                class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700"
-                            />
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Razón (opcional)</label>
-                            <textarea
-                                v-model="grantForm.reason"
-                                rows="3"
-                                class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700"
-                                placeholder="Razón por la que se otorga el permiso..."
-                            ></textarea>
-                        </div>
-                    </div>
-
-                    <div class="flex justify-end space-x-3 mt-6">
-                        <button
-                            type="button"
-                            @click="showGrantModal = false"
-                            class="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            type="submit"
-                            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md"
-                        >
-                            Otorgar
-                        </button>
-                    </div>
-                </form>
+                    </form>
+                </div>
             </div>
-        </Modal>
+        </div>
 
         <!-- Role Permissions Modal -->
-        <Modal v-if="showRoleModal" @close="showRoleModal = false">
-            <div class="p-6">
-                <h3 class="text-lg font-medium mb-4">Editar Permisos del Rol: {{ selectedRole?.name }}</h3>
-                <form @submit.prevent="updateRolePermissions">
-                    <div class="space-y-4 max-h-96 overflow-y-auto">
-                        <div
-                            v-for="permission in permissions"
-                            :key="permission.id"
-                            class="flex items-center"
-                        >
-                            <input
-                                :id="permission.id"
-                                v-model="rolePermissionsForm.permission_ids"
-                                :value="permission.id"
-                                type="checkbox"
-                                class="rounded border-gray-300 dark:border-gray-600"
-                            />
-                            <label :for="permission.id" class="ml-2 text-sm">
-                                <div class="font-medium">{{ permission.display_name }}</div>
-                                <div class="text-gray-500 dark:text-gray-400">{{ permission.description }}</div>
-                            </label>
+        <div v-if="showRoleModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                <div class="mt-3">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Editar Permisos del Rol: {{ selectedRole?.name }}</h3>
+                    <form @submit.prevent="updateRolePermissions">
+                        <div class="space-y-4 max-h-96 overflow-y-auto">
+                            <div
+                                v-for="permission in permissions"
+                                :key="permission.id"
+                                class="flex items-center p-2 hover:bg-gray-50 rounded-md"
+                            >
+                                <input
+                                    :id="permission.id"
+                                    v-model="rolePermissionsForm.permission_ids"
+                                    :value="permission.id"
+                                    type="checkbox"
+                                    class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <label :for="permission.id" class="ml-2 text-sm text-gray-900 cursor-pointer flex-1">
+                                    <div class="font-medium">{{ permission.display_name }}</div>
+                                    <div class="text-gray-600">{{ permission.description }}</div>
+                                </label>
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="flex justify-end space-x-3 mt-6">
-                        <button
-                            type="button"
-                            @click="showRoleModal = false"
-                            class="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            type="submit"
-                            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md"
-                        >
-                            Guardar
-                        </button>
-                    </div>
-                </form>
+                        <div class="flex justify-end space-x-3 mt-6">
+                            <button
+                                type="button"
+                                @click="showRoleModal = false"
+                                class="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="submit"
+                                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                Guardar
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
-        </Modal>
+        </div>
     </AppLayout>
 </template>
 
@@ -381,7 +385,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/app/AppSidebarLayout.vue';
-import Modal from '@/components/ui/dialog/Dialog.vue';
+
 
 interface Permission {
     id: string;
@@ -599,4 +603,33 @@ const formatDate = (dateString: string) => {
 onMounted(() => {
     loadExpiredPermissions();
 });
-</script> 
+</script>
+
+<style scoped>
+/* Estilos específicos para mejorar el contraste en los dropdowns */
+select option {
+    background-color: white;
+    color: #111827; /* text-gray-900 */
+    padding: 8px 12px;
+}
+
+select option:hover {
+    background-color: #f3f4f6; /* bg-gray-100 */
+}
+
+select option:checked {
+    background-color: #3b82f6; /* bg-blue-500 */
+    color: white;
+}
+
+/* Mejorar la legibilidad de los checkboxes */
+input[type="checkbox"]:checked {
+    background-color: #3b82f6;
+    border-color: #3b82f6;
+}
+
+/* Estilos para el hover en las opciones de permisos */
+.hover\:bg-gray-50:hover {
+    background-color: #f9fafb;
+}
+</style> 

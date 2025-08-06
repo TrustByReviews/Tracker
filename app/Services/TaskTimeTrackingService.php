@@ -12,6 +12,37 @@ use Illuminate\Support\Facades\Auth;
 class TaskTimeTrackingService
 {
     /**
+     * Verificar límite de tareas simultáneas para un usuario
+     */
+    public function checkSimultaneousTasksLimit(User $user): bool
+    {
+        // Verificar si el usuario tiene permiso para tareas simultáneas sin límite
+        if ($user->hasPermission('unlimited_simultaneous_tasks')) {
+            return true; // Sin límite
+        }
+        
+        // Contar tareas activas del usuario
+        $activeTasksCount = Task::where('user_id', $user->id)
+            ->where('is_working', true)
+            ->where('status', 'in progress')
+            ->count();
+        
+        // Límite de 3 tareas simultáneas
+        return $activeTasksCount < 3;
+    }
+    
+    /**
+     * Obtener el número de tareas activas de un usuario
+     */
+    public function getActiveTasksCount(User $user): int
+    {
+        return Task::where('user_id', $user->id)
+            ->where('is_working', true)
+            ->where('status', 'in progress')
+            ->count();
+    }
+    
+    /**
      * Iniciar trabajo en una tarea
      */
     public function startWork(Task $task, User $user): bool
@@ -34,6 +65,12 @@ class TaskTimeTrackingService
                 throw new \Exception('No puedes trabajar en una tarea completada');
             }
             
+            // Verificar límite de tareas simultáneas
+            if (!$this->checkSimultaneousTasksLimit($user)) {
+                $activeCount = $this->getActiveTasksCount($user);
+                throw new \Exception("Ya tienes {$activeCount} tareas activas. El límite es 3 tareas simultáneas. Contacta a tu administrador si necesitas trabajar en más tareas.");
+            }
+            
             // Crear log de inicio
             $timeLog = TaskTimeLog::create([
                 'task_id' => $task->id,
@@ -48,7 +85,12 @@ class TaskTimeTrackingService
                 'status' => 'in progress',
                 'work_started_at' => now(),
                 'is_working' => true,
-                'actual_start' => $task->actual_start ?? now()->format('Y-m-d')
+                'actual_start' => $task->actual_start ?? now()->format('Y-m-d'),
+                'auto_paused' => false,
+                'auto_paused_at' => null,
+                'auto_pause_reason' => null,
+                'alert_count' => 0,
+                'last_alert_at' => null
             ]);
             
             Log::info('Trabajo iniciado en tarea', [
@@ -104,8 +146,35 @@ class TaskTimeTrackingService
                 throw new \Exception('No se encontró sesión activa de trabajo');
             }
             
-            // Calcular tiempo transcurrido
-            $duration = max(0, now()->diffInSeconds($activeLog->started_at));
+            // Calcular tiempo transcurrido con mayor precisión
+            $startTime = \Carbon\Carbon::parse($activeLog->started_at);
+            $endTime = \Carbon\Carbon::now();
+            
+            // Calcular duración usando valor absoluto y redondear a entero para evitar problemas de zona horaria
+            $duration = (int) round($endTime->diffInSeconds($startTime, true));
+            
+            // Log para debug si hay problemas de tiempo
+            if ($endTime->lt($startTime)) {
+                Log::warning('Tiempo de fin anterior al tiempo de inicio, usando valor absoluto', [
+                    'task_id' => $task->id,
+                    'started_at' => $activeLog->started_at,
+                    'startTime' => $startTime->toDateTimeString(),
+                    'endTime' => $endTime->toDateTimeString(),
+                    'raw_difference' => $endTime->diffInSeconds($startTime, false),
+                    'absolute_duration' => $duration
+                ]);
+            }
+            
+            // Log para debug
+            Log::info('Calculando duración de pausa', [
+                'task_id' => $task->id,
+                'started_at' => $activeLog->started_at,
+                'startTime' => $startTime->toDateTimeString(),
+                'now' => $endTime->toDateTimeString(),
+                'duration_seconds' => $duration,
+                'total_before' => $task->total_time_seconds,
+                'diff_in_seconds' => $endTime->diffInSeconds($startTime, false)
+            ]);
             
             // Actualizar log
             $activeLog->update([
@@ -180,7 +249,7 @@ class TaskTimeTrackingService
                 'action' => 'resume'
             ]);
             
-            // Crear nuevo log de reanudación
+            // Crear nuevo log de reanudación (este será el log activo)
             $newLog = TaskTimeLog::create([
                 'task_id' => $task->id,
                 'user_id' => $user->id,
@@ -189,11 +258,22 @@ class TaskTimeTrackingService
                 'notes' => 'Reanudación de trabajo'
             ]);
             
+            // Log para debug
+            Log::info('Reanudando trabajo - nuevo log creado', [
+                'task_id' => $task->id,
+                'paused_log_id' => $pausedLog->id,
+                'new_log_id' => $newLog->id,
+                'new_log_started_at' => $newLog->started_at
+            ]);
+            
             // Actualizar tarea
             $task->update([
                 'is_working' => true,
                 'work_started_at' => now()
             ]);
+            
+            // El total_time_seconds ya está actualizado desde cuando se pausó
+            // No necesitamos modificarlo aquí, solo mantener el valor acumulado
             
             Log::info('Trabajo reanudado en tarea', [
                 'task_id' => $task->id,
@@ -249,8 +329,10 @@ class TaskTimeTrackingService
                 throw new \Exception('No se encontró sesión activa de trabajo');
             }
             
-            // Calcular tiempo transcurrido
-            $duration = max(0, now()->diffInSeconds($activeLog->started_at));
+            // Calcular tiempo transcurrido con mayor precisión
+            $startTime = \Carbon\Carbon::parse($activeLog->started_at);
+            $endTime = now();
+            $duration = max(0, $endTime->diffInSeconds($startTime, false));
             
             // Actualizar log
             $activeLog->update([
@@ -338,6 +420,94 @@ class TaskTimeTrackingService
                 $query->whereNotNull('paused_at')
                       ->whereNull('resumed_at');
             })
+            ->with(['sprint', 'project'])
+            ->get();
+    }
+
+    /**
+     * Reanudar tarea auto-pausada
+     */
+    public function resumeAutoPausedTask(Task $task, User $user): bool
+    {
+        try {
+            DB::beginTransaction();
+            
+            // Verificar que la tarea está asignada al usuario
+            if ($task->user_id !== $user->id) {
+                throw new \Exception('No tienes permisos para reanudar esta tarea');
+            }
+            
+            // Verificar que la tarea está auto-pausada
+            if (!$task->auto_paused) {
+                throw new \Exception('Esta tarea no está auto-pausada');
+            }
+            
+            // Crear nuevo log de reanudación
+            $newLog = TaskTimeLog::create([
+                'task_id' => $task->id,
+                'user_id' => $user->id,
+                'started_at' => now(),
+                'action' => 'resume_auto_paused',
+                'notes' => 'Reanudación de tarea auto-pausada'
+            ]);
+            
+            // Actualizar tarea
+            $task->update([
+                'is_working' => true,
+                'work_started_at' => now(),
+                'auto_paused' => false,
+                'auto_paused_at' => null,
+                'auto_pause_reason' => null,
+                'alert_count' => 0,
+                'last_alert_at' => null
+            ]);
+            
+            Log::info('Tarea auto-pausada reanudada', [
+                'task_id' => $task->id,
+                'task_name' => $task->name,
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'new_log_id' => $newLog->id
+            ]);
+            
+            DB::commit();
+            return true;
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error al reanudar tarea auto-pausada', [
+                'error' => $e->getMessage(),
+                'task_id' => $task->id,
+                'user_id' => $user->id
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Resetear contadores de alerta cuando se inicia trabajo manualmente
+     */
+    public function resetAlertCounters(Task $task): void
+    {
+        $task->update([
+            'alert_count' => 0,
+            'last_alert_at' => null
+        ]);
+        
+        Log::info('Contadores de alerta reseteados', [
+            'task_id' => $task->id,
+            'task_name' => $task->name
+        ]);
+    }
+
+    /**
+     * Obtener tareas auto-pausadas de un usuario
+     */
+    public function getAutoPausedTasksForUser(User $user): \Illuminate\Database\Eloquent\Collection
+    {
+        return Task::where('user_id', $user->id)
+            ->where('auto_paused', true)
+            ->where('status', 'in progress')
             ->with(['sprint', 'project'])
             ->get();
     }
