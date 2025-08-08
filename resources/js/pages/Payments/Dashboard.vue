@@ -44,7 +44,7 @@
                     </div>
                 </div>
 
-                <!-- Estadísticas del Usuario -->
+                <!-- Statistics del User -->
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
                     <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                         <div class="p-6">
@@ -119,7 +119,7 @@
                     </div>
                 </div>
 
-                <!-- Historial de Pagos -->
+                <!-- Storyl de Pagos -->
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                     <div class="p-6">
                         <h3 class="text-lg font-semibold text-gray-900 mb-4">

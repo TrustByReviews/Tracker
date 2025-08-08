@@ -142,7 +142,7 @@
 
       <!-- Assignment Info -->
       <div v-if="task.assigned_by" class="text-xs text-gray-500 mb-4">
-        <span>Asignado por: {{ task.assigned_by_user?.name || 'N/A' }}</span>
+        <span>Assigned por: {{ task.assigned_by_user?.name || 'N/A' }}</span>
         <span v-if="task.assigned_at" class="ml-2">
           el {{ formatDate(task.assigned_at) }}
         </span>
@@ -328,8 +328,8 @@ const formatDate = (dateString) => {
 
 const getStatusLabel = (status) => {
   const labels = {
-    'to do': 'Pendiente',
-    'in progress': 'En Progreso',
+    'to do': 'Pending',
+    'in progress': 'In Progress',
     'done': 'Completada'
   }
   return labels[status] || status
@@ -337,16 +337,16 @@ const getStatusLabel = (status) => {
 
 const getPriorityLabel = (priority) => {
   const labels = {
-    high: 'Alta',
-    medium: 'Media',
-    low: 'Baja'
+    high: 'High',
+    medium: 'Medium',
+    low: 'Low'
   }
   return labels[priority] || priority
 }
 
 const getApprovalStatusLabel = (status) => {
   const labels = {
-    pending: 'Pendiente',
+    pending: 'Pending',
     approved: 'Aprobada',
     rejected: 'Rechazada'
   }

@@ -203,7 +203,7 @@ const getBorderColor = (project: Project) => {
       <!-- Filtros Avanzados -->
       <div class="p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-medium text-gray-900 dark:text-white">Filtros Avanzados</h3>
+          <h3 class="text-lg font-medium text-gray-900 dark:text-white">Advanced Filters</h3>
           <Button 
             v-if="hasActiveFilters" 
             @click="clearFilters" 
@@ -211,20 +211,20 @@ const getBorderColor = (project: Project) => {
             size="sm"
           >
             <Icon name="x" class="h-4 w-4 mr-2" />
-            Limpiar Filtros
+            Clear Filters
           </Button>
         </div>
         
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <!-- Filtro por Estado -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Estado</label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
             <Select v-model="filters.status" @update:model-value="applyFilters">
               <SelectTrigger>
-                <SelectValue placeholder="Todos los estados" />
+                <SelectValue placeholder="All statuses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los estados</SelectItem>
+                <SelectItem value="">All statuses</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
                 <SelectItem value="paused">Paused</SelectItem>
@@ -234,15 +234,15 @@ const getBorderColor = (project: Project) => {
             </Select>
           </div>
 
-          <!-- Filtro por Usuario Asignado -->
+          <!-- Filtro por User Assigned -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Usuario Asignado</label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Assigned User</label>
             <Select v-model="filters.assigned_user_id" @update:model-value="applyFilters">
               <SelectTrigger>
-                <SelectValue placeholder="Todos los usuarios" />
+                <SelectValue placeholder="All users" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los usuarios</SelectItem>
+                <SelectItem value="">All users</SelectItem>
                 <SelectItem 
                   v-for="developer in developers" 
                   :key="developer.id" 
@@ -254,33 +254,33 @@ const getBorderColor = (project: Project) => {
             </Select>
           </div>
 
-          <!-- Búsqueda por Nombre -->
+          <!-- Search by Name -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Buscar Proyecto</label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Search Project</label>
             <Input 
               v-model="filters.search" 
-              placeholder="Buscar por nombre..."
+              placeholder="Search by name..."
               @input="applyFilters"
             />
           </div>
 
-          <!-- Ordenar por -->
+          <!-- Sort por -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Ordenar por</label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Sort by</label>
             <Select v-model="filters.sort_by" @update:model-value="applyFilters">
               <SelectTrigger>
-                <SelectValue placeholder="Ordenar por" />
+                <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="created_at">Fecha de creación</SelectItem>
-                <SelectItem value="name">Nombre</SelectItem>
-                <SelectItem value="status">Estado</SelectItem>
-                <SelectItem value="completion_rate">Porcentaje completado</SelectItem>
-                <SelectItem value="total_tasks">Total de tareas</SelectItem>
-                <SelectItem value="completed_tasks">Tareas completadas</SelectItem>
-                <SelectItem value="team_members">Miembros del equipo</SelectItem>
-                <SelectItem value="sprints_count">Número de sprints</SelectItem>
-                <SelectItem value="updated_at">Última actualización</SelectItem>
+                <SelectItem value="created_at">Creation date</SelectItem>
+                <SelectItem value="name">Name</SelectItem>
+                <SelectItem value="status">Status</SelectItem>
+                <SelectItem value="completion_rate">Completion percentage</SelectItem>
+                <SelectItem value="total_tasks">Total tasks</SelectItem>
+                <SelectItem value="completed_tasks">Completed tasks</SelectItem>
+                <SelectItem value="team_members">Team members</SelectItem>
+                <SelectItem value="sprints_count">Number of sprints</SelectItem>
+                <SelectItem value="updated_at">Last update</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -289,14 +289,14 @@ const getBorderColor = (project: Project) => {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           <!-- Orden -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Orden</label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Order</label>
             <Select v-model="filters.sort_order" @update:model-value="applyFilters">
               <SelectTrigger>
-                <SelectValue placeholder="Orden" />
+                <SelectValue placeholder="Order" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="asc">Ascendente</SelectItem>
-                <SelectItem value="desc">Descendente</SelectItem>
+                <SelectItem value="asc">Ascending</SelectItem>
+                <SelectItem value="desc">Descending</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -462,7 +462,7 @@ const getBorderColor = (project: Project) => {
                 variant="outline"
               >
                 <Icon name="x" class="h-4 w-4 mr-2" />
-                Limpiar Filtros
+                Clear Filters
               </Button>
               <ProjectCreateModal 
                 v-if="props.permissions === 'admin'" 

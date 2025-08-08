@@ -49,7 +49,7 @@ const submit = () => {
   });
 };
 
-const getRoleName = (developer: Developer) => {
+const getRoleeeeeeeeeeeeeName = (developer: Developer) => {
   return developer.roles?.[0]?.name || 'Developer';
 };
 </script>
@@ -128,7 +128,7 @@ const getRoleName = (developer: Developer) => {
                 <label :for="`dev-${developer.id}`" class="flex-1 text-sm">
                   <div class="font-medium">{{ developer.name }}</div>
                   <div class="text-gray-500 text-xs">{{ developer.email }}</div>
-                  <div class="text-gray-400 text-xs">{{ getRoleName(developer) }}</div>
+                  <div class="text-gray-400 text-xs">{{ getRoleeeeeeeeeeeeeName(developer) }}</div>
                 </label>
               </div>
             </div>

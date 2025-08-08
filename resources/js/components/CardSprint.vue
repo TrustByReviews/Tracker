@@ -33,22 +33,22 @@ const formatDate = (date: string) => {
 const showSprint = () => {
 
     
-    // Obtener el project_id válido, intentando múltiples fuentes
+    // Get valid project_id, trying multiple sources
     let validProjectId: string | null = props.project_id;
     
-    // Si props.project_id es inválido, intentar usar sprint.project_id
+    // If props.project_id is invalid, try using sprint.project_id
     if (!validProjectId || validProjectId === 'NaN' || validProjectId === 'undefined' || validProjectId === null) {
         validProjectId = props.sprint.project_id;
 
     }
     
-    // Si aún es inválido, intentar usar sprint.project.id
+    // If still invalid, try using sprint.project.id
     if (!validProjectId || validProjectId === 'NaN' || validProjectId === 'undefined' || validProjectId === null) {
         validProjectId = props.sprint.project?.id || null;
 
     }
     
-    // Validar que tengamos un project_id válido
+    // Validate that we have a valid project_id
     if (!validProjectId || validProjectId === 'NaN' || validProjectId === 'undefined' || validProjectId === null) {
         console.error('No valid project_id found:', {
             props_project_id: props.project_id,
@@ -59,18 +59,18 @@ const showSprint = () => {
         return;
     }
     
-    // Validar que sprint.id sea un UUID válido
+    // Validate that sprint.id is a valid UUID
     if (!props.sprint.id || props.sprint.id === 'NaN' || props.sprint.id === 'undefined') {
         console.error('Invalid sprint.id:', props.sprint.id);
         alert('Error: Invalid sprint ID.');
         return;
     }
     
-    const url = `/projects/${validProjectId}/sprints/${props.sprint.id}`;
+    const url = `/team-leader/sprints/${props.sprint.id}`;
     window.location.href = url;
 }
 
-// Calcular el progreso del sprint basado en las tareas
+// Calculate sprint progress based on tasks
 const getSprintProgress = () => {
     if (!props.sprint.tasks || props.sprint.tasks.length === 0) {
         return 0;
@@ -83,7 +83,7 @@ const getSprintProgress = () => {
     return Math.round((completedTasks / props.sprint.tasks.length) * 100);
 }
 
-// Obtener estadísticas del sprint
+// Get sprint statistics
 const getSprintStats = () => {
     if (!props.sprint.tasks && !props.sprint.bugs) {
         return {
@@ -104,7 +104,7 @@ const getSprintStats = () => {
     const tasks = props.sprint.tasks || [];
     const bugs = props.sprint.bugs || [];
     
-    // Estadísticas de tareas
+    // Task statistics
     const totalTasks = tasks.length;
     const completedTasks = tasks.filter(task => 
         task.status === 'completed' || task.status === 'done'
@@ -113,7 +113,7 @@ const getSprintStats = () => {
         task.status === 'in progress'
     ).length;
     
-    // Estadísticas de bugs
+    // Bug statistics
     const totalBugs = bugs.length;
     const completedBugs = bugs.filter(bug => 
         ['resolved', 'verified', 'closed'].includes(bug.status)
@@ -122,7 +122,7 @@ const getSprintStats = () => {
         ['assigned', 'in progress'].includes(bug.status)
     ).length;
     
-    // Totales combinados
+    // Combined totals
     const total = totalTasks + totalBugs;
     const completed = completedTasks + completedBugs;
     const inProgress = inProgressTasks + inProgressBugs;
@@ -130,19 +130,19 @@ const getSprintStats = () => {
     
     const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
     
-    // Calcular días restantes
+    // Calculate remaining days
     const endDate = new Date(props.sprint.end_date);
     const today = new Date();
     const daysToEnd = Math.max(0, Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
     
-    // Calcular prioridad
-    let priorityScore = 50; // Prioridad normal
+    // Calculate priority
+    let priorityScore = 50; // Normal priority
     if (daysToEnd === 0 && completionRate < 100) {
-        priorityScore = 100; // Atrasado
+        priorityScore = 100; // Overdue
     } else if (daysToEnd <= 3 && completionRate < 50) {
-        priorityScore = 90; // Alta prioridad
+        priorityScore = 90; // High priority
     } else if (daysToEnd <= 7 && completionRate < 70) {
-        priorityScore = 70; // Prioridad media
+        priorityScore = 70; // Medium priority
     }
     
     return {
@@ -160,7 +160,7 @@ const getSprintStats = () => {
     };
 }
 
-// Obtener estado del sprint
+// Get sprint status
 const getSprintStatus = () => {
     const today = new Date();
     const startDate = new Date(props.sprint.start_date);
@@ -175,7 +175,7 @@ const getSprintStatus = () => {
     }
 }
 
-// Obtener color de prioridad
+// Get priority color
 const getPriorityColor = () => {
     const stats = getSprintStats();
     if (stats.priorityScore > 2) return 'text-red-600';
@@ -184,7 +184,7 @@ const getPriorityColor = () => {
     return 'text-green-600';
 }
 
-// Obtener icono de prioridad
+// Get priority icon
 const getPriorityIcon = () => {
     const stats = getSprintStats();
     if (stats.priorityScore > 2) return 'alert-triangle';
@@ -193,7 +193,7 @@ const getPriorityIcon = () => {
     return 'check-circle';
 }
 
-// Obtener color de estado
+// Get status color
 const getStatusColor = () => {
     const status = getSprintStatus();
     switch (status) {
@@ -204,7 +204,7 @@ const getStatusColor = () => {
     }
 }
 
-// Obtener color de borde
+// Get border color
 const getBorderColor = () => {
     const status = getSprintStatus();
     switch (status) {
@@ -264,7 +264,7 @@ const getBorderColor = () => {
 
         <!-- Sprint Stats Detalladas -->
         <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
-            <!-- Tareas -->
+            <!-- Tasks -->
             <div class="space-y-1">
                 <div class="text-center p-2 bg-blue-100 rounded">
                     <div class="font-semibold text-blue-800">{{ getSprintStats().totalTasks }}</div>

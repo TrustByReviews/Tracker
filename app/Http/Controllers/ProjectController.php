@@ -41,6 +41,9 @@ class ProjectController extends Controller
 
         if ($permissions === 'admin') {
             $projectsQuery = Project::with(['users', 'sprints.tasks', 'creator']);
+        } elseif ($permissions === 'qa') {
+            // QA puede ver proyectos a los que está asignado
+            $projectsQuery = $authUser->projects()->with(['users', 'sprints.tasks', 'creator']);
         } elseif ($permissions === 'developer') {
             $projectsQuery = $authUser->projects()->with(['users', 'sprints.tasks', 'creator']);
         }

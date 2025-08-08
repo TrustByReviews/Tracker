@@ -101,11 +101,69 @@
           <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
-          Tarea Relacionada
+          Related Task
         </div>
         <div class="bg-blue-50 border border-blue-200 rounded p-2">
           <div class="text-sm font-medium text-blue-900">{{ bug.related_task.name }}</div>
           <div class="text-xs text-blue-700">{{ bug.related_task.status }}</div>
+        </div>
+      </div>
+
+      <!-- QA Status Information -->
+      <div v-if="bug.qa_status" class="mb-4">
+        <div class="flex items-center text-xs text-gray-500 mb-2">
+          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          QA Status
+        </div>
+        <div class="flex items-center space-x-2">
+          <span
+            :class="{
+              'bg-yellow-100 text-yellow-800': bug.qa_status === 'pending',
+              'bg-blue-100 text-blue-800': bug.qa_status === 'in_progress',
+              'bg-green-100 text-green-800': bug.qa_status === 'approved',
+              'bg-red-100 text-red-800': bug.qa_status === 'rejected'
+            }"
+            class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+          >
+            {{ getQaStatusLabel(bug.qa_status) }}
+          </span>
+          <span v-if="bug.qa_reviewed_by_user" class="text-xs text-gray-600">
+            by {{ bug.qa_reviewed_by_user.name }}
+          </span>
+        </div>
+        <div v-if="bug.qa_rejection_reason" class="mt-2 p-2 bg-red-50 border border-red-200 rounded">
+          <p class="text-xs text-red-800 font-medium">Rejection Reason:</p>
+          <p class="text-xs text-red-700">{{ bug.qa_rejection_reason }}</p>
+        </div>
+      </div>
+
+      <!-- Team Leader Status Information -->
+      <div v-if="bug.team_leader_requested_changes || bug.team_leader_final_approval" class="mb-4">
+        <div class="flex items-center text-xs text-gray-500 mb-2">
+          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+          </svg>
+          Team Leader Review
+        </div>
+        <div class="flex items-center space-x-2">
+          <span
+            :class="{
+              'bg-green-100 text-green-800': bug.team_leader_final_approval,
+              'bg-orange-100 text-orange-800': bug.team_leader_requested_changes
+            }"
+            class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+          >
+            {{ bug.team_leader_final_approval ? 'Approved' : 'Changes Requested' }}
+          </span>
+          <span v-if="bug.team_leader_reviewed_by" class="text-xs text-gray-600">
+            by {{ bug.team_leader_reviewed_by.name }}
+          </span>
+        </div>
+        <div v-if="bug.team_leader_change_notes" class="mt-2 p-2 bg-orange-50 border border-orange-200 rounded">
+          <p class="text-xs text-orange-800 font-medium">Change Request:</p>
+          <p class="text-xs text-orange-700">{{ bug.team_leader_change_notes }}</p>
         </div>
       </div>
 
@@ -129,7 +187,7 @@
           <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
-          <span>Estimado: {{ bug.estimated_hours }}h</span>
+          <span>Estimated: {{ bug.estimated_hours }}h</span>
         </div>
 
         <!-- Total Accumulated Time -->
@@ -137,7 +195,7 @@
           <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
-          <span>Total acumulado: {{ totalAccumulatedTime }}</span>
+          <span>Total accumulated: {{ totalAccumulatedTime }}</span>
         </div>
 
         <!-- Current Session Time (if working) -->
@@ -145,7 +203,7 @@
           <svg class="w-4 h-4 mr-1 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
-          <span>Sesión actual: {{ elapsedTime }}</span>
+          <span>Current session: {{ elapsedTime }}</span>
         </div>
 
         <!-- Auto-Paused Status -->
@@ -153,15 +211,15 @@
           <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
           </svg>
-          <span>Auto-pausado: {{ bug.auto_pause_reason }}</span>
+          <span>Auto-paused: {{ bug.auto_pause_reason }}</span>
         </div>
       </div>
 
       <!-- Assignment Info -->
       <div v-if="bug.assigned_by" class="text-xs text-gray-500 mb-4">
-        <span>Asignado por: {{ bug.assigned_by_user?.name || 'N/A' }}</span>
+        <span>Assigned by: {{ bug.assigned_by_user?.name || 'N/A' }}</span>
         <span v-if="bug.assigned_at" class="ml-2">
-          el {{ formatDate(bug.assigned_at) }}
+          on {{ formatDate(bug.assigned_at) }}
         </span>
       </div>
 
@@ -176,7 +234,7 @@
           <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
           </svg>
-          Auto-asignar
+          Self-assign
         </button>
 
         <!-- Start Work Button -->
@@ -188,7 +246,7 @@
           <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
-          Iniciar
+          Start
         </button>
 
         <!-- Pause Work Button -->
@@ -200,7 +258,7 @@
           <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
-          Pausar
+          Pause
         </button>
 
         <!-- Resume Work Button -->
@@ -212,7 +270,7 @@
           <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
-          Reanudar
+          Resume
         </button>
 
         <!-- Finish Work Button -->
@@ -224,7 +282,7 @@
           <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
           </svg>
-          Finalizar
+          Finish
         </button>
 
         <!-- View Details Button -->
@@ -236,7 +294,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
           </svg>
-          Ver detalles
+          View details
         </button>
       </div>
     </div>
@@ -295,23 +353,23 @@ const totalAccumulatedTime = computed(() => {
 
 const getStatusLabel = (status) => {
   const labels = {
-    'new': 'Nuevo',
-    'assigned': 'Asignado',
-    'in progress': 'En Progreso',
-    'resolved': 'Resuelto',
-    'verified': 'Verificado',
-    'closed': 'Cerrado',
-    'reopened': 'Reabierto'
+    'new': 'New',
+    'assigned': 'Assigned',
+    'in progress': 'In Progress',
+    'resolved': 'Resolved',
+    'verified': 'Verified',
+    'closed': 'Closed',
+    'reopened': 'Reopened'
   }
   return labels[status] || status
 }
 
 const getImportanceLabel = (importance) => {
   const labels = {
-    'low': 'Baja',
-    'medium': 'Media',
-    'high': 'Alta',
-    'critical': 'Crítica'
+    'low': 'Low',
+    'medium': 'Medium',
+    'high': 'High',
+    'critical': 'Critical'
   }
   return labels[importance] || importance
 }
@@ -320,21 +378,31 @@ const getBugTypeLabel = (bugType) => {
   const labels = {
     'frontend': 'Frontend',
     'backend': 'Backend',
-    'database': 'Base de Datos',
+    'database': 'Database',
     'api': 'API',
     'ui_ux': 'UI/UX',
-    'performance': 'Rendimiento',
-    'security': 'Seguridad',
-    'other': 'Otro'
+    'performance': 'Performance',
+    'security': 'Security',
+    'other': 'Other'
   }
   return labels[bugType] || bugType
+}
+
+const getQaStatusLabel = (qaStatus) => {
+  const labels = {
+    'pending': 'Pending',
+    'in_progress': 'In Progress',
+    'approved': 'Approved',
+    'rejected': 'Rejected'
+  }
+  return labels[qaStatus] || qaStatus
 }
 
 const getFileName = (attachment) => {
   if (typeof attachment === 'string') {
     return attachment.split('/').pop()
   }
-  return attachment.name || 'Archivo'
+  return attachment.name || 'File'
 }
 
 const openAttachment = (attachment) => {
@@ -346,7 +414,7 @@ const openAttachment = (attachment) => {
 }
 
 const formatDate = (date) => {
-  return new Date(date).toLocaleDateString('es-ES')
+  return new Date(date).toLocaleDateString('en-US')
 }
 
 const startTimer = () => {
@@ -375,7 +443,7 @@ watch(isWorking, (newValue) => {
 }, { immediate: true })
 
 onMounted(() => {
-  // Iniciar timer si el bug ya está trabajando
+  // Start timer if bug is already working
   if (isWorking.value) {
     startTimer()
   }

@@ -23,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'permission' => CheckPermission::class,
+            'role' => \App\Http\Middleware\CheckRole::class,
         ]);
 
         $middleware->web(append: [

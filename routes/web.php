@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\QaController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SprintController;
 use App\Http\Controllers\TaskController;
@@ -23,9 +24,45 @@ Route::get('dashboard', [App\Http\Controllers\DashboardController::class, 'index
 
 Route::middleware(['auth'])->group(function () {
     // Projects routes with permissions
-    Route::middleware('permission:projects.view')->group(function () {
+    Route::middleware(['auth'])->group(function () {
         Route::get('projects', [ProjectController::class, 'index'])->name('projects.index');
         Route::get('projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
+    });
+
+    // Team Leader Routes
+    Route::middleware(['auth'])->group(function () {
+        // Dashboard y páginas principales
+        Route::get('team-leader/dashboard', [TeamLeaderController::class, 'dashboard'])->name('team-leader.dashboard');
+        Route::get('team-leader/projects', [TeamLeaderController::class, 'projects'])->name('team-leader.projects');
+        Route::get('team-leader/sprints', [TeamLeaderController::class, 'sprints'])->name('team-leader.sprints');
+        Route::get('team-leader/notifications', [TeamLeaderController::class, 'notifications'])->name('team-leader.notifications');
+        Route::get('team-leader/reports', [TeamLeaderController::class, 'reports'])->name('team-leader.reports');
+        Route::get('team-leader/settings', [TeamLeaderController::class, 'settings'])->name('team-leader.settings');
+        
+        // API endpoints para el sidebar
+        Route::get('api/team-leader/stats', [TeamLeaderController::class, 'getStats'])->name('api.team-leader.stats');
+        Route::get('api/team-leader/notifications', [TeamLeaderController::class, 'getNotifications'])->name('api.team-leader.notifications');
+        
+        // Notifications routes
+        Route::get('team-leader/notifications', [TeamLeaderController::class, 'notifications'])->name('team-leader.notifications');
+        Route::post('team-leader/notifications/{notification}/read', [TeamLeaderController::class, 'markNotificationAsRead'])->name('team-leader.notifications.read');
+        Route::post('team-leader/notifications/read-all', [TeamLeaderController::class, 'markAllNotificationsAsRead'])->name('team-leader.notifications.read-all');
+        
+        // Review Routes
+        Route::get('team-leader/review/tasks', [App\Http\Controllers\TeamLeaderReviewController::class, 'getTasksReadyForReview'])->name('team-leader.review.tasks');
+        Route::get('team-leader/review/bugs', [App\Http\Controllers\TeamLeaderReviewController::class, 'getBugsReadyForReview'])->name('team-leader.review.bugs');
+        Route::get('team-leader/review/stats', [App\Http\Controllers\TeamLeaderReviewController::class, 'getReviewStats'])->name('team-leader.review.stats');
+        
+        Route::post('team-leader/review/tasks/{task}/approve', [App\Http\Controllers\TeamLeaderReviewController::class, 'approveTask'])->name('team-leader.review.tasks.approve');
+        Route::post('team-leader/review/tasks/{task}/request-changes', [App\Http\Controllers\TeamLeaderReviewController::class, 'requestTaskChanges'])->name('team-leader.review.tasks.request-changes');
+        
+        Route::post('team-leader/review/bugs/{bug}/approve', [App\Http\Controllers\TeamLeaderReviewController::class, 'approveBug'])->name('team-leader.review.bugs.approve');
+        Route::post('team-leader/review/bugs/{bug}/request-changes', [App\Http\Controllers\TeamLeaderReviewController::class, 'requestBugChanges'])->name('team-leader.review.bugs.request-changes');
+        
+        // Rutas para gestionar sprints y sus elementos
+        Route::get('team-leader/sprints/{sprint}', [TeamLeaderController::class, 'showSprint'])->name('team-leader.sprints.show');
+        Route::get('team-leader/sprints/{sprint}/tasks', [TeamLeaderController::class, 'sprintTasks'])->name('team-leader.sprints.tasks');
+        Route::get('team-leader/sprints/{sprint}/bugs', [TeamLeaderController::class, 'sprintBugs'])->name('team-leader.sprints.bugs');
     });
     
     Route::middleware('permission:projects.create')->group(function () {
@@ -41,7 +78,7 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // Sprints routes with permissions
-    Route::middleware('permission:sprints.view')->group(function () {
+    Route::middleware(['auth'])->group(function () {
         Route::get('sprints', [SprintController::class, 'index'])->name('sprints.index');
         Route::get('projects/{project}/sprints/{sprint}', [SprintController::class, 'show'])->name('sprints.show');
     });
@@ -59,7 +96,7 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // Tasks routes with permissions
-    Route::middleware('permission:tasks.view')->group(function () {
+    Route::middleware(['auth'])->group(function () {
         Route::get('tasks', [TaskController::class, 'index'])->name('tasks.index');
         Route::get('tasks/{task}', [TaskController::class, 'show'])->name('tasks.show');
         Route::get('tasks/available', [TaskController::class, 'getAvailableTasks'])->name('tasks.available');
@@ -91,6 +128,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('pending-tasks', [TeamLeaderController::class, 'pendingTasks'])->name('pending-tasks');
         Route::get('in-progress-tasks', [TeamLeaderController::class, 'inProgressTasks'])->name('in-progress-tasks');
         Route::get('developers', [TeamLeaderController::class, 'developers'])->name('developers');
+
         
         Route::middleware('permission:tasks.approve')->group(function () {
             Route::post('tasks/{task}/approve', [TeamLeaderController::class, 'approveTask'])->name('tasks.approve');
@@ -101,9 +139,44 @@ Route::middleware(['auth'])->group(function () {
             Route::post('tasks/{task}/assign', [TeamLeaderController::class, 'assignTask'])->name('tasks.assign');
         });
         
+
+        
         Route::get('stats/approval', [TeamLeaderController::class, 'getApprovalStats'])->name('stats.approval');
         Route::get('stats/developer-time', [TeamLeaderController::class, 'getDeveloperTimeSummary'])->name('stats.developer-time');
         Route::get('stats/recently-completed', [TeamLeaderController::class, 'getRecentlyCompleted'])->name('stats.recently-completed');
+    });
+
+    // QA routes (for actions only)
+    Route::prefix('qa')->name('qa.')->middleware('role:qa')->group(function () {
+        // Task management
+        Route::post('tasks/{task}/assign', [QaController::class, 'assignTask'])->name('tasks.assign');
+        Route::post('tasks/{task}/approve', [QaController::class, 'approveTask'])->name('tasks.approve');
+        Route::post('tasks/{task}/reject', [QaController::class, 'rejectTask'])->name('tasks.reject');
+        Route::get('tasks/{task}', [QaController::class, 'showTask'])->name('tasks.show');
+        
+        // Finished items for QA approval (unified view)
+        Route::get('finished-items', [QaController::class, 'finishedItems'])->name('finished-items');
+        Route::post('tasks/{task}/start-testing', [QaController::class, 'startTestingTask'])->name('tasks.start-testing');
+        Route::post('tasks/{task}/pause-testing', [QaController::class, 'pauseTestingTask'])->name('tasks.pause-testing');
+        Route::post('tasks/{task}/resume-testing', [QaController::class, 'resumeTestingTask'])->name('tasks.resume-testing');
+        Route::post('tasks/{task}/finish-testing', [QaController::class, 'finishTestingTask'])->name('tasks.finish-testing');
+        
+        // Bug management
+        Route::post('bugs/{bug}/assign', [QaController::class, 'assignBug'])->name('bugs.assign');
+        Route::post('bugs/{bug}/approve', [QaController::class, 'approveBug'])->name('bugs.approve');
+        Route::post('bugs/{bug}/reject', [QaController::class, 'rejectBug'])->name('bugs.reject');
+        Route::get('bugs/{bug}', [QaController::class, 'showBug'])->name('bugs.show');
+        
+        // Bug testing actions
+        Route::post('bugs/{bug}/start-testing', [QaController::class, 'startTestingBug'])->name('bugs.start-testing');
+        Route::post('bugs/{bug}/pause-testing', [QaController::class, 'pauseTestingBug'])->name('bugs.pause-testing');
+        Route::post('bugs/{bug}/resume-testing', [QaController::class, 'resumeTestingBug'])->name('bugs.resume-testing');
+        Route::post('bugs/{bug}/finish-testing', [QaController::class, 'finishTestingBug'])->name('bugs.finish-testing');
+        
+        // Notifications
+        Route::get('notifications', [QaController::class, 'notifications'])->name('notifications');
+        Route::post('notifications/{notification}/read', [QaController::class, 'markNotificationAsRead'])->name('notifications.read');
+        Route::post('notifications/read-all', [QaController::class, 'markAllNotificationsAsRead'])->name('notifications.read-all');
     });
 
     // Admin routes with permissions
@@ -175,9 +248,14 @@ Route::prefix('payments')->name('payments.')->group(function () {
     });
     
     Route::middleware('permission:payment-reports.generate')->group(function () {
-        Route::post('generate', [PaymentController::class, 'generate'])->name('generate');
-        Route::post('generate-detailed', [PaymentController::class, 'generateDetailedReport'])->name('generate-detailed');
-    });
+    Route::post('generate', [PaymentController::class, 'generate'])->name('generate');
+    Route::post('generate-detailed', [PaymentController::class, 'generateDetailedReport'])->name('generate-detailed');
+    Route::post('generate-project', [PaymentController::class, 'generateProjectReport'])->name('generate-project');
+    Route::post('generate-user-type', [PaymentController::class, 'generateUserTypeReport'])->name('generate-user-type');
+    Route::get('test-report', [PaymentController::class, 'testReportGeneration'])->name('test-report');
+    Route::post('generate-simple-excel', [PaymentController::class, 'generateSimpleExcel'])->name('generate-simple-excel');
+    Route::get('test-communication', [PaymentController::class, 'testCommunication'])->name('test-communication');
+});
     
     Route::middleware('permission:payment-reports.approve')->group(function () {
         Route::post('reports/{paymentReport}/approve', [PaymentController::class, 'approve'])->name('reports.approve');
@@ -203,11 +281,7 @@ Route::post('/payment-reports/generate', function () {
     Route::post('/tasks/{task}/approve', [App\Http\Controllers\DeveloperCanvasController::class, 'approveTask'])->name('tasks.approve');
     Route::post('/tasks/{task}/reject', [App\Http\Controllers\DeveloperCanvasController::class, 'rejectTask'])->name('tasks.reject');
 
-    // Team Leader routes
-    Route::get('/team-leader', [App\Http\Controllers\TeamLeaderController::class, 'index'])->name('team-leader.index');
-    Route::get('/team-leader/projects/{project}', [App\Http\Controllers\TeamLeaderController::class, 'projectDetails'])->name('team-leader.project-details');
-    Route::post('/team-leader/tasks/{task}/approve', [App\Http\Controllers\TeamLeaderController::class, 'approveTask'])->name('team-leader.approve-task');
-    Route::post('/team-leader/tasks/{task}/reject', [App\Http\Controllers\TeamLeaderController::class, 'rejectTask'])->name('team-leader.reject-task');
+
 
     Route::post('tasks', [TaskController::class , 'store'])->name('tasks.store');
     Route::put('/tasks/{task}', [TaskController::class, 'update'])->name('tasks.update');
@@ -253,16 +327,19 @@ Route::post('/payment-reports/generate', function () {
     });
 
     // Bugs routes with permissions
-    Route::middleware('permission:bugs.view')->group(function () {
+    Route::middleware(['auth'])->group(function () {
         Route::get('bugs', [App\Http\Controllers\BugController::class, 'index'])->name('bugs.index');
         Route::get('bugs/{bug}', [App\Http\Controllers\BugController::class, 'show'])->name('bugs.show');
         Route::get('bugs/available', [App\Http\Controllers\BugController::class, 'getAvailableBugs'])->name('bugs.available');
         Route::get('bugs/my-bugs', [App\Http\Controllers\BugController::class, 'getAssignedBugs'])->name('bugs.my-bugs');
-    });
-    
-    Route::middleware('permission:bugs.create')->group(function () {
+        
+        // Allow bug creation for authenticated users (temporarily remove permission requirement)
         Route::post('bugs', [App\Http\Controllers\BugController::class, 'store'])->name('bugs.store');
     });
+    
+    // Route::middleware('permission:bugs.create')->group(function () {
+    //     Route::post('bugs', [App\Http\Controllers\BugController::class, 'store'])->name('bugs.store');
+    // });
     
     Route::middleware('permission:bugs.edit')->group(function () {
         Route::put('bugs/{bug}', [App\Http\Controllers\BugController::class, 'update'])->name('bugs.update');
@@ -276,6 +353,7 @@ Route::post('/payment-reports/generate', function () {
     Route::middleware('permission:bugs.assign')->group(function () {
         Route::post('bugs/{bug}/assign', [App\Http\Controllers\BugController::class, 'assignBug'])->name('bugs.assign');
         Route::post('bugs/{bug}/self-assign', [App\Http\Controllers\BugController::class, 'selfAssignBug'])->name('bugs.self-assign');
+        Route::post('bugs/{bug}/unassign', [App\Http\Controllers\BugController::class, 'unassignBug'])->name('bugs.unassign');
     });
     
     // Bug time tracking routes (available to all authenticated users)

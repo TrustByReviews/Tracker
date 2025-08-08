@@ -149,7 +149,7 @@ class AdminDashboardService
             $totalTimeSpent = $developer->tasks->sum('total_time_seconds');
             $totalEstimatedTime = $developer->tasks->sum('estimated_hours') * 3600;
             
-            $efficiency = $totalEstimatedTime > 0 ? round(($totalEstimatedTime / $totalTimeSpent) * 100, 1) : 0;
+            $efficiency = ($totalEstimatedTime > 0 && $totalTimeSpent > 0) ? round(($totalEstimatedTime / $totalTimeSpent) * 100, 1) : 0;
             $completionRate = $totalTasks > 0 ? round(($completedTasks / $totalTasks) * 100, 1) : 0;
             
             $metrics[] = [
@@ -163,7 +163,7 @@ class AdminDashboardService
                 'formatted_estimated_time' => gmdate('H:i:s', $totalEstimatedTime),
                 'efficiency_percentage' => $efficiency,
                 'completion_rate' => $completionRate,
-                'average_task_time' => $completedTasks > 0 ? round($totalTimeSpent / $completedTasks / 3600, 1) : 0
+                'average_task_time' => ($completedTasks > 0 && $totalTimeSpent > 0) ? round($totalTimeSpent / $completedTasks / 3600, 1) : 0
             ];
         }
 
@@ -202,7 +202,7 @@ class AdminDashboardService
             
             $teamMembers = $project->users->count();
             $completionRate = $totalTasks > 0 ? round(($completedTasks / $totalTasks) * 100, 1) : 0;
-            $efficiency = $totalEstimatedTime > 0 ? round(($totalEstimatedTime / $totalTimeSpent) * 100, 1) : 0;
+            $efficiency = ($totalEstimatedTime > 0 && $totalTimeSpent > 0) ? round(($totalEstimatedTime / $totalTimeSpent) * 100, 1) : 0;
             
             $metrics[] = [
                 'project' => $project,
@@ -216,7 +216,7 @@ class AdminDashboardService
                 'formatted_estimated_time' => gmdate('H:i:s', $totalEstimatedTime),
                 'completion_rate' => $completionRate,
                 'efficiency_percentage' => $efficiency,
-                'average_task_time' => $completedTasks > 0 ? round($totalTimeSpent / $completedTasks / 3600, 1) : 0
+                'average_task_time' => ($completedTasks > 0 && $totalTimeSpent > 0) ? round($totalTimeSpent / $completedTasks / 3600, 1) : 0
             ];
         }
 

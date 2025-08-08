@@ -25,13 +25,167 @@ class DashboardController extends Controller
             return redirect()->route('login');
         }
         
-        $isAdmin = $user->roles()->where('name', 'admin')->exists();
-
-        if ($isAdmin) {
+        // Verificar roles del usuario
+        $userRoles = $user->roles->pluck('value')->toArray();
+        
+        if (in_array('admin', $userRoles)) {
             return $this->adminDashboard();
+        } elseif (in_array('qa', $userRoles)) {
+            return $this->qaDashboard();
+        } elseif (in_array('team_leader', $userRoles)) {
+            // Redirigir a los TLs a su dashboard específico
+            return redirect()->route('team-leader.dashboard');
         } else {
             return $this->developerDashboard();
         }
+    }
+
+    private function qaDashboard()
+    {
+        $user = Auth::user();
+        
+        // Obtener proyectos asignados al QA
+        $projects = $user->projects()->with(['users', 'sprints.tasks'])->get();
+        
+        // Tareas listas para testing
+        $tasksReadyForTesting = Task::whereHas('project', function ($query) use ($user) {
+            $query->whereHas('users', function ($q) use ($user) {
+                $q->where('users.id', $user->id);
+            });
+        })
+        ->where('qa_status', 'ready_for_test')
+        ->with(['project', 'user', 'sprint'])
+        ->orderBy('priority', 'desc')
+        ->orderBy('created_at', 'asc')
+        ->get();
+
+        // Bugs listos para testing
+        $bugsReadyForTesting = Bug::whereHas('project', function ($query) use ($user) {
+            $query->whereHas('users', function ($q) use ($user) {
+                $q->where('users.id', $user->id);
+            });
+        })
+        ->where('qa_status', 'ready_for_test')
+        ->with(['project', 'user', 'sprint'])
+        ->orderBy('importance', 'desc')
+        ->orderBy('created_at', 'asc')
+        ->get();
+
+        // Tareas en testing por el QA actual
+        $tasksInTesting = Task::where('qa_assigned_to', $user->id)
+            ->where('qa_status', 'testing')
+            ->with(['project', 'user', 'sprint'])
+            ->get();
+
+        // Bugs en testing por el QA actual
+        $bugsInTesting = Bug::where('qa_assigned_to', $user->id)
+            ->where('qa_status', 'testing')
+            ->with(['project', 'user', 'sprint'])
+            ->get();
+
+        // Tareas existentes (solo para ver)
+        $existingTasks = Task::whereHas('project', function ($query) use ($user) {
+            $query->whereHas('users', function ($q) use ($user) {
+                $q->where('users.id', $user->id);
+            });
+        })
+        ->whereNotIn('qa_status', ['ready_for_test', 'testing'])
+        ->with(['project', 'user', 'sprint'])
+        ->orderBy('created_at', 'desc')
+        ->limit(20)
+        ->get();
+
+        // Bugs existentes (solo para ver)
+        $existingBugs = Bug::whereHas('project', function ($query) use ($user) {
+            $query->whereHas('users', function ($q) use ($user) {
+                $q->where('users.id', $user->id);
+            });
+        })
+        ->whereNotIn('qa_status', ['ready_for_test', 'testing'])
+        ->with(['project', 'user', 'sprint'])
+        ->orderBy('created_at', 'desc')
+        ->limit(20)
+        ->get();
+
+        // Estadísticas
+        $stats = [
+            'total_projects' => $projects->count(),
+            'tasks_ready_for_test' => $tasksReadyForTesting->count(),
+            'bugs_ready_for_test' => $bugsReadyForTesting->count(),
+            'tasks_in_testing' => $tasksInTesting->count(),
+            'bugs_in_testing' => $bugsInTesting->count(),
+        ];
+
+        return Inertia::render('Dashboard', [
+            'user' => $user,
+            'projects' => $projects,
+            'tasksReadyForTesting' => $tasksReadyForTesting,
+            'bugsReadyForTesting' => $bugsReadyForTesting,
+            'tasksInTesting' => $tasksInTesting,
+            'bugsInTesting' => $bugsInTesting,
+            'existingTasks' => $existingTasks,
+            'existingBugs' => $existingBugs,
+            'stats' => $stats,
+            'isQa' => true,
+            'isAdmin' => false,
+        ]);
+    }
+
+    private function teamLeaderDashboard()
+    {
+        $user = Auth::user();
+        
+        // Obtener proyectos del Team Leader
+        $projects = $user->projects()->with(['users', 'sprints.tasks'])->get();
+        
+        // Tareas pendientes de aprobación
+        $pendingTasks = Task::whereHas('sprint.project.users', function ($query) use ($user) {
+            $query->where('users.id', $user->id);
+        })
+        ->where('status', 'done')
+        ->where('approval_status', 'pending')
+        ->with(['project', 'user', 'sprint'])
+        ->orderBy('created_at', 'desc')
+        ->get();
+
+        // Tareas aprobadas por QA que requieren revisión final
+        $qaApprovedTasks = Task::where('qa_status', 'approved')
+            ->where('approval_status', 'approved')
+            ->whereHas('sprint.project.users', function ($query) use ($user) {
+                $query->where('users.id', $user->id);
+            })
+            ->with(['project', 'user', 'sprint', 'qaAssignedTo', 'qaReviewedBy'])
+            ->orderBy('qa_completed_at', 'desc')
+            ->get();
+
+        // Bugs aprobados por QA que requieren revisión final
+        $qaApprovedBugs = Bug::where('qa_status', 'approved')
+            ->where('status', 'resolved')
+            ->whereHas('project.users', function ($query) use ($user) {
+                $query->where('users.id', $user->id);
+            })
+            ->with(['project', 'user', 'sprint', 'qaAssignedTo', 'qaReviewedBy'])
+            ->orderBy('qa_completed_at', 'desc')
+            ->get();
+
+        // Estadísticas
+        $stats = [
+            'total_projects' => $projects->count(),
+            'pending_tasks' => $pendingTasks->count(),
+            'qa_approved_tasks' => $qaApprovedTasks->count(),
+            'qa_approved_bugs' => $qaApprovedBugs->count(),
+        ];
+
+        return Inertia::render('Dashboard', [
+            'user' => $user,
+            'projects' => $projects,
+            'pendingTasks' => $pendingTasks,
+            'qaApprovedTasks' => $qaApprovedTasks,
+            'qaApprovedBugs' => $qaApprovedBugs,
+            'stats' => $stats,
+            'isTeamLeader' => true,
+            'isAdmin' => false,
+        ]);
     }
 
     private function developerDashboard()

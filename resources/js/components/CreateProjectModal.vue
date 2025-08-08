@@ -54,13 +54,13 @@ const submit = () => {
             <Input v-model="form.name" class="w-full border-gray-300 text-black bg-white" />
           </div>
 
-          <!-- Descripción -->
+          <!-- Description -->
           <div>
             <label class="block text-sm font-medium text-gray-700">Description</label>
             <Input v-model="form.description" class="w-full border-gray-300 text-black bg-white" />
           </div>
 
-          <!-- Seleccionar desarrolladores -->
+          <!-- Select developers -->
           <div>
             <label class="block text-sm font-medium text-gray-700">Developers</label>
             <select

@@ -22,7 +22,7 @@ const closeMenu = () => {
     isOpen.value = false;
 };
 
-// Cerrar menú al hacer clic fuera
+// Close menú al hacer clic fuera
 const handleClickOutside = (event: Event) => {
     const target = event.target as HTMLElement;
     if (!target.closest('.user-menu')) {

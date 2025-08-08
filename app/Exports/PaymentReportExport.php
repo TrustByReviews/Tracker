@@ -11,7 +11,7 @@ class PaymentReportExport implements FromArray, WithHeadings, WithTitle
     protected $data;
     protected $title;
 
-    public function __construct($data, $title = 'Reporte de Pagos')
+    public function __construct($data, $title = 'Payment Report')
     {
         $this->data = $data;
         $this->title = $title;
@@ -25,14 +25,14 @@ class PaymentReportExport implements FromArray, WithHeadings, WithTitle
     public function headings(): array
     {
         return [
-            'Desarrollador',
+            'Developer',
             'Email',
-            'Valor/Hora ($)',
-            'Tareas Completadas',
-            'Horas Estimadas',
-            'Horas Reales',
-            'Eficiencia (%)',
-            'Total Ganado ($)'
+            'Hourly Rate ($)',
+            'Completed Tasks',
+            'Estimated Hours',
+            'Actual Hours',
+            'Efficiency (%)',
+            'Total Earned ($)'
         ];
     }
 

@@ -10,7 +10,7 @@
 
         <div class="py-12">
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                <!-- Tabs de navegación -->
+                <!-- Navigation Tabs -->
                 <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
                     <div class="border-b border-gray-200 dark:border-gray-600">
                         <nav class="-mb-px flex space-x-8 px-6">
@@ -83,7 +83,7 @@
                         </div>
                     </div>
 
-                    <!-- Estadísticas Generales -->
+                    <!-- General Statistics -->
                     <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
                         <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                             <div class="p-6">
@@ -176,7 +176,7 @@
                         </div>
                     </div>
 
-                    <!-- Reportes Recientes -->
+                    <!-- Recent Reports -->
                     <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
                         <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-600">
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Recent Reports</h3>
@@ -243,7 +243,7 @@
                         </div>
                     </div>
 
-                    <!-- Reportes Pendientes -->
+                    <!-- Pending Reports -->
                     <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                         <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-600">
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Pending Reports</h3>
@@ -305,6 +305,135 @@
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-6">Generate Payment Reports</h3>
                             
                             <form @submit.prevent="generateReport" class="space-y-6">
+                                <!-- Report Type Selection -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Report Type
+                                    </label>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                        <label class="flex items-center space-x-3 p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer">
+                                            <input 
+                                                type="radio" 
+                                                value="developers" 
+                                                v-model="reportType"
+                                                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+                                            >
+                                            <div>
+                                                <p class="text-sm font-medium text-gray-900 dark:text-white">By Developers</p>
+                                                <p class="text-xs text-gray-500 dark:text-gray-400">All selected developers</p>
+                                            </div>
+                                        </label>
+                                        
+                                        <label class="flex items-center space-x-3 p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer">
+                                            <input 
+                                                type="radio" 
+                                                value="project" 
+                                                v-model="reportType"
+                                                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+                                            >
+                                            <div>
+                                                <p class="text-sm font-medium text-gray-900 dark:text-white">By Project</p>
+                                                <p class="text-xs text-gray-500 dark:text-gray-400">Filter by specific project</p>
+                                            </div>
+                                        </label>
+                                        
+                                        <label class="flex items-center space-x-3 p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer">
+                                            <input 
+                                                type="radio" 
+                                                value="role" 
+                                                v-model="reportType"
+                                                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+                                            >
+                                            <div>
+                                                <p class="text-sm font-medium text-gray-900 dark:text-white">By Roleeeeeee</p>
+                                                <p class="text-xs text-gray-500 dark:text-gray-400">Filter by user role</p>
+                                            </div>
+                                        </label>
+                                        
+                                        <label class="flex items-center space-x-3 p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer">
+                                            <input 
+                                                type="radio" 
+                                                value="week" 
+                                                v-model="reportType"
+                                                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+                                            >
+                                            <div>
+                                                <p class="text-sm font-medium text-gray-900 dark:text-white">By Week</p>
+                                                <p class="text-xs text-gray-500 dark:text-gray-400">Specific week of month</p>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- Project Selection (when report type is project) -->
+                                <div v-if="reportType === 'project'">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Select Project
+                                    </label>
+                                    <select 
+                                        v-model="selectedProject" 
+                                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                    >
+                                        <option value="">All Projects</option>
+                                        <option v-for="project in projects" :key="project.id" :value="project.id">
+                                            {{ project.name }}
+                                        </option>
+                                    </select>
+                                </div>
+
+                                <!-- Roleeeeeee Selection (when report type is role) -->
+                                <div v-if="reportType === 'role'">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Select Roleeeeeee
+                                    </label>
+                                    <select 
+                                        v-model="selectedRoleeeeeee" 
+                                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                    >
+                                        <option value="">All Roleeeeeees</option>
+                                        <option value="admin">Admin</option>
+                                        <option value="team_leader">Team Leader</option>
+                                        <option value="developer">Developer</option>
+                                        <option value="qa">QA Tester</option>
+                                    </select>
+                                </div>
+
+                                <!-- Week Selection (when report type is week) -->
+                                <div v-if="reportType === 'week'">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Select Week of Month
+                                    </label>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
+                                                Month
+                                            </label>
+                                            <select 
+                                                v-model="selectedMonth" 
+                                                @change="updateWeekOptions"
+                                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                            >
+                                                <option v-for="month in availableMonths" :key="month.value" :value="month.value">
+                                                    {{ month.label }}
+                                                </option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
+                                                Week
+                                            </label>
+                                            <select 
+                                                v-model="selectedWeek" 
+                                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                            >
+                                                <option v-for="week in availableWeeks" :key="week.value" :value="week.value">
+                                                    {{ week.label }}
+                                                </option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <!-- Developer Selection -->
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -550,7 +679,7 @@
                         </div>
                     </div>
 
-                    <!-- Reporte en el Sistema -->
+                    <!-- Report in System -->
                     <div v-if="showReport && reportData" class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mt-6">
                         <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-600">
                             <div class="flex justify-between items-center">
@@ -574,7 +703,7 @@
                             </div>
                         </div>
 
-                        <!-- Resumen del Reporte -->
+                        <!-- Report Summary -->
                         <div class="p-6 border-b border-gray-200 dark:border-gray-600">
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div class="text-center">
@@ -592,7 +721,7 @@
                             </div>
                         </div>
 
-                        <!-- Detalles por Desarrollador -->
+                        <!-- Details by Developer -->
                         <div class="overflow-x-auto">
                             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead class="bg-gray-50 dark:bg-gray-700">
@@ -652,7 +781,7 @@
                             </table>
                         </div>
 
-                        <!-- Detalles de Tareas -->
+                        <!-- Task Details -->
                         <div v-if="reportData.developers.some(d => d.tasks.length > 0)" class="p-6 border-t border-gray-200 dark:border-gray-600">
                             <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Task Details</h4>
                             <div class="overflow-x-auto">
@@ -716,7 +845,7 @@
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 
 const props = defineProps({
     statistics: Object,
@@ -730,11 +859,13 @@ const props = defineProps({
 
 const activeTab = ref('dashboard');
 
+// Filtros para el dashboard
 const filters = ref({
-    start_date: props.filters?.start_date || '',
-    end_date: props.filters?.end_date || '',
+    start_date: '',
+    end_date: ''
 });
 
+// Variables para generación de reportes
 const selectedDevelopers = ref([]);
 const startDate = ref('');
 const endDate = ref('');
@@ -742,14 +873,110 @@ const quickPeriod = ref('');
 const format = ref('excel');
 const email = ref('');
 
-// Variables para el reporte en el sistema
+// Nuevas variables para tipos de reporte
+const reportType = ref('developers');
+const selectedProject = ref('');
+const selectedRoleeeeeeeeeeeeee = ref('');
+const selectedMonth = ref('');
+const selectedWeek = ref('');
+
+// Variables para mostrar reporte
 const reportData = ref(null);
 const showReport = ref(false);
 const loadingReport = ref(false);
 
+// Variables para proyectos y semanas
+const projects = ref([]);
+const availableMonths = ref([]);
+const availableWeeks = ref([]);
+
 const isFormValid = computed(() => {
-    return selectedDevelopers.value.length > 0 && format.value;
+    return selectedDevelopers.value.length > 0 && 
+           (startDate.value || quickPeriod.value) && 
+           (endDate.value || quickPeriod.value);
 });
+
+// Función para inicializar las opciones de meses y semanas
+const initializeDateOptions = () => {
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth();
+    
+    // Generate month options (last 12 months)
+    availableMonths.value = [];
+    for (let i = 0; i < 12; i++) {
+        const month = new Date(currentYear, currentMonth - i, 1);
+        availableMonths.value.push({
+            value: month.toISOString().slice(0, 7), // YYYY-MM
+            label: month.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+        });
+    }
+    
+    // Set current month as default
+    selectedMonth.value = availableMonths.value[0].value;
+    updateWeekOptions();
+};
+
+// Function to update week options based on selected month
+const updateWeekOptions = () => {
+    if (!selectedMonth.value) return;
+    
+    const [year, month] = selectedMonth.value.split('-');
+    const firstDay = new Date(parseInt(year), parseInt(month) - 1, 1);
+    const lastDay = new Date(parseInt(year), parseInt(month), 0);
+    const daysInMonth = lastDay.getDate();
+    
+    availableWeeks.value = [];
+    
+    // Calculate weeks of the month
+    let weekStart = 1;
+    let weekNumber = 1;
+    
+    while (weekStart <= daysInMonth) {
+        const weekEnd = Math.min(weekStart + 6, daysInMonth);
+        availableWeeks.value.push({
+            value: weekNumber,
+            label: `Week ${weekNumber} (${weekStart}-${weekEnd})`
+        });
+        weekStart += 7;
+        weekNumber++;
+    }
+    
+    // Set first week as default
+    if (availableWeeks.value.length > 0) {
+        selectedWeek.value = availableWeeks.value[0].value;
+    }
+};
+
+// Function to get start and end dates of selected week
+const getWeekDates = () => {
+    if (!selectedMonth.value || !selectedWeek.value) return { start: '', end: '' };
+    
+    const [year, month] = selectedMonth.value.split('-');
+    const weekNumber = parseInt(selectedWeek.value);
+    const weekStart = (weekNumber - 1) * 7 + 1;
+    const weekEnd = Math.min(weekStart + 6, new Date(parseInt(year), parseInt(month), 0).getDate());
+    
+    const startDate = new Date(parseInt(year), parseInt(month) - 1, weekStart);
+    const endDate = new Date(parseInt(year), parseInt(month) - 1, weekEnd);
+    
+    return {
+        start: startDate.toISOString().slice(0, 10),
+        end: endDate.toISOString().slice(0, 10)
+    };
+};
+
+// Function to load projects
+const loadProjects = async () => {
+    try {
+        const response = await fetch('/api/projects');
+        if (response.ok) {
+            const data = await response.json();
+            projects.value = data.projects || [];
+        }
+    } catch (error) {
+        console.error('Error loading projects:', error);
+    }
+};
 
 const selectAll = () => {
     selectedDevelopers.value = props.developers.map(d => d.id);
@@ -814,24 +1041,44 @@ const formatDisplayDate = (dateString) => {
 };
 
 const generateReport = () => {
+    if (!isFormValid.value) {
+        alert('Please select developers and date range');
+        return;
+    }
+
+    // Determine dates based on report type
+    let reportStartDate = startDate.value;
+    let reportEndDate = endDate.value;
+    
+    if (reportType.value === 'week') {
+        const weekDates = getWeekDates();
+        reportStartDate = weekDates.start;
+        reportEndDate = weekDates.end;
+    }
+
     const data = {
         developer_ids: selectedDevelopers.value,
-        start_date: startDate.value || null,
-        end_date: endDate.value || null,
-        format: format.value,
-        email: email.value,
+        start_date: reportStartDate,
+        end_date: reportEndDate,
+        report_type: reportType.value,
+        project_id: selectedProject.value || null,
+        role: selectedRoleeeeeeeeeeeeee.value || null,
+        month: selectedMonth.value || null,
+        week: selectedWeek.value || null
     };
 
-    if (format.value === 'email') {
-        router.post('/payments/generate-detailed', data);
-    } else if (format.value === 'excel') {
-        // Usar fetch para descarga directa de Excel
+    console.log('Generating report with data:', data);
+
+    if (format.value === 'excel') {
+        // Use fetch for direct Excel download
         loadingReport.value = true;
+        console.log('Starting Excel download...');
+        console.log('Data to send:', data);
         fetch('/api/download-excel', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                // 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
                 'Accept': 'application/octet-stream',
             },
             body: JSON.stringify(data)
@@ -858,32 +1105,37 @@ const generateReport = () => {
             endDate.value = '';
             quickPeriod.value = '';
             email.value = '';
+            reportType.value = 'developers';
+            selectedProject.value = '';
+            selectedRoleeeeeeeeeeeeee.value = '';
+            selectedMonth.value = '';
+            selectedWeek.value = '';
         })
         .catch(error => {
-            console.error('Error detallado:', error);
+            console.error('Detailed error:', error);
             console.error('Error message:', error.message);
             console.error('Error stack:', error.stack);
             
-            // Mostrar error más detallado
-            let errorMessage = 'Error generating Excel report';
+            // Show more detailed error
+            let errorMonthsage = 'Error generating Excel report';
             if (error.message) {
-                errorMessage += ': ' + error.message;
+                errorMonthsage += ': ' + error.message;
             }
-            alert(errorMessage);
+            alert(errorMonthsage);
         })
         .finally(() => {
             loadingReport.value = false;
         });
     } else if (format.value === 'pdf') {
-        // Usar fetch para descarga directa de PDF
+        // Use fetch for direct PDF download
         loadingReport.value = true;
-        console.log('Iniciando descarga de PDF...');
-        console.log('Datos a enviar:', data);
+        console.log('Starting PDF download...');
+        console.log('Data to send:', data);
         fetch('/api/download-pdf', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                // 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
                 'Accept': 'application/pdf',
             },
             body: JSON.stringify(data)
@@ -910,30 +1162,35 @@ const generateReport = () => {
             endDate.value = '';
             quickPeriod.value = '';
             email.value = '';
+            reportType.value = 'developers';
+            selectedProject.value = '';
+            selectedRoleeeeeeeeeeeeee.value = '';
+            selectedMonth.value = '';
+            selectedWeek.value = '';
         })
         .catch(error => {
-            console.error('Error detallado:', error);
+            console.error('Detailed error:', error);
             console.error('Error message:', error.message);
             console.error('Error stack:', error.stack);
             
-            // Mostrar error más detallado
-            let errorMessage = 'Error generating PDF report';
+            // Show more detailed error
+            let errorMonthsage = 'Error generating PDF report';
             if (error.message) {
-                errorMessage += ': ' + error.message;
+                errorMonthsage += ': ' + error.message;
             }
-            alert(errorMessage);
+            alert(errorMonthsage);
         })
         .finally(() => {
             loadingReport.value = false;
         });
     } else if (format.value === 'view') {
-        // Usar fetch para mostrar reporte en el sistema
+        // Use fetch to show report in system
         loadingReport.value = true;
         fetch('/api/show-report', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                // 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
                 'Accept': 'application/json',
             },
             body: JSON.stringify(data)
@@ -1015,4 +1272,10 @@ const approveReport = (reportId) => {
 const markAsPaid = (reportId) => {
     router.post(route('payments.reports.mark-paid', reportId));
 };
+
+// Initialize options when component mounts
+onMounted(() => {
+    initializeDateOptions();
+    loadProjects();
+});
 </script> 

@@ -208,7 +208,7 @@
                         <div class="email">{{ $developer['email'] }}</div>
                     </td>
                     <td class="currency">${{ number_format($developer['hour_value'], 2) }}</td>
-                    <td>{{ $developer['completed_tasks'] + $developer['in_progress_tasks'] }}</td>
+                                            <td>{{ $developer['completed_tasks'] }}</td>
                     <td>{{ number_format($developer['total_hours'], 2) }}</td>
                     <td class="currency">${{ number_format($developer['total_earnings'], 2) }}</td>
                 </tr>
@@ -226,7 +226,7 @@
                     <th>Developer</th>
                     <th>Task</th>
                     <th>Project</th>
-                    <th>Status</th>
+                                            <th>Completed Date</th>
                     <th>Hours</th>
                     <th>Payment</th>
                     <th>Date</th>
@@ -239,10 +239,10 @@
                             <td>{{ $developer['name'] }}</td>
                             <td>{{ $task['name'] }}</td>
                             <td>{{ $task['project'] }}</td>
-                            <td>{{ ucfirst(str_replace('_', ' ', $task['status'])) }}</td>
-                            <td>{{ number_format($task['actual_hours'], 2) }}</td>
+                            <td>{{ $task['completed_at'] ? date('Y-m-d', strtotime($task['completed_at'])) : 'N/A' }}</td>
+                            <td>{{ number_format($task['hours'], 2) }}</td>
                             <td class="currency">${{ number_format($task['earnings'], 2) }}</td>
-                            <td>{{ $task['completed_at'] ? date('Y-m-d', strtotime($task['completed_at'])) : ($task['created_at'] ? date('Y-m-d', strtotime($task['created_at'])) : 'N/A') }}</td>
+                            <td>{{ $task['completed_at'] ? date('Y-m-d', strtotime($task['completed_at'])) : 'N/A' }}</td>
                         </tr>
                     @endforeach
                 @endforeach

@@ -137,6 +137,29 @@
                   <option value="asc">Ascending</option>
                 </Select>
               </div>
+
+              <!-- QA Status Filter - Developer Only -->
+              <div v-if="permissions === 'developer'">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">QA Status</label>
+                <Select v-model="filters.qa_status" @change="applyFilters">
+                  <option value="">All QA Statuses</option>
+                  <option value="pending">Pending</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </Select>
+              </div>
+
+              <!-- Team Leader Status Filter - Developer Only -->
+              <div v-if="permissions === 'developer'">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Team Leader Status</label>
+                <Select v-model="filters.team_leader_status" @change="applyFilters">
+                  <option value="">All TL Statuses</option>
+                  <option value="pending">Pending Review</option>
+                  <option value="approved">Approved</option>
+                  <option value="changes_requested">Changes Requested</option>
+                </Select>
+              </div>
             </div>
 
             <div class="flex justify-between items-center mt-4">
@@ -184,6 +207,60 @@
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <BugCard
                 v-for="bug in activeBugs"
+                :key="bug.id"
+                :bug="bug"
+                @self-assign="handleSelfAssign"
+                @start-work="handleStartWork"
+                @pause-work="handlePauseWork"
+                @resume-work="handleResumeWork"
+                @finish-work="handleFinishWork"
+                @view-details="viewBug"
+              />
+            </div>
+          </div>
+
+          <!-- Rejected by QA Bugs - Developer Only -->
+          <div v-if="permissions === 'developer' && getRejectedByQaBugs().length > 0">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+                Rejected by QA ({{ getRejectedByQaBugs().length }})
+              </h2>
+              <div class="flex space-x-2">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                  Needs Fixes
+                </span>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <BugCard
+                v-for="bug in getRejectedByQaBugs()"
+                :key="bug.id"
+                :bug="bug"
+                @self-assign="handleSelfAssign"
+                @start-work="handleStartWork"
+                @pause-work="handlePauseWork"
+                @resume-work="handleResumeWork"
+                @finish-work="handleFinishWork"
+                @view-details="viewBug"
+              />
+            </div>
+          </div>
+
+          <!-- Changes Requested by Team Leader - Developer Only -->
+          <div v-if="permissions === 'developer' && getTeamLeaderChangesRequestedBugs().length > 0">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+                Changes Requested by Team Leader ({{ getTeamLeaderChangesRequestedBugs().length }})
+              </h2>
+              <div class="flex space-x-2">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                  Changes Required
+                </span>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <BugCard
+                v-for="bug in getTeamLeaderChangesRequestedBugs()"
                 :key="bug.id"
                 :bug="bug"
                 @self-assign="handleSelfAssign"
@@ -311,6 +388,8 @@ const filters = ref({
   search: '',
   sort_by: 'recent',
   sort_order: 'desc',
+  qa_status: '',
+  team_leader_status: '',
   ...props.filters
 })
 
@@ -351,8 +430,40 @@ const closedBugs = computed(() => {
   return props.bugs.filter(bug => bug.status === 'closed')
 })
 
+// QA and Team Leader filtering functions
+const getRejectedByQaBugs = () => {
+  const bugs = props.bugs.filter(bug => bug.qa_status === 'rejected');
+  return bugs;
+}
+
+const getTeamLeaderChangesRequestedBugs = () => {
+  const bugs = props.bugs.filter(bug => bug.team_leader_requested_changes === true);
+  return bugs;
+}
+
+const getActiveBugsIncludingRejected = () => {
+  const bugs = props.bugs.filter(bug =>
+    bug.status === 'new' ||
+    bug.status === 'assigned' ||
+    bug.status === 'in progress' ||
+    bug.qa_status === 'rejected' ||
+    bug.team_leader_requested_changes === true
+  );
+  return bugs;
+}
+
 const hasActiveFilters = computed(() => {
-  return Object.values(filters.value).some(value => value !== '' && value !== 'recent' && value !== 'desc')
+  return filters.value.project_id ||
+         filters.value.sprint_id ||
+         filters.value.status ||
+         filters.value.importance ||
+         filters.value.bug_type ||
+         filters.value.assigned_user_id ||
+         filters.value.search ||
+         filters.value.qa_status ||
+         filters.value.team_leader_status ||
+         filters.value.sort_by !== 'recent' ||
+         filters.value.sort_order !== 'desc'
 })
 
 const applyFilters = () => {
@@ -372,7 +483,9 @@ const clearFilters = () => {
     assigned_user_id: '',
     search: '',
     sort_by: 'recent',
-    sort_order: 'desc'
+    sort_order: 'desc',
+    qa_status: '',
+    team_leader_status: ''
   }
   applyFilters()
 }

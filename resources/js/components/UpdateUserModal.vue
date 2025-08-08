@@ -40,17 +40,17 @@ const submit = () => {
     try {
         form.put(`/users/${props.user.id}`, {
             onSuccess: () => {
-                success('Usuario actualizado', `El usuario ${props.user.name} ha sido actualizado exitosamente`);
+                success('User updated', `User ${props.user.name} has been updated successfully`);
                 form.reset();
                 open.value = false;
                 router.reload();
             },
             onError: () => {
-                error('Error al actualizar', 'Hubo un problema al actualizar el usuario. Por favor, verifica los datos.');
+                error('Update error', 'There was a problem updating the user. Please verify the data.');
             }
         });
     } catch (err) {
-        error('Error inesperado', 'Ocurrió un error inesperado al actualizar el usuario.');
+        error('Unexpected error', 'An unexpected error occurred while updating the user.');
         console.log(err);
     }
 }
@@ -75,7 +75,7 @@ const disableInput = () => {
                         <Input v-model="form.name" class="w-full border-gray-300 text-black bg-white" :disabled="disableInput()" />
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Nick name</label>
+                        <label class="block text-sm font-medium text-gray-700">Nickname</label>
                         <Input :model-value="form.nickname || ''" @update:model-value="(value) => form.nickname = String(value)" class="w-full border-gray-300 text-black bg-white capitalize" :disabled="disableInput()" />
                     </div>
                     <div>
@@ -87,7 +87,7 @@ const disableInput = () => {
                         <Input v-model="form.password" placeholder="If you forget your password, enter a new one." class="w-full border-gray-300 text-black bg-white" :disabled="disableInput()" />
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Hour value</label>
+                        <label class="block text-sm font-medium text-gray-700">Hour Value</label>
                         <Input v-model="form.hour_value" class="w-full border-gray-300 text-black bg-white" :disabled="disableInput()" />
                     </div>
                     <div class="flex space-x-4 justify-start">
@@ -103,15 +103,15 @@ const disableInput = () => {
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Work time</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Work Time</label>
                             <select
                                 v-model="form.work_time"
                                 :class="['border h-9 border-gray-300 rounded bg-white px-2']"
                                 :disabled="disableInput()"
                             >
                                 <option value="status" disabled>Status</option>
-                                <option value="part time">Part time</option>
-                                <option value="full">Full</option>
+                                <option value="part time">Part Time</option>
+                                <option value="full">Full Time</option>
                             </select>
                         </div>
                     </div>

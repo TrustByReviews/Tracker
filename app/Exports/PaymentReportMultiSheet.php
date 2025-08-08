@@ -18,8 +18,8 @@ class PaymentReportMultiSheet implements WithMultipleSheets
     public function sheets(): array
     {
         return [
-            'Resumen por Desarrollador' => new PaymentReportExport($this->developerData, 'Resumen por Desarrollador'),
-            'Detalles por Tarea' => new TaskDetailsExport($this->taskData, 'Detalles por Tarea')
+            'Developer Summary' => new PaymentReportExport($this->developerData, 'Developer Summary'),
+            'Task Details' => new TaskDetailsExport($this->taskData, 'Task Details')
         ];
     }
 } 

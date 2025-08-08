@@ -74,7 +74,7 @@ const applyFilters = () => {
     })
 }
 
-// Limpiar filtros
+// Clear filtros
 const clearFilters = () => {
     filters.value = {
         project_id: '',
@@ -86,7 +86,7 @@ const clearFilters = () => {
     applyFilters()
 }
 
-// Calcular estadísticas de sprint
+// Calculate sprint statistics
 const getSprintStats = (sprint: Sprint) => {
     const totalTasks = sprint.tasks?.length || 0
     const completedTasks = sprint.tasks?.filter(task => task.status === 'done').length || 0
@@ -97,7 +97,7 @@ const getSprintStats = (sprint: Sprint) => {
     const endDate = new Date(sprint.end_date)
     const daysToEnd = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
     
-    // Calcular prioridad basada en tareas pendientes vs días restantes
+    // Calculate priority based on pending tasks vs remaining days
     const priorityScore = daysToEnd > 0 ? pendingTasks / daysToEnd : pendingTasks
     
     return {
@@ -141,11 +141,11 @@ const getPriorityIcon = (priorityScore: number) => {
     return 'check-circle'
 }
 
-// Filtrar sprints por estado
+// Filter sprints por estado
 const filteredSprints = computed(() => {
     let filtered = props.sprints
 
-    // Filtrar por estado si está seleccionado en filtros
+    // Filter by status if selected in filters
     if (filters.value.status) {
         filtered = filtered.filter(sprint => getSprintStatus(sprint) === filters.value.status)
     }
@@ -153,7 +153,7 @@ const filteredSprints = computed(() => {
     return filtered
 })
 
-// Obtener estadísticas generales
+// Get general statistics
 const getGeneralStats = () => {
     const totalSprints = props.sprints.length
     const activeSprints = props.sprints.filter(sprint => getSprintStatus(sprint) === 'active').length
@@ -175,20 +175,20 @@ const getSprintsByStatus = (status: string) => {
 
 // Obtener opciones de ordenamiento
 const sortOptions = [
-    { value: 'recent', label: 'Más recientes' },
-    { value: 'task_count', label: 'Más tareas' },
-    { value: 'completed_tasks', label: 'Más tareas completadas' },
-    { value: 'pending_tasks', label: 'Más tareas pendientes' },
-    { value: 'completion_rate', label: 'Mayor tasa de completado' },
-    { value: 'days_to_end', label: 'Más próximos al cierre' },
-    { value: 'priority_score', label: 'Mayor prioridad' }
+    { value: 'recent', label: 'Most recent' },
+    { value: 'task_count', label: 'Most tasks' },
+    { value: 'completed_tasks', label: 'Most completed tasks' },
+    { value: 'pending_tasks', label: 'Most pending tasks' },
+    { value: 'completion_rate', label: 'Highest completion rate' },
+    { value: 'days_to_end', label: 'Closest to closing' },
+    { value: 'priority_score', label: 'Highest priority' }
 ]
 
 // Opciones de filtro por tipo
 const itemTypeOptions = [
-    { value: 'all', label: 'Todos los elementos' },
-    { value: 'tasks', label: 'Solo tareas' },
-    { value: 'bugs', label: 'Solo bugs' }
+    { value: 'all', label: 'All elements' },
+    { value: 'tasks', label: 'Tasks only' },
+    { value: 'bugs', label: 'Bugs only' }
 ]
 
 // Observar cambios en filtros
@@ -262,20 +262,20 @@ watch(filters, () => {
       <CardHeader>
         <CardTitle class="flex items-center gap-2">
           <Icon name="filter" class="h-5 w-5" />
-          Filtros Avanzados
+          Advanced Filters
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <!-- Filtro por Proyecto -->
+          <!-- Filtro por Project -->
           <div>
-            <label class="block text-sm font-medium mb-2">Proyecto</label>
+            <label class="block text-sm font-medium mb-2">Project</label>
             <Select v-model="filters.project_id">
               <SelectTrigger>
-                <SelectValue placeholder="Todos los proyectos" />
+                <SelectValue placeholder="All projects" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los proyectos</SelectItem>
+                <SelectItem value="">All projects</SelectItem>
                 <SelectItem 
                   v-for="project in projects" 
                   :key="project.id" 
@@ -287,12 +287,12 @@ watch(filters, () => {
             </Select>
           </div>
 
-          <!-- Filtro por Tipo de Elemento -->
+          <!-- Filtro por Type de Elemento -->
           <div>
-            <label class="block text-sm font-medium mb-2">Tipo de Elemento</label>
+            <label class="block text-sm font-medium mb-2">Element Type</label>
             <Select v-model="filters.item_type">
               <SelectTrigger>
-                <SelectValue placeholder="Todos los elementos" />
+                <SelectValue placeholder="All elements" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem 
@@ -308,23 +308,23 @@ watch(filters, () => {
 
           <!-- Filtro por Estado -->
           <div>
-            <label class="block text-sm font-medium mb-2">Estado</label>
+            <label class="block text-sm font-medium mb-2">Status</label>
             <Select v-model="filters.status">
               <SelectTrigger>
-                <SelectValue placeholder="Todos los estados" />
+                <SelectValue placeholder="All statuses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los estados</SelectItem>
-                <SelectItem value="active">Activos</SelectItem>
-                <SelectItem value="upcoming">Próximos</SelectItem>
-                <SelectItem value="completed">Completados</SelectItem>
+                <SelectItem value="">All statuses</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="upcoming">Upcoming</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <!-- Ordenamiento -->
           <div>
-            <label class="block text-sm font-medium mb-2">Ordenar por</label>
+            <label class="block text-sm font-medium mb-2">Sort by</label>
             <Select v-model="filters.sort_by">
               <SelectTrigger>
                 <SelectValue />
@@ -343,34 +343,34 @@ watch(filters, () => {
 
           <!-- Orden -->
           <div>
-            <label class="block text-sm font-medium mb-2">Orden</label>
+            <label class="block text-sm font-medium mb-2">Order</label>
             <Select v-model="filters.sort_order">
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="desc">Descendente</SelectItem>
-                <SelectItem value="asc">Ascendente</SelectItem>
+                <SelectItem value="desc">Descending</SelectItem>
+                <SelectItem value="asc">Ascending</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
 
-        <!-- Botones de acción -->
+        <!-- Action buttons -->
         <div class="flex justify-end gap-2 mt-4">
           <Button variant="outline" @click="clearFilters">
             <Icon name="x" class="h-4 w-4 mr-2" />
-            Limpiar Filtros
+            Clear Filters
           </Button>
           <Button @click="applyFilters">
             <Icon name="search" class="h-4 w-4 mr-2" />
-            Aplicar Filtros
+            Apply Filters
           </Button>
         </div>
       </CardContent>
     </Card>
 
-    <!-- Sprints con Información Detallada -->
+    <!-- Sprints with Detailed Information -->
     <div v-if="filteredSprints.length > 0" class="space-y-8">
       <!-- Active Sprints -->
       <div v-if="getSprintsByStatus('active').length > 0">
@@ -437,7 +437,7 @@ watch(filters, () => {
       <div class="flex justify-center gap-2">
         <Button variant="outline" @click="clearFilters" v-if="props.sprints.length > 0">
           <Icon name="x" class="h-4 w-4 mr-2" />
-          Limpiar Filtros
+          Clear Filters
         </Button>
         <CreateSprintModal 
           v-if="permissions === 'admin' && projects.length > 0" 

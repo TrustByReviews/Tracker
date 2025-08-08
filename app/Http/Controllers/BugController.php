@@ -47,6 +47,17 @@ class BugController extends Controller
             $bugsQuery = Bug::with(['user', 'sprint', 'project', 'assignedBy', 'relatedTask']);
             $projects = Project::orderBy('name')->get();
             $sprints = Sprint::with('project')->orderBy('start_date', 'desc')->get();
+        } elseif ($permissions === 'qa') {
+            // QA ve bugs de sus proyectos asignados
+            $bugsQuery = Bug::whereHas('sprint.project', function ($query) use ($authUser) {
+                $query->whereHas('users', function ($q) use ($authUser) {
+                    $q->where('users.id', $authUser->id);
+                });
+            })->with(['user', 'sprint', 'project', 'assignedBy', 'relatedTask']);
+            $projects = $authUser->projects()->orderBy('name')->get();
+            $sprints = Sprint::whereHas('project.users', function ($query) use ($authUser) {
+                $query->where('users.id', $authUser->id);
+            })->with('project')->orderBy('start_date', 'desc')->get();
         } elseif ($permissions === 'team_leader') {
             // Team leader ve bugs de sus proyectos
             $bugsQuery = Bug::whereHas('sprint.project.users', function ($query) use ($authUser) {
@@ -61,7 +72,7 @@ class BugController extends Controller
             $bugsQuery = Bug::where(function ($query) use ($authUser) {
                 $query->where('user_id', $authUser->id)
                       ->orWhereNull('user_id');
-            })->with(['user', 'sprint', 'project', 'assignedBy', 'relatedTask']);
+            })->with(['user', 'sprint', 'project', 'assignedBy', 'relatedTask', 'qaReviewedBy', 'teamLeaderReviewedBy']);
             $projects = $authUser->projects()->orderBy('name')->get();
             $sprints = Sprint::whereHas('project.users', function ($query) use ($authUser) {
                 $query->where('users.id', $authUser->id);
@@ -69,7 +80,7 @@ class BugController extends Controller
         }
 
         // Aplicar filtros
-        $filters = $request->only(['project_id', 'sprint_id', 'status', 'importance', 'bug_type', 'assigned_user_id', 'sort_by', 'sort_order', 'search']);
+        $filters = $request->only(['project_id', 'sprint_id', 'status', 'importance', 'bug_type', 'assigned_user_id', 'sort_by', 'sort_order', 'search', 'qa_status', 'team_leader_status']);
 
         // Filtro por proyecto
         if (!empty($filters['project_id'])) {
@@ -113,6 +124,28 @@ class BugController extends Controller
                 $query->where('title', 'like', '%' . $filters['search'] . '%')
                       ->orWhere('description', 'like', '%' . $filters['search'] . '%');
             });
+        }
+
+        // Filtro por estado de QA
+        if (!empty($filters['qa_status'])) {
+            $bugsQuery->where('qa_status', $filters['qa_status']);
+        }
+
+        // Filtro por estado de Team Leader
+        if (!empty($filters['team_leader_status'])) {
+            switch ($filters['team_leader_status']) {
+                case 'pending':
+                    $bugsQuery->where('qa_status', 'approved')
+                              ->where('team_leader_final_approval', false)
+                              ->where('team_leader_requested_changes', false);
+                    break;
+                case 'approved':
+                    $bugsQuery->where('team_leader_final_approval', true);
+                    break;
+                case 'changes_requested':
+                    $bugsQuery->where('team_leader_requested_changes', true);
+                    break;
+            }
         }
 
         $bugs = $bugsQuery->get();
@@ -199,9 +232,23 @@ class BugController extends Controller
             abort(403, 'No tienes permisos para ver este bug.');
         }
 
+        // Obtener usuarios del proyecto para asignación
+        $projectUsers = collect();
+        if ($bug->project) {
+            $projectUsers = User::whereHas('projects', function ($query) use ($bug) {
+                $query->where('project_id', $bug->project_id);
+            })
+            ->whereHas('roles', function ($query) {
+                $query->whereIn('name', ['developer', 'team_leader']);
+            })
+            ->select('id', 'name', 'email')
+            ->get();
+        }
+
         return Inertia::render('Bug/Show', [
             'bug' => $bug,
             'permissions' => $permissions,
+            'projectUsers' => $projectUsers,
         ]);
     }
 
@@ -266,10 +313,11 @@ class BugController extends Controller
             'estimated_hours' => $validatedData['estimated_hours'] ?? 0,
             'estimated_minutes' => $validatedData['estimated_minutes'] ?? 0,
             'tags' => $validatedData['tags'],
-            'related_task_id' => $validatedData['related_task_id'],
+            'related_task_id' => $validatedData['related_task_id'] ?? null,
             'attachments' => $attachments,
             'priority_score' => $priorityScore,
             'status' => Bug::STATUS_NEW,
+            'qa_status' => 'testing',
         ]);
 
         return redirect()->route('bugs.show', $bug->id)
@@ -455,6 +503,22 @@ class BugController extends Controller
             }
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Error al auto-asignar bug: ' . $e->getMessage());
+        }
+    }
+
+    public function unassignBug(Request $request, $bugId): RedirectResponse
+    {
+        try {
+            $response = $this->bugAssignmentService->unassignBug($bugId);
+            $responseData = json_decode($response->getContent(), true);
+            
+            if ($response->getStatusCode() === 200) {
+                return redirect()->back()->with('success', $responseData['message']);
+            } else {
+                return redirect()->back()->with('error', $responseData['error']);
+            }
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Error al desasignar bug: ' . $e->getMessage());
         }
     }
 

@@ -1,162 +1,120 @@
 <?php
 
-/**
- * Script para asignar los permisos correctos de pagos a los usuarios
- */
-
 require_once __DIR__ . '/../vendor/autoload.php';
 
-use App\Models\User;
-use App\Models\Permission;
-use App\Models\Role;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Foundation\Application;
+use Illuminate\Foundation\Configuration\Exceptions;
+use Illuminate\Foundation\Configuration\Middleware;
 
-// Inicializar Laravel
-$app = require_once __DIR__ . '/../bootstrap/app.php';
-$app->make('Illuminate\Contracts\Console\Kernel')->bootstrap();
+// Bootstrap Laravel
+$app = Application::configure(basePath: __DIR__ . '/..')
+    ->withRouting(
+        web: __DIR__ . '/../routes/web.php',
+        api: __DIR__ . '/../routes/api.php',
+        commands: __DIR__ . '/../routes/console.php',
+        health: '/up',
+    )
+    ->withMiddleware(function (Middleware $middleware) {
+        //
+    })
+    ->withExceptions(function (Exceptions $exceptions) {
+        //
+    })->create();
 
-echo "🔧 ARREGLANDO PERMISOS DE PAGOS\n";
-echo "===============================\n\n";
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
-try {
-    // 1. Verificar que los permisos existen
-    echo "1. Verificando permisos de pagos...\n";
-    $paymentPermissions = Permission::where('module', 'payments')->get();
-    echo "✅ Se encontraron " . $paymentPermissions->count() . " permisos de pagos\n";
-    
-    foreach ($paymentPermissions as $permission) {
-        echo "   - {$permission->name}: {$permission->display_name}\n";
+echo "=== CORRECCIÓN DE PERMISOS DE REPORTES DE PAGO ===\n\n";
+
+// Verificar si existen los permisos
+$permissions = [
+    'payment-reports.view',
+    'payment-reports.generate',
+    'payment-reports.manage'
+];
+
+echo "🔍 Verificando permisos existentes:\n";
+foreach ($permissions as $permission) {
+    $perm = \App\Models\Permission::where('name', $permission)->first();
+    if ($perm) {
+        echo "   ✅ Permiso '{$permission}' existe\n";
+    } else {
+        echo "   ❌ Permiso '{$permission}' no existe - creando...\n";
+        \App\Models\Permission::create([
+            'name' => $permission,
+            'display_name' => ucwords(str_replace('-', ' ', $permission)),
+            'module' => 'payment-reports'
+        ]);
+        echo "   ✅ Permiso '{$permission}' creado\n";
     }
-    echo "\n";
+}
+
+// Asignar permisos a roles
+echo "\n🔧 Asignando permisos a roles:\n";
+
+// Admin debe tener todos los permisos
+$adminRole = \App\Models\Role::where('name', 'admin')->first();
+if ($adminRole) {
+    $adminPermissions = \App\Models\Permission::whereIn('name', $permissions)->get();
+    $adminRole->permissions()->sync($adminPermissions->pluck('id'));
+    echo "   ✅ Permisos asignados al rol 'admin'\n";
+} else {
+    echo "   ❌ Rol 'admin' no encontrado\n";
+}
+
+// Team Leader debe tener permisos de vista y generación
+$tlRole = \App\Models\Role::where('name', 'team_leader')->first();
+if ($tlRole) {
+    $tlPermissions = \App\Models\Permission::whereIn('name', ['payment-reports.view', 'payment-reports.generate'])->get();
+    $tlRole->permissions()->sync($tlPermissions->pluck('id'));
+    echo "   ✅ Permisos asignados al rol 'team_leader'\n";
+} else {
+    echo "   ❌ Rol 'team_leader' no encontrado\n";
+}
+
+// Developer debe tener permiso de vista
+$devRole = \App\Models\Role::where('name', 'developer')->first();
+if ($devRole) {
+    $devPermissions = \App\Models\Permission::whereIn('name', ['payment-reports.view'])->get();
+    $devRole->permissions()->sync($devPermissions->pluck('id'));
+    echo "   ✅ Permisos asignados al rol 'developer'\n";
+} else {
+    echo "   ❌ Rol 'developer' no encontrado\n";
+}
+
+// QA debe tener permiso de vista
+$qaRole = \App\Models\Role::where('name', 'qa')->first();
+if ($qaRole) {
+    $qaPermissions = \App\Models\Permission::whereIn('name', ['payment-reports.view'])->get();
+    $qaRole->permissions()->sync($qaPermissions->pluck('id'));
+    echo "   ✅ Permisos asignados al rol 'qa'\n";
+} else {
+    echo "   ❌ Rol 'qa' no encontrado\n";
+}
+
+// Verificar usuarios específicos
+echo "\n👥 Verificando permisos de usuarios:\n";
+
+$users = \App\Models\User::with('roles')->get();
+foreach ($users as $user) {
+    $mainRole = $user->getMainRole();
+    echo "   👤 {$user->name} ({$user->email}) - Rol: {$mainRole}\n";
     
-    // 2. Verificar roles
-    echo "2. Verificando roles...\n";
-    $roles = Role::all();
-    foreach ($roles as $role) {
-        echo "   - {$role->name}: {$role->display_name}\n";
-    }
-    echo "\n";
-    
-    // 3. Asignar permisos a roles
-    echo "3. Asignando permisos a roles...\n";
-    
-    // Admin - todos los permisos
-    $adminRole = Role::where('name', 'admin')->first();
-    if ($adminRole) {
-        $adminPermissions = Permission::whereIn('name', [
-            'payments.view',
-            'payment-reports.view',
-            'payment-reports.generate',
-            'payment-reports.approve',
-            'payment-reports.export',
-        ])->get();
-        
-        $adminRole->permissions()->sync($adminPermissions->pluck('id'));
-        echo "   ✅ Admin: " . $adminPermissions->count() . " permisos asignados\n";
-    }
-    
-    // Team Leader - ver y exportar
-    $teamLeaderRole = Role::where('name', 'team_leader')->first();
-    if ($teamLeaderRole) {
-        $teamLeaderPermissions = Permission::whereIn('name', [
-            'payments.view',
-            'payment-reports.view',
-            'payment-reports.export',
-        ])->get();
-        
-        $teamLeaderRole->permissions()->sync($teamLeaderPermissions->pluck('id'));
-        echo "   ✅ Team Leader: " . $teamLeaderPermissions->count() . " permisos asignados\n";
-    }
-    
-    // Developer - ver dashboard de pagos
-    $developerRole = Role::where('name', 'developer')->first();
-    if ($developerRole) {
-        $developerPermissions = Permission::whereIn('name', [
-            'payments.view',
-        ])->get();
-        
-        $developerRole->permissions()->sync($developerPermissions->pluck('id'));
-        echo "   ✅ Developer: " . $developerPermissions->count() . " permisos asignados\n";
-    }
-    
-    echo "\n";
-    
-    // 4. Verificar usuarios desarrolladores
-    echo "4. Verificando usuarios desarrolladores...\n";
-    $developers = User::whereHas('roles', function ($query) {
-        $query->where('name', 'developer');
-    })->get();
-    
-    foreach ($developers as $developer) {
-        echo "   👤 {$developer->name} ({$developer->email}):\n";
-        
-        // Verificar permisos directos
-        $directPermissions = $developer->permissions ?? collect();
-        if ($directPermissions->count() > 0) {
-            echo "     Permisos directos:\n";
-            foreach ($directPermissions as $permission) {
-                echo "       - {$permission->name}\n";
-            }
-        }
-        
-        // Verificar permisos por roles
-        $rolePermissions = $developer->roles->flatMap(function ($role) {
-            return $role->permissions ?? collect();
-        });
-        
-        if ($rolePermissions->count() > 0) {
-            echo "     Permisos por roles:\n";
-            foreach ($rolePermissions->unique('id') as $permission) {
-                echo "       - {$permission->name}\n";
-            }
-        }
-        
-        // Verificar si tiene acceso a pagos
-        $hasPaymentAccess = $developer->hasPermission('payments.view');
-        echo "     Acceso a pagos: " . ($hasPaymentAccess ? '✅ SÍ' : '❌ NO') . "\n";
-        
-        echo "\n";
+    if ($user->hasPermission('payment-reports.view')) {
+        echo "      ✅ Tiene permiso 'payment-reports.view'\n";
+    } else {
+        echo "      ❌ NO tiene permiso 'payment-reports.view'\n";
     }
     
-    // 5. Asignar permisos directos si es necesario
-    echo "5. Asignando permisos directos a desarrolladores...\n";
-    $paymentViewPermission = Permission::where('name', 'payments.view')->first();
-    
-    if ($paymentViewPermission) {
-        foreach ($developers as $developer) {
-            if (!$developer->hasPermission('payments.view')) {
-                $developer->permissions()->attach($paymentViewPermission->id);
-                echo "   ✅ {$developer->name}: Permiso payments.view asignado directamente\n";
-            }
-        }
+    if ($user->hasPermission('payment-reports.generate')) {
+        echo "      ✅ Tiene permiso 'payment-reports.generate'\n";
+    } else {
+        echo "      ❌ NO tiene permiso 'payment-reports.generate'\n";
     }
-    
-    echo "\n";
-    
-    // 6. Verificar rutas disponibles
-    echo "6. Verificando rutas de pagos disponibles...\n";
-    echo "   - /payments/dashboard (requiere: payments.view)\n";
-    echo "   - /payments/admin (requiere: payment-reports.view)\n";
-    echo "   - /payments/reports (requiere: payment-reports.view)\n";
-    echo "\n";
-    
-    // 7. Mostrar resumen final
-    echo "7. Resumen final:\n";
-    echo "   - Desarrolladores con acceso a pagos: " . $developers->filter(function ($dev) {
-        return $dev->hasPermission('payments.view');
-    })->count() . "/" . $developers->count() . "\n";
-    
-    echo "\n🎉 ¡Permisos de pagos arreglados!\n";
-    echo "===============================\n";
-    echo "Ahora los desarrolladores deberían poder acceder a:\n";
-    echo "- http://localhost:8000/payments/dashboard\n";
-    echo "\n";
-    echo "Para probar, usa cualquiera de estos usuarios:\n";
-    foreach ($developers as $developer) {
-        echo "- {$developer->email} (password: password)\n";
-    }
-    
-} catch (Exception $e) {
-    echo "❌ Error durante la corrección: " . $e->getMessage() . "\n";
-    echo "Stack trace:\n" . $e->getTraceAsString() . "\n";
-} 
+}
+
+echo "\n✅ Corrección de permisos completada\n";
+echo "\n📋 Resumen:\n";
+echo "- Permisos de reportes de pago creados/verificados\n";
+echo "- Permisos asignados a roles apropiados\n";
+echo "- Usuarios verificados para permisos\n";
+echo "- Sistema listo para generar reportes\n"; 

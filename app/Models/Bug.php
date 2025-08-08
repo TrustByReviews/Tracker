@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Traits\HasUuid;
+use App\Services\NotificationService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -57,6 +58,25 @@ class Bug extends Model
         'reproducibility',
         'severity',
         'related_task_id',
+        'qa_status',
+        'qa_assigned_to',
+        'qa_assigned_at',
+        'qa_started_at',
+        'qa_completed_at',
+        'qa_notes',
+        'qa_rejection_reason',
+        'qa_reviewed_by',
+        'qa_reviewed_at',
+        'qa_testing_started_at',
+        'qa_testing_paused_at',
+        'qa_testing_finished_at',
+        'team_leader_final_approval',
+        'team_leader_final_approval_at',
+        'team_leader_final_notes',
+        'team_leader_requested_changes',
+        'team_leader_requested_changes_at',
+        'team_leader_change_notes',
+        'team_leader_reviewed_by',
     ];
 
     protected $casts = [
@@ -101,6 +121,25 @@ class Bug extends Model
         'priority_score' => 'integer',
         'reproducibility' => 'string',
         'severity' => 'string',
+        'qa_status' => 'string',
+        'qa_assigned_to' => 'string',
+        'qa_assigned_at' => 'datetime',
+        'qa_started_at' => 'datetime',
+        'qa_completed_at' => 'datetime',
+        'qa_notes' => 'string',
+        'qa_rejection_reason' => 'string',
+        'qa_reviewed_by' => 'string',
+        'qa_reviewed_at' => 'datetime',
+        'qa_testing_started_at' => 'datetime',
+        'qa_testing_paused_at' => 'datetime',
+        'qa_testing_finished_at' => 'datetime',
+        'team_leader_final_approval' => 'boolean',
+        'team_leader_final_approval_at' => 'datetime',
+        'team_leader_final_notes' => 'string',
+        'team_leader_requested_changes' => 'boolean',
+        'team_leader_requested_changes_at' => 'datetime',
+        'team_leader_change_notes' => 'string',
+        'team_leader_reviewed_by' => 'string',
     ];
 
     // Estados posibles del bug
@@ -183,6 +222,21 @@ class Bug extends Model
     public function relatedTask(): BelongsTo
     {
         return $this->belongsTo(Task::class, 'related_task_id');
+    }
+
+    public function qaAssignedTo(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'qa_assigned_to');
+    }
+
+    public function qaReviewedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'qa_reviewed_by');
+    }
+
+    public function teamLeaderReviewedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'team_leader_reviewed_by');
     }
 
     // Helper methods for time tracking
@@ -288,5 +342,202 @@ class Bug extends Model
             self::TYPE_SECURITY => 'shield',
             default => 'bug',
         };
+    }
+
+    /**
+     * Obtener el color del estado de QA
+     */
+    public function getQaStatusColor(): string
+    {
+        return match($this->qa_status) {
+            'pending' => 'bg-gray-100 text-gray-800',
+            'ready_for_test' => 'bg-blue-100 text-blue-800',
+            'testing' => 'bg-yellow-100 text-yellow-800',
+            'approved' => 'bg-green-100 text-green-800',
+            'rejected' => 'bg-red-100 text-red-800',
+            default => 'bg-gray-100 text-gray-800',
+        };
+    }
+
+    /**
+     * Verificar si el bug está lista para QA
+     */
+    public function isReadyForQa(): bool
+    {
+        return $this->status === self::STATUS_RESOLVED && $this->qa_status === 'pending';
+    }
+
+    /**
+     * Verificar si el bug está siendo testeado por QA
+     */
+    public function isBeingTestedByQa(): bool
+    {
+        return $this->qa_status === 'testing';
+    }
+
+    /**
+     * Verificar si el bug fue aprobado por QA
+     */
+    public function isApprovedByQa(): bool
+    {
+        return $this->qa_status === 'approved';
+    }
+
+    /**
+     * Verificar si el bug fue rechazado por QA
+     */
+    public function isRejectedByQa(): bool
+    {
+        return $this->qa_status === 'rejected';
+    }
+
+    /**
+     * Marcar el bug como lista para QA
+     */
+    public function markAsReadyForQa(): void
+    {
+        $this->update([
+            'qa_status' => 'ready_for_test',
+        ]);
+    }
+
+    /**
+     * Asignar el bug a un QA
+     */
+    public function assignToQa(User $qaUser): void
+    {
+        $this->update([
+            'qa_assigned_to' => $qaUser->id,
+            'qa_assigned_at' => now(),
+            'qa_status' => 'testing',
+            'qa_started_at' => now(),
+        ]);
+    }
+
+    /**
+     * Aprobar el bug por QA
+     */
+    public function approveByQa(User $qaUser, ?string $notes = null): void
+    {
+        $this->update([
+            'qa_status' => 'approved',
+            'qa_completed_at' => now(),
+            'qa_notes' => $notes,
+            'qa_reviewed_by' => $qaUser->id,
+            'qa_reviewed_at' => now(),
+        ]);
+
+        // Enviar notificaciones automáticamente
+        $notificationService = app(NotificationService::class);
+        $notificationService->notifyBugApprovedByQa($this->fresh(), $qaUser);
+        $notificationService->notifyBugCompletedByQa($this->fresh(), $qaUser);
+    }
+
+    /**
+     * Rechazar el bug por QA
+     */
+    public function rejectByQa(User $qaUser, string $reason): void
+    {
+        $this->update([
+            'qa_status' => 'rejected',
+            'qa_completed_at' => now(),
+            'qa_rejection_reason' => $reason,
+            'qa_reviewed_by' => $qaUser->id,
+            'qa_reviewed_at' => now(),
+        ]);
+
+        // Enviar notificaciones automáticamente
+        $notificationService = app(NotificationService::class);
+        $notificationService->notifyBugRejectedByQa($this->fresh(), $qaUser, $reason);
+    }
+
+    /**
+     * Verificar si el bug está lista para revisión del Team Leader
+     */
+    public function isReadyForTeamLeaderReview(): bool
+    {
+        return $this->qa_status === 'approved' && !$this->team_leader_final_approval && !$this->team_leader_requested_changes;
+    }
+
+    /**
+     * Verificar si el bug fue aprobado finalmente por el Team Leader
+     */
+    public function isFinallyApprovedByTeamLeader(): bool
+    {
+        return $this->team_leader_final_approval === true;
+    }
+
+    /**
+     * Verificar si el Team Leader solicitó cambios
+     */
+    public function hasTeamLeaderRequestedChanges(): bool
+    {
+        return $this->team_leader_requested_changes === true;
+    }
+
+    /**
+     * Aprobar finalmente el bug por el Team Leader
+     */
+    public function finallyApproveByTeamLeader(User $teamLeader, ?string $notes = null): void
+    {
+        $this->update([
+            'team_leader_final_approval' => true,
+            'team_leader_final_approval_at' => now(),
+            'team_leader_final_notes' => $notes,
+            'team_leader_reviewed_by' => $teamLeader->id,
+        ]);
+
+        // Enviar notificaciones automáticamente
+        $notificationService = app(NotificationService::class);
+        $notificationService->notifyBugFinalApproved($this->fresh(), $teamLeader);
+    }
+
+    /**
+     * Solicitar cambios por el Team Leader
+     */
+    public function requestChangesByTeamLeader(User $teamLeader, string $notes): void
+    {
+        $this->update([
+            'team_leader_requested_changes' => true,
+            'team_leader_requested_changes_at' => now(),
+            'team_leader_change_notes' => $notes,
+            'team_leader_reviewed_by' => $teamLeader->id,
+        ]);
+
+        // Enviar notificaciones automáticamente
+        $notificationService = app(NotificationService::class);
+        $notificationService->notifyBugChangesRequested($this->fresh(), $teamLeader, $notes);
+    }
+
+    /**
+     * Verificar si el desarrollador puede tener más bugs activos
+     */
+    public static function canDeveloperHaveMoreActiveBugs(User $developer): bool
+    {
+        $activeBugsCount = self::where('user_id', $developer->id)
+            ->where(function ($query) {
+                $query->where('is_working', true)
+                    ->orWhere('status', 'in progress')
+                    ->orWhere('qa_status', 'rejected')
+                    ->orWhere('team_leader_requested_changes', true);
+            })
+            ->count();
+
+        return $activeBugsCount < 3;
+    }
+
+    /**
+     * Obtener el conteo de bugs activos de un desarrollador
+     */
+    public static function getActiveBugsCount(User $developer): int
+    {
+        return self::where('user_id', $developer->id)
+            ->where(function ($query) {
+                $query->where('is_working', true)
+                    ->orWhere('status', 'in progress')
+                    ->orWhere('qa_status', 'rejected')
+                    ->orWhere('team_leader_requested_changes', true);
+            })
+            ->count();
     }
 }

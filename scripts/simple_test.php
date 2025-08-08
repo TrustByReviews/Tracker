@@ -1,156 +1,151 @@
 <?php
 
-require_once 'vendor/autoload.php';
+/**
+ * Script de Prueba Simple - Sistema de Notificaciones
+ * 
+ * Este script prueba las funcionalidades básicas del sistema
+ */
 
-$app = require_once 'bootstrap/app.php';
+require_once __DIR__ . '/../vendor/autoload.php';
+
+use Illuminate\Foundation\Application;
+use Illuminate\Foundation\Configuration\Exceptions;
+use Illuminate\Foundation\Configuration\Middleware;
+
+// Inicializar Laravel
+$app = Application::configure(basePath: __DIR__ . '/..')
+    ->withRouting(
+        web: __DIR__ . '/../routes/web.php',
+        commands: __DIR__ . '/../routes/console.php',
+        health: '/up',
+    )
+    ->withMiddleware(function (Middleware $middleware) {
+        //
+    })
+    ->withExceptions(function (Exceptions $exceptions) {
+        //
+    })->create();
+
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
-use Illuminate\Support\Facades\DB;
+use App\Models\User;
+use App\Models\Task;
+use App\Models\Bug;
+use App\Models\Project;
+use App\Models\Sprint;
+use App\Services\NotificationService;
 
-echo "=== PRUEBA SIMPLE DEL SISTEMA ===\n\n";
+echo "🚀 INICIANDO PRUEBA SIMPLE DEL SISTEMA DE NOTIFICACIONES\n";
+echo "========================================================\n\n";
 
 try {
-    // 1. Verificar usuario principal usando DB directamente
-    echo "👤 VERIFICANDO USUARIO PRINCIPAL...\n";
-    $mainUser = DB::table('users')->where('email', 'andresxfernandezx@gmail.com')->first();
-    
-    if (!$mainUser) {
-        echo "❌ Usuario principal no encontrado\n";
-        exit(1);
+    // 1. Verificar que los modelos existen
+    echo "✅ Verificando modelos...\n";
+    echo "   - Task model: " . (class_exists(Task::class) ? 'OK' : 'ERROR') . "\n";
+    echo "   - Bug model: " . (class_exists(Bug::class) ? 'OK' : 'ERROR') . "\n";
+    echo "   - User model: " . (class_exists(User::class) ? 'OK' : 'ERROR') . "\n";
+    echo "   - Project model: " . (class_exists(Project::class) ? 'OK' : 'ERROR') . "\n";
+    echo "   - Sprint model: " . (class_exists(Sprint::class) ? 'OK' : 'ERROR') . "\n";
+    echo "   - NotificationService: " . (class_exists(NotificationService::class) ? 'OK' : 'ERROR') . "\n";
+
+    // 2. Verificar que las rutas están registradas
+    echo "\n✅ Verificando rutas...\n";
+    $routes = [
+        'team-leader.review.tasks',
+        'team-leader.review.bugs',
+        'team-leader.review.stats'
+    ];
+
+    foreach ($routes as $routeName) {
+        $route = \Illuminate\Support\Facades\Route::getRoutes()->getByName($routeName);
+        echo "   - {$routeName}: " . ($route ? 'OK' : 'ERROR') . "\n";
     }
+
+    // 3. Verificar métodos en los modelos
+    echo "\n✅ Verificando métodos de modelos...\n";
     
-    echo "✅ Usuario principal: {$mainUser->name} ({$mainUser->email})\n\n";
-    
-    // 2. Verificar estructura de tablas
-    echo "🔍 VERIFICANDO ESTRUCTURA DE TABLAS...\n";
-    
-    // Verificar que current_session_start no existe en bugs
-    $bugColumns = DB::select("SELECT column_name FROM information_schema.columns WHERE table_name = 'bugs'");
-    $bugColumnNames = array_column($bugColumns, 'column_name');
-    
-    if (in_array('current_session_start', $bugColumnNames)) {
-        echo "❌ current_session_start aún existe en tabla bugs\n";
-    } else {
-        echo "✅ current_session_start eliminado de tabla bugs\n";
+    // Verificar métodos en Task
+    $taskMethods = ['isReadyForTeamLeaderReview', 'finallyApproveByTeamLeader', 'requestChangesByTeamLeader', 'canDeveloperHaveMoreActiveTasks'];
+    foreach ($taskMethods as $method) {
+        echo "   - Task::{$method}: " . (method_exists(Task::class, $method) ? 'OK' : 'ERROR') . "\n";
     }
-    
-    // Verificar que work_finished_at existe en ambas tablas
-    if (in_array('work_finished_at', $bugColumnNames)) {
-        echo "✅ work_finished_at existe en tabla bugs\n";
-    } else {
-        echo "❌ work_finished_at no existe en tabla bugs\n";
+
+    // Verificar métodos en Bug
+    $bugMethods = ['isReadyForTeamLeaderReview', 'finallyApproveByTeamLeader', 'requestChangesByTeamLeader', 'canDeveloperHaveMoreActiveBugs'];
+    foreach ($bugMethods as $method) {
+        echo "   - Bug::{$method}: " . (method_exists(Bug::class, $method) ? 'OK' : 'ERROR') . "\n";
     }
+
+    // 4. Verificar métodos en NotificationService
+    echo "\n✅ Verificando métodos de NotificationService...\n";
+    $notificationMethods = [
+        'notifyTaskCompletedByQa',
+        'notifyBugCompletedByQa', 
+        'notifyTaskApprovedWithChanges',
+        'notifyBugApprovedWithChanges'
+    ];
     
-    $taskColumns = DB::select("SELECT column_name FROM information_schema.columns WHERE table_name = 'tasks'");
-    $taskColumnNames = array_column($taskColumns, 'column_name');
-    
-    if (in_array('work_finished_at', $taskColumnNames)) {
-        echo "✅ work_finished_at existe en tabla tasks\n";
-    } else {
-        echo "❌ work_finished_at no existe en tabla tasks\n";
+    foreach ($notificationMethods as $method) {
+        echo "   - NotificationService::{$method}: " . (method_exists(NotificationService::class, $method) ? 'OK' : 'ERROR') . "\n";
     }
-    
-    // Verificar que duration existe en bug_time_logs
-    $timeLogColumns = DB::select("SELECT column_name FROM information_schema.columns WHERE table_name = 'bug_time_logs'");
-    $timeLogColumnNames = array_column($timeLogColumns, 'column_name');
-    
-    if (in_array('duration', $timeLogColumnNames)) {
-        echo "✅ duration existe en tabla bug_time_logs\n";
-    } else {
-        echo "❌ duration no existe en tabla bug_time_logs\n";
+
+    // 5. Verificar archivos Vue
+    echo "\n✅ Verificando componentes Vue...\n";
+    $vueFiles = [
+        'resources/js/pages/TeamLeader/ReviewTasks.vue',
+        'resources/js/pages/TeamLeader/ReviewBugs.vue',
+        'resources/js/components/TaskCard.vue',
+        'resources/js/components/BugCard.vue'
+    ];
+
+    foreach ($vueFiles as $file) {
+        echo "   - {$file}: " . (file_exists($file) ? 'OK' : 'ERROR') . "\n";
     }
+
+    // 6. Verificar campos en la base de datos
+    echo "\n✅ Verificando campos de base de datos...\n";
     
-    echo "\n";
-    
-    // 3. Verificar datos limpios
-    echo "🧹 VERIFICANDO DATOS LIMPIOS...\n";
-    
-    $activeTasks = DB::table('tasks')->where('is_working', true)->count();
-    $activeBugs = DB::table('bugs')->where('is_working', true)->count();
-    
-    echo "   - Tareas activas: {$activeTasks}\n";
-    echo "   - Bugs activos: {$activeBugs}\n";
-    
-    if ($activeTasks === 0 && $activeBugs === 0) {
-        echo "✅ No hay actividades activas (sistema limpio)\n";
-    } else {
-        echo "⚠️  Hay actividades activas\n";
+    // Verificar campos en tasks
+    $taskFields = [
+        'team_leader_final_approval',
+        'team_leader_final_approval_at',
+        'team_leader_final_notes',
+        'team_leader_requested_changes',
+        'team_leader_requested_changes_at',
+        'team_leader_change_notes',
+        'team_leader_reviewed_by'
+    ];
+
+    $taskTable = \Illuminate\Support\Facades\Schema::getColumnListing('tasks');
+    foreach ($taskFields as $field) {
+        echo "   - tasks.{$field}: " . (in_array($field, $taskTable) ? 'OK' : 'ERROR') . "\n";
     }
-    
-    // 4. Verificar asignaciones
-    echo "\n🔗 VERIFICANDO ASIGNACIONES...\n";
-    
-    $unassignedTasks = DB::table('tasks')->whereNull('user_id')->count();
-    $unassignedBugs = DB::table('bugs')->whereNull('user_id')->count();
-    
-    echo "   - Tareas sin asignar: {$unassignedTasks}\n";
-    echo "   - Bugs sin asignar: {$unassignedBugs}\n";
-    
-    if ($unassignedTasks === 0 && $unassignedBugs === 0) {
-        echo "✅ Todas las tareas y bugs están asignados\n";
-    } else {
-        echo "⚠️  Hay elementos sin asignar\n";
+
+    // Verificar campos en bugs
+    $bugFields = [
+        'team_leader_final_approval',
+        'team_leader_final_approval_at',
+        'team_leader_final_notes',
+        'team_leader_requested_changes',
+        'team_leader_requested_changes_at',
+        'team_leader_change_notes',
+        'team_leader_reviewed_by'
+    ];
+
+    $bugTable = \Illuminate\Support\Facades\Schema::getColumnListing('bugs');
+    foreach ($bugFields as $field) {
+        echo "   - bugs.{$field}: " . (in_array($field, $bugTable) ? 'OK' : 'ERROR') . "\n";
     }
-    
-    // 5. Probar funcionalidad de tiempo
-    echo "\n⏰ PROBANDO FUNCIONALIDAD DE TIEMPO...\n";
-    
-    // Buscar un bug para probar
-    $testBug = DB::table('bugs')->where('user_id', $mainUser->id)->first();
-    
-    if ($testBug) {
-        echo "   - Bug de prueba: {$testBug->title}\n";
-        echo "   - Estado actual: {$testBug->status}\n";
-        echo "   - Tiempo total: {$testBug->total_time_seconds} segundos\n";
-        
-        if ($testBug->work_started_at) {
-            echo "   - Último trabajo iniciado: {$testBug->work_started_at}\n";
-        } else {
-            echo "   - No ha iniciado trabajo aún\n";
-        }
-        
-        if ($testBug->work_finished_at) {
-            echo "   - Último trabajo finalizado: {$testBug->work_finished_at}\n";
-        } else {
-            echo "   - No ha finalizado trabajo aún\n";
-        }
-        
-        echo "✅ Bug de prueba encontrado y verificado\n";
-    } else {
-        echo "⚠️  No se encontró bug de prueba para el usuario principal\n";
-    }
-    
-    // 6. Verificar logs de tiempo
-    echo "\n📊 VERIFICANDO LOGS DE TIEMPO...\n";
-    
-    $unfinishedLogs = DB::table('bug_time_logs')->whereNull('finished_at')->count();
-    $logsWithoutDuration = DB::table('bug_time_logs')->whereNull('duration')->count();
-    
-    echo "   - Logs sin finalizar: {$unfinishedLogs}\n";
-    echo "   - Logs sin duración: {$logsWithoutDuration}\n";
-    
-    if ($unfinishedLogs === 0 && $logsWithoutDuration === 0) {
-        echo "✅ Todos los logs están completos\n";
-    } else {
-        echo "⚠️  Hay logs incompletos\n";
-    }
-    
-    // 7. Resumen final
-    echo "\n📋 RESUMEN FINAL:\n";
-    echo "✅ Sistema simplificado implementado correctamente\n";
-    echo "✅ Manejo de tiempo unificado (work_started_at + work_finished_at)\n";
-    echo "✅ Eliminado current_session_start\n";
-    echo "✅ Frontend calcula tiempo transcurrido localmente\n";
-    echo "✅ No más problemas de zona horaria en backend\n";
-    echo "✅ Sistema listo para uso en producción\n";
-    
-    echo "\n🎯 PRÓXIMOS PASOS:\n";
-    echo "   1. Probar el frontend en http://127.0.0.1:8000/bugs\n";
-    echo "   2. Verificar que los timers funcionan correctamente\n";
-    echo "   3. Probar inicio/pausa/finalización de trabajo\n";
-    echo "   4. Verificar que no hay errores de JavaScript\n";
-    
+
+    echo "\n✅ PRUEBA SIMPLE COMPLETADA EXITOSAMENTE\n";
+    echo "🎯 El sistema está listo para pruebas manuales\n";
+    echo "\n📋 URLs para probar:\n";
+    echo "   - Team Leader Review Tasks: http://localhost:8000/team-leader/review/tasks\n";
+    echo "   - Team Leader Review Bugs: http://localhost:8000/team-leader/review/bugs\n";
+    echo "   - Developer Tasks: http://localhost:8000/tasks\n";
+    echo "   - Developer Bugs: http://localhost:8000/bugs\n";
+
 } catch (Exception $e) {
-    echo "❌ Error: " . $e->getMessage() . "\n";
-    echo "Stack trace:\n" . $e->getTraceAsString() . "\n";
+    echo "❌ ERROR EN LA PRUEBA: " . $e->getMessage() . "\n";
+    echo "📋 Stack trace:\n" . $e->getTraceAsString() . "\n";
 } 

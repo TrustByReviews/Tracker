@@ -112,6 +112,54 @@
                     {{ bug.user?.name || 'Unassigned' }}
                   </p>
                 </div>
+                
+                <!-- Assignment Actions -->
+                <div class="space-y-2">
+                  <!-- Self Assign Button -->
+                  <button
+                    v-if="!bug.user_id && (permissions === 'developer' || permissions === 'team_leader' || permissions === 'admin')"
+                    @click="handleSelfAssign(bug.id)"
+                    class="w-full px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    Assign to Me
+                  </button>
+                  
+                  <!-- Assign to Others (Admin/Team Leader only) -->
+                  <div v-if="(permissions === 'admin' || permissions === 'team_leader') && projectUsers.length > 0">
+                    <div class="flex gap-2">
+                      <select
+                        v-model="selectedUser"
+                        class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select Developer</option>
+                        <option
+                          v-for="user in projectUsers"
+                          :key="user.id"
+                          :value="user.id"
+                        >
+                          {{ user.name }} ({{ user.email }})
+                        </option>
+                      </select>
+                      <button
+                        @click="handleAssignToUser(bug.id)"
+                        :disabled="!selectedUser"
+                        class="px-3 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Assign
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <!-- Unassign Button -->
+                  <button
+                    v-if="bug.user_id && (permissions === 'admin' || permissions === 'team_leader' || (permissions === 'developer' && bug.user_id === authUser?.id))"
+                    @click="handleUnassign(bug.id)"
+                    class="w-full px-3 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  >
+                    Unassign
+                  </button>
+                </div>
+                
                 <div>
                   <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Assigned By</span>
                   <p class="text-sm text-gray-900 dark:text-white mt-1">
@@ -518,7 +566,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { router } from '@inertiajs/vue3'
+import { router, usePage } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 
 const props = defineProps({
@@ -529,10 +577,19 @@ const props = defineProps({
   permissions: {
     type: String,
     required: true
+  },
+  projectUsers: {
+    type: Array,
+    default: () => []
   }
 })
 
 const showEditModal = ref(false)
+const selectedUser = ref('')
+const authUser = ref(null)
+
+// Get current user from Inertia
+authUser.value = usePage().props.auth?.user
 
 // Helper functions
 const getStatusLabel = (status) => {
@@ -666,6 +723,25 @@ const handleSelfAssign = async (bugId) => {
     router.reload()
   } catch (error) {
     console.error('Error self-assigning bug:', error)
+  }
+}
+
+const handleAssignToUser = async (bugId) => {
+  try {
+    await router.post(`/bugs/${bugId}/assign`, { user_id: selectedUser.value })
+    selectedUser.value = ''
+    router.reload()
+  } catch (error) {
+    console.error('Error assigning bug to user:', error)
+  }
+}
+
+const handleUnassign = async (bugId) => {
+  try {
+    await router.post(`/bugs/${bugId}/unassign`)
+    router.reload()
+  } catch (error) {
+    console.error('Error unassigning bug:', error)
   }
 }
 

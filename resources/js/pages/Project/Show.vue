@@ -276,7 +276,7 @@ const back = () => {
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Sprints</h2>
         <CreateSprintModal 
-          v-if="permissions === 'admin'" 
+          v-if="permissions === 'admin' || permissions === 'team_leader'" 
           :project="project" 
         />
       </div>
@@ -302,7 +302,7 @@ const back = () => {
               Get started by creating your first sprint for this project.
             </p>
             <CreateSprintModal 
-              v-if="permissions === 'admin'" 
+              v-if="permissions === 'admin' || permissions === 'team_leader'" 
               :project="project" 
             />
           </CardContent>

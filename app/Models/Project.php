@@ -51,6 +51,11 @@ class Project extends Model
         return $this->hasMany(Bug::class, 'project_id');
     }
 
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class, 'project_id');
+    }
+
     /**
      * Calcular el progreso total del proyecto incluyendo tareas y bugs
      */

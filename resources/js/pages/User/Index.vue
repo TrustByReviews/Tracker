@@ -90,7 +90,7 @@ const applyFilters = () => {
   })
 }
 
-// Limpiar filtros
+// Clear filtros
 const clearFilters = () => {
   search.value = ''
   statusFilter.value = ''
@@ -99,7 +99,7 @@ const clearFilters = () => {
   applyFilters()
 }
 
-// Navegar a página
+// Navigate to page
 const goToPage = (pageNumber: number) => {
   router.get('/users', {
     search: search.value,
@@ -139,8 +139,8 @@ const getStatusIcon = (status: string) => {
   }
 }
 
-const getRoleBadge = (roles: any[]) => {
-  if (!roles || roles.length === 0) return { label: 'No Role', class: 'bg-gray-100 text-gray-800' }
+const getRoleeeeeeeeeeeeeeBadge = (roles: any[]) => {
+  if (!roles || roles.length === 0) return { label: 'No Roleeeeeeeeeee', class: 'bg-gray-100 text-gray-800' }
   
   const role = roles[0]
   switch (role.value) {
@@ -271,7 +271,7 @@ const formatCurrency = (amount: number) => {
           </div>
 
           <div>
-            <Label for="role">Role</Label>
+            <Label for="role">Roleeeeeeeeeee</Label>
             <Select v-model="roleFilter">
               <SelectTrigger>
                 <SelectValue placeholder="All roles" />
@@ -331,14 +331,14 @@ const formatCurrency = (amount: number) => {
 
         <CardContent>
           <div class="space-y-3">
-            <!-- Status and Role -->
+            <!-- Status and Roleeeeeeeeeeeeee -->
             <div class="flex gap-2">
               <Badge :class="getStatusClass(user.status)">
                 <Icon :name="getStatusIcon(user.status)" class="h-3 w-3 mr-1" />
                 {{ user.status }}
               </Badge>
-              <Badge :class="getRoleBadge(user.roles).class">
-                {{ getRoleBadge(user.roles).label }}
+              <Badge :class="getRoleeeeeeeeeeeeeeBadge(user.roles).class">
+                {{ getRoleeeeeeeeeeeeeeBadge(user.roles).label }}
               </Badge>
             </div>
 
@@ -451,7 +451,7 @@ const formatCurrency = (amount: number) => {
       </Card>
     </div>
 
-    <!-- No Users Message -->
+    <!-- No Users Monthsage -->
     <div v-if="users.data.length === 0" class="text-center py-12">
       <Icon name="users" class="h-12 w-12 text-gray-400 mx-auto mb-4" />
       <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No users found</h3>

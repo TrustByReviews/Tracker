@@ -2,316 +2,318 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Task;
-use App\Models\User;
 use App\Models\Project;
-use App\Services\TaskApprovalService;
-use App\Services\TaskAssignmentService;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use App\Models\Sprint;
+use App\Models\Task;
+use App\Models\Bug;
+use App\Models\User;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
-use Inertia\Response;
+use Illuminate\Http\Request;
 
 class TeamLeaderController extends Controller
 {
-    public function __construct(
-        private TaskApprovalService $taskApprovalService,
-        private TaskAssignmentService $taskAssignmentService
-    ) {
-    }
-
-    /**
-     * Dashboard principal del team leader
-     */
-    public function dashboard(): Response
+    public function dashboard()
     {
-        $teamLeader = Auth::user();
+        $user = Auth::user();
         
-        // Verificar que el usuario es team leader
-        if (!$teamLeader->roles()->where('name', 'team_leader')->exists()) {
-            abort(403, 'Access denied. Team leader role required.');
-        }
-        
-        $pendingTasks = $this->taskApprovalService->getPendingTasksForTeamLeader($teamLeader);
-        $inProgressTasks = $this->taskApprovalService->getInProgressTasksForTeamLeader($teamLeader);
-        $developersWithTasks = $this->taskApprovalService->getDevelopersWithActiveTasks($teamLeader);
-        $approvalStats = $this->taskApprovalService->getApprovalStatsForTeamLeader($teamLeader);
-        $developerTimeSummary = $this->taskApprovalService->getDeveloperTimeSummary($teamLeader);
-        $recentlyCompleted = $this->taskApprovalService->getRecentlyCompletedTasks($teamLeader);
-        
+        // Obtener proyectos donde el TL está asignado
+        $projects = Project::whereHas('users', function ($query) use ($user) {
+            $query->where('users.id', $user->id);
+        })->with(['sprints', 'tasks', 'bugs'])->get();
+
+        // Obtener sprints activos (basado en fechas)
+        $activeSprints = Sprint::whereHas('project.users', function ($query) use ($user) {
+            $query->where('users.id', $user->id);
+        })->where('start_date', '<=', now())
+          ->where('end_date', '>=', now())
+          ->with(['project', 'tasks', 'bugs'])->get();
+
+        // Obtener tareas pendientes de revisión
+        $pendingTasks = Task::whereHas('project.users', function ($query) use ($user) {
+            $query->where('users.id', $user->id);
+        })->where('qa_status', 'approved')
+          ->where('team_leader_final_approval', false)
+          ->where('team_leader_requested_changes', false)
+          ->with(['user', 'project', 'sprint', 'qaReviewedBy'])
+          ->get();
+
+        // Obtener bugs pendientes de revisión
+        $pendingBugs = Bug::whereHas('project.users', function ($query) use ($user) {
+            $query->where('users.id', $user->id);
+        })->where('qa_status', 'approved')
+          ->where('team_leader_final_approval', false)
+          ->where('team_leader_requested_changes', false)
+          ->with(['user', 'project', 'sprint', 'qaReviewedBy'])
+          ->get();
+
+        // Obtener tareas aprobadas por QA
+        $qaApprovedTasks = Task::whereHas('project.users', function ($query) use ($user) {
+            $query->where('users.id', $user->id);
+        })->where('qa_status', 'approved')
+          ->with(['user', 'project', 'sprint', 'qaReviewedBy'])
+          ->get();
+
+        // Obtener bugs aprobados por QA
+        $qaApprovedBugs = Bug::whereHas('project.users', function ($query) use ($user) {
+            $query->where('users.id', $user->id);
+        })->where('qa_status', 'approved')
+          ->with(['user', 'project', 'sprint', 'qaReviewedBy'])
+          ->get();
+
+        // Estadísticas
+        $stats = [
+            'activeProjects' => $projects->count(),
+            'activeSprints' => $activeSprints->count(),
+            'pendingTasks' => $pendingTasks->count(),
+            'pendingBugs' => $pendingBugs->count(),
+            'qaApprovedTasks' => $qaApprovedTasks->count(),
+            'qaApprovedBugs' => $qaApprovedBugs->count(),
+        ];
+
         return Inertia::render('TeamLeader/Dashboard', [
+            'user' => $user,
+            'projects' => $projects,
+            'activeSprints' => $activeSprints,
             'pendingTasks' => $pendingTasks,
-            'inProgressTasks' => $inProgressTasks,
-            'developersWithTasks' => $developersWithTasks,
-            'approvalStats' => $approvalStats,
-            'developerTimeSummary' => $developerTimeSummary,
-            'recentlyCompleted' => $recentlyCompleted,
+            'pendingBugs' => $pendingBugs,
+            'qaApprovedTasks' => $qaApprovedTasks,
+            'qaApprovedBugs' => $qaApprovedBugs,
+            'stats' => $stats,
+        ]);
+    }
+
+    public function projects()
+    {
+        $user = Auth::user();
+        
+        $projects = Project::whereHas('users', function ($query) use ($user) {
+            $query->where('users.id', $user->id);
+        })->with(['sprints', 'tasks', 'bugs', 'users'])->get();
+
+        return Inertia::render('TeamLeader/Projects', [
+            'user' => $user,
+            'projects' => $projects,
+        ]);
+    }
+
+    public function sprints()
+    {
+        $user = Auth::user();
+        
+        // Obtener proyectos del TL
+        $projects = Project::whereHas('users', function ($query) use ($user) {
+            $query->where('users.id', $user->id);
+        })->get();
+
+        // Obtener sprints de esos proyectos con sus relaciones
+        $sprints = Sprint::whereIn('project_id', $projects->pluck('id'))
+            ->with([
+                'project',
+                'tasks' => function ($query) {
+                    $query->with(['user', 'qaReviewedBy']);
+                },
+                'bugs' => function ($query) {
+                    $query->with(['user', 'qaReviewedBy']);
+                }
+            ])
+            ->get();
+
+        return Inertia::render('TeamLeader/Sprints', [
+            'sprints' => $sprints,
+            'projects' => $projects,
+            'permissions' => 'team_leader'
+        ]);
+    }
+
+    public function notifications()
+    {
+        $user = Auth::user();
+        
+        // Aquí puedes implementar la lógica para obtener notificaciones
+        $notifications = []; // Placeholder
+
+        return Inertia::render('TeamLeader/Notifications', [
+            'user' => $user,
+            'notifications' => $notifications,
+        ]);
+    }
+
+    public function reports()
+    {
+        $user = Auth::user();
+        
+        // Aquí puedes implementar la lógica para reportes
+        $reports = []; // Placeholder
+
+        return Inertia::render('TeamLeader/Reports', [
+            'user' => $user,
+            'reports' => $reports,
+        ]);
+    }
+
+    public function settings()
+    {
+        $user = Auth::user();
+        
+        return Inertia::render('TeamLeader/Settings', [
+            'user' => $user,
+        ]);
+    }
+
+    // API endpoints para el sidebar
+    public function getStats()
+    {
+        $user = Auth::user();
+        
+        $activeProjects = Project::whereHas('users', function ($query) use ($user) {
+            $query->where('users.id', $user->id);
+        })->count();
+
+        $activeSprints = Sprint::whereHas('project.users', function ($query) use ($user) {
+            $query->where('users.id', $user->id);
+        })->where('start_date', '<=', now())
+          ->where('end_date', '>=', now())
+          ->count();
+
+        $pendingTasks = Task::whereHas('project.users', function ($query) use ($user) {
+            $query->where('users.id', $user->id);
+        })->where('qa_status', 'approved')
+          ->where('team_leader_final_approval', false)
+          ->where('team_leader_requested_changes', false)
+          ->count();
+
+        $qaApprovedBugs = Bug::whereHas('project.users', function ($query) use ($user) {
+            $query->where('users.id', $user->id);
+        })->where('qa_status', 'approved')
+          ->where('team_leader_final_approval', false)
+          ->where('team_leader_requested_changes', false)
+          ->count();
+
+        $qaApprovedTasks = Task::whereHas('project.users', function ($query) use ($user) {
+            $query->where('users.id', $user->id);
+        })->where('qa_status', 'approved')->count();
+
+        return response()->json([
+            'stats' => [
+                'activeProjects' => $activeProjects,
+                'activeSprints' => $activeSprints,
+                'pendingTasks' => $pendingTasks,
+                'qaApprovedBugs' => $qaApprovedBugs,
+                'qaApprovedTasks' => $qaApprovedTasks,
+            ]
+        ]);
+    }
+
+    public function getNotifications()
+    {
+        $user = Auth::user();
+        
+        $notifications = $user->notifications()
+            ->where('type', 'App\Notifications\TaskCompletedByQA')
+            ->orWhere('type', 'App\Notifications\BugCompletedByQA')
+            ->orderBy('created_at', 'desc')
+            ->limit(10)
+            ->get();
+
+        $unreadCount = $user->notifications()->whereNull('read_at')->count();
+
+        return response()->json([
+            'notifications' => $notifications,
+            'unread_count' => $unreadCount
+        ]);
+    }
+
+    public function markNotificationAsRead($notificationId)
+    {
+        $user = Auth::user();
+        $notification = $user->notifications()->findOrFail($notificationId);
+        $notification->markAsRead();
+
+        return response()->json(['success' => true]);
+    }
+
+    public function markAllNotificationsAsRead()
+    {
+        $user = Auth::user();
+        $user->unreadNotifications()->update(['read_at' => now()]);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Mostrar tareas de un sprint específico
+     */
+    public function showSprint(Sprint $sprint)
+    {
+        $user = Auth::user();
+        
+        // Verificar que el TL pertenece al proyecto del sprint
+        if (!$sprint->project->users->contains($user->id)) {
+            abort(403, 'No tienes acceso a este sprint');
+        }
+
+        // Cargar el sprint con todas sus relaciones necesarias
+        $sprint->load([
+            'project',
+            'tasks.user',
+            'tasks.qaReviewedBy',
+            'bugs.user',
+            'bugs.qaReviewedBy'
+        ]);
+
+        // Obtener desarrolladores disponibles del proyecto
+        $developers = $sprint->project->users()
+            ->whereHas('roles', function($query) {
+                $query->where('name', 'developer');
+            })->get();
+
+        return Inertia::render('TeamLeader/SprintDetailsFixed', [
+            'sprint' => $sprint,
+            'project' => $sprint->project,
+            'tasks' => $sprint->tasks,
+            'bugs' => $sprint->bugs,
+            'developers' => $developers,
+            'permissions' => 'team_leader'
+        ]);
+    }
+
+    public function sprintTasks(Sprint $sprint)
+    {
+        $user = Auth::user();
+        
+        // Verificar que el TL pertenece al proyecto del sprint
+        if (!$sprint->project->users->contains($user->id)) {
+            abort(403, 'No tienes acceso a este sprint');
+        }
+
+        $tasks = $sprint->tasks()->with(['user', 'project', 'qaReviewedBy'])->get();
+
+        return Inertia::render('Task/Index', [
+            'user' => $user,
+            'sprint' => $sprint->load(['project']),
+            'tasks' => $tasks,
         ]);
     }
 
     /**
-     * Vista de tareas pendientes de aprobación
+     * Mostrar bugs de un sprint específico
      */
-    public function pendingTasks(): Response
+    public function sprintBugs(Sprint $sprint)
     {
-        $teamLeader = Auth::user();
+        $user = Auth::user();
         
-        if (!$teamLeader->roles()->where('name', 'team_leader')->exists()) {
-            abort(403, 'Access denied. Team leader role required.');
+        // Verificar que el TL pertenece al proyecto del sprint
+        if (!$sprint->project->users->contains($user->id)) {
+            abort(403, 'No tienes acceso a este sprint');
         }
-        
-        $pendingTasks = $this->taskApprovalService->getPendingTasksForTeamLeader($teamLeader);
-        
-        return Inertia::render('TeamLeader/PendingTasks', [
-            'pendingTasks' => $pendingTasks,
+
+        $bugs = $sprint->bugs()->with(['user', 'project', 'qaReviewedBy'])->get();
+
+        return Inertia::render('Bug/Index', [
+            'user' => $user,
+            'sprint' => $sprint->load(['project']),
+            'bugs' => $bugs,
         ]);
-    }
-
-    /**
-     * Vista de tareas en progreso
-     */
-    public function inProgressTasks(): Response
-    {
-        $teamLeader = Auth::user();
-        
-        if (!$teamLeader->roles()->where('name', 'team_leader')->exists()) {
-            abort(403, 'Access denied. Team leader role required.');
-        }
-        
-        $inProgressTasks = $this->taskApprovalService->getInProgressTasksForTeamLeader($teamLeader);
-        
-        return Inertia::render('TeamLeader/InProgressTasks', [
-            'inProgressTasks' => $inProgressTasks,
-        ]);
-    }
-
-    /**
-     * Vista de desarrolladores y sus tareas
-     */
-    public function developers(): Response
-    {
-        $teamLeader = Auth::user();
-        
-        if (!$teamLeader->roles()->where('name', 'team_leader')->exists()) {
-            abort(403, 'Access denied. Team leader role required.');
-        }
-        
-        $developersWithTasks = $this->taskApprovalService->getDevelopersWithActiveTasks($teamLeader);
-        $developerTimeSummary = $this->taskApprovalService->getDeveloperTimeSummary($teamLeader);
-        
-        return Inertia::render('TeamLeader/Developers', [
-            'developersWithTasks' => $developersWithTasks,
-            'developerTimeSummary' => $developerTimeSummary,
-        ]);
-    }
-
-    /**
-     * Aprobar una tarea
-     */
-    public function approveTask(Request $request, $taskId): JsonResponse
-    {
-        try {
-            $validatedData = $request->validate([
-                'notes' => 'nullable|string|max:500',
-            ]);
-
-            $task = Task::findOrFail($taskId);
-            $teamLeader = Auth::user();
-
-            $this->taskApprovalService->approveTask($task, $teamLeader, $validatedData['notes'] ?? null);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Tarea aprobada correctamente',
-                'task' => $task->fresh(['user', 'sprint', 'project', 'reviewedBy'])
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Error al aprobar tarea', [
-                'error' => $e->getMessage(),
-                'task_id' => $taskId,
-                'team_leader_id' => Auth::id()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
-        }
-    }
-
-    /**
-     * Rechazar una tarea
-     */
-    public function rejectTask(Request $request, $taskId): JsonResponse
-    {
-        try {
-            $validatedData = $request->validate([
-                'rejection_reason' => 'required|string|max:500',
-            ]);
-
-            $task = Task::findOrFail($taskId);
-            $teamLeader = Auth::user();
-
-            $this->taskApprovalService->rejectTask($task, $teamLeader, $validatedData['rejection_reason']);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Tarea rechazada correctamente',
-                'task' => $task->fresh(['user', 'sprint', 'project', 'reviewedBy'])
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Error al rechazar tarea', [
-                'error' => $e->getMessage(),
-                'task_id' => $taskId,
-                'team_leader_id' => Auth::id()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
-        }
-    }
-
-    /**
-     * Obtener estadísticas de aprobación
-     */
-    public function getApprovalStats(): JsonResponse
-    {
-        try {
-            $teamLeader = Auth::user();
-            
-            if (!$teamLeader->roles()->where('name', 'team_leader')->exists()) {
-                throw new \Exception('Access denied. Team leader role required.');
-            }
-            
-            $stats = $this->taskApprovalService->getApprovalStatsForTeamLeader($teamLeader);
-
-            return response()->json([
-                'success' => true,
-                'stats' => $stats
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Error al obtener estadísticas de aprobación', [
-                'error' => $e->getMessage(),
-                'team_leader_id' => Auth::id()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Error al obtener estadísticas'
-            ], 500);
-        }
-    }
-
-    /**
-     * Obtener resumen de tiempo por desarrollador
-     */
-    public function getDeveloperTimeSummary(): JsonResponse
-    {
-        try {
-            $teamLeader = Auth::user();
-            
-            if (!$teamLeader->roles()->where('name', 'team_leader')->exists()) {
-                throw new \Exception('Access denied. Team leader role required.');
-            }
-            
-            $summary = $this->taskApprovalService->getDeveloperTimeSummary($teamLeader);
-
-            return response()->json([
-                'success' => true,
-                'summary' => $summary
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Error al obtener resumen de tiempo por desarrollador', [
-                'error' => $e->getMessage(),
-                'team_leader_id' => Auth::id()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Error al obtener resumen de tiempo'
-            ], 500);
-        }
-    }
-
-    /**
-     * Obtener tareas recientemente completadas
-     */
-    public function getRecentlyCompleted(Request $request): JsonResponse
-    {
-        try {
-            $validatedData = $request->validate([
-                'days' => 'nullable|integer|min:1|max:30',
-            ]);
-
-            $teamLeader = Auth::user();
-            
-            if (!$teamLeader->roles()->where('name', 'team_leader')->exists()) {
-                throw new \Exception('Access denied. Team leader role required.');
-            }
-            
-            $days = $validatedData['days'] ?? 7;
-            $recentlyCompleted = $this->taskApprovalService->getRecentlyCompletedTasks($teamLeader, $days);
-
-            return response()->json([
-                'success' => true,
-                'recentlyCompleted' => $recentlyCompleted
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Error al obtener tareas recientemente completadas', [
-                'error' => $e->getMessage(),
-                'team_leader_id' => Auth::id()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Error al obtener tareas completadas'
-            ], 500);
-        }
-    }
-
-    /**
-     * Asignar tarea a desarrollador (desde vista de team leader)
-     */
-    public function assignTask(Request $request, $taskId): JsonResponse
-    {
-        try {
-            $validatedData = $request->validate([
-                'developer_id' => 'required|string|exists:users,id',
-            ]);
-
-            $task = Task::findOrFail($taskId);
-            $developer = User::findOrFail($validatedData['developer_id']);
-            $teamLeader = Auth::user();
-
-            $this->taskAssignmentService->assignTaskByTeamLeader($task, $developer, $teamLeader);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Tarea asignada correctamente',
-                'task' => $task->fresh(['user', 'sprint', 'project', 'assignedBy'])
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Error al asignar tarea desde team leader', [
-                'error' => $e->getMessage(),
-                'task_id' => $taskId,
-                'developer_id' => $validatedData['developer_id'] ?? null,
-                'team_leader_id' => Auth::id()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
-        }
     }
 } 

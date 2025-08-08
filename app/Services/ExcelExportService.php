@@ -26,22 +26,15 @@ class ExcelExportService
     public function generatePaymentReport($developers, $startDate = null, $endDate = null)
     {
         $spreadsheet = new Spreadsheet();
-        $spreadsheet->removeSheetByIndex(0); // Remove default sheet
-
-        // Create Summary sheet
-        $summarySheet = $spreadsheet->createSheet();
-        $summarySheet->setTitle('Summary');
-        $this->createSummarySheet($summarySheet, $developers, $startDate, $endDate);
+        
+        // Usar la hoja por defecto para el resumen
+        $this->createSummarySheet($spreadsheet, $developers, $startDate, $endDate);
 
         // Create Details sheet
-        $detailsSheet = $spreadsheet->createSheet();
-        $detailsSheet->setTitle('Details');
-        $this->createDetailsSheet($detailsSheet, $developers);
+        $this->createDetailsSheet($spreadsheet, $developers, $startDate, $endDate);
 
         // Create Statistics sheet
-        $statsSheet = $spreadsheet->createSheet();
-        $statsSheet->setTitle('Statistics');
-        $this->createStatisticsSheet($statsSheet, $developers);
+        $this->createStatisticsSheet($spreadsheet, $developers, $startDate, $endDate);
 
         return $spreadsheet;
     }
@@ -234,56 +227,58 @@ class ExcelExportService
     }
 
     /**
-     * Crear hoja de resumen por desarrollador
+     * Create developer summary sheet
      */
     private function createSummarySheet($spreadsheet, $developers, $startDate, $endDate)
     {
         $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setTitle('Resumen por Desarrollador');
+        $sheet->setTitle('Developer Summary');
         
-        // Configurar ancho de columnas
+        // Configure column widths
         $sheet->getColumnDimension('A')->setWidth(25);
-        $sheet->getColumnDimension('B')->setWidth(30);
-        $sheet->getColumnDimension('C')->setWidth(15);
-        $sheet->getColumnDimension('D')->setWidth(20);
-        $sheet->getColumnDimension('E')->setWidth(18);
+        $sheet->getColumnDimension('B')->setWidth(15);
+        $sheet->getColumnDimension('C')->setWidth(30);
+        $sheet->getColumnDimension('D')->setWidth(15);
+        $sheet->getColumnDimension('E')->setWidth(20);
         $sheet->getColumnDimension('F')->setWidth(18);
-        $sheet->getColumnDimension('G')->setWidth(20);
+        $sheet->getColumnDimension('G')->setWidth(18);
         $sheet->getColumnDimension('H')->setWidth(20);
+        $sheet->getColumnDimension('I')->setWidth(20);
 
-        // Título del reporte
-        $sheet->mergeCells('A1:H1');
+        // Report title
+        $sheet->mergeCells('A1:I1');
         $sheet->setCellValue('A1', 'PAYMENT REPORT - TASK TRACKING SYSTEM');
-        $this->styleTitle($sheet, 'A1:H1');
+        $this->styleTitle($sheet, 'A1:I1');
 
-        // Información del reporte
-        $sheet->mergeCells('A2:H2');
-        $sheet->setCellValue('A2', 'Generado el: ' . now()->format('Y-m-d H:i:s'));
-        $this->styleSubtitle($sheet, 'A2:H2');
+        // Report information
+        $sheet->mergeCells('A2:I2');
+        $sheet->setCellValue('A2', 'Generated on: ' . now()->format('Y-m-d H:i:s'));
+        $this->styleSubtitle($sheet, 'A2:I2');
 
-        $sheet->mergeCells('A3:H3');
+        $sheet->mergeCells('A3:I3');
         $periodText = $startDate && $endDate ? 
-            "Período: {$startDate} a {$endDate}" : 
-            "Período: Todos los datos disponibles";
+            "Period: {$startDate} to {$endDate}" : 
+            "Period: All available data";
         $sheet->setCellValue('A3', $periodText);
-        $this->styleSubtitle($sheet, 'A3:H3');
+        $this->styleSubtitle($sheet, 'A3:I3');
 
-        // Encabezados de tabla
+        // Table headers
         $headers = [
-            'Desarrollador',
+            'Developer',
+            'Role',
             'Email',
-            'Valor/Hora ($)',
-            'Tareas Completadas',
-            'Horas Estimadas',
-            'Horas Reales',
-            'Eficiencia (%)',
-            'Total Ganado ($)'
+            'Hourly Rate ($)',
+            'Completed Tasks',
+            'Estimated Hours',
+            'Actual Hours',
+            'Efficiency (%)',
+            'Total Earned ($)'
         ];
 
         $sheet->fromArray($headers, null, 'A5');
-        $this->styleTableHeader($sheet, 'A5:H5');
+        $this->styleTableHeader($sheet, 'A5:I5');
 
-        // Datos de desarrolladores
+        // Developer data
         $row = 6;
         foreach ($developers as $developer) {
             $completedTasks = $developer['tasks'] ?? [];
@@ -293,144 +288,168 @@ class ExcelExportService
                 round((($totalEstimatedHours - $totalActualHours) / $totalEstimatedHours) * 100, 1) : 0;
 
             $sheet->setCellValue("A{$row}", $developer['name']);
-            $sheet->setCellValue("B{$row}", $developer['email']);
-            $sheet->setCellValue("C{$row}", $developer['hour_value']);
-            $sheet->setCellValue("D{$row}", count($completedTasks));
-            $sheet->setCellValue("E{$row}", $totalEstimatedHours);
-            $sheet->setCellValue("F{$row}", $totalActualHours);
-            $sheet->setCellValue("G{$row}", $efficiency);
-            $sheet->setCellValue("H{$row}", $developer['total_earnings']);
+            $sheet->setCellValue("B{$row}", $developer['role'] ?? 'Developer');
+            $sheet->setCellValue("C{$row}", $developer['email']);
+            $sheet->setCellValue("D{$row}", $developer['hour_value']);
+            $sheet->setCellValue("E{$row}", count($completedTasks));
+            $sheet->setCellValue("F{$row}", $totalEstimatedHours);
+            $sheet->setCellValue("G{$row}", $totalActualHours);
+            $sheet->setCellValue("H{$row}", $efficiency);
+            $sheet->setCellValue("I{$row}", $developer['total_earnings']);
 
-            // Aplicar formato de moneda
-            $sheet->getStyle("C{$row}")->getNumberFormat()->setFormatCode('$#,##0.00');
-            $sheet->getStyle("H{$row}")->getNumberFormat()->setFormatCode('$#,##0.00');
+            // Apply currency format
+            $sheet->getStyle("D{$row}")->getNumberFormat()->setFormatCode('$#,##0.00');
+            $sheet->getStyle("I{$row}")->getNumberFormat()->setFormatCode('$#,##0.00');
 
-            // Aplicar formato de porcentaje
-            $sheet->getStyle("G{$row}")->getNumberFormat()->setFormatCode('0.0%');
+            // Apply percentage format
+            $sheet->getStyle("H{$row}")->getNumberFormat()->setFormatCode('0.0%');
 
-            // Aplicar formato condicional para eficiencia
+            // Apply conditional formatting for efficiency
             if ($efficiency > 0) {
-                $sheet->getStyle("G{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('D4EDDA');
-                $sheet->getStyle("G{$row}")->getFont()->setColor(new Color('155724'));
+                $sheet->getStyle("H{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('D4EDDA');
+                $sheet->getStyle("H{$row}")->getFont()->setColor(new Color('155724'));
             } elseif ($efficiency < 0) {
-                $sheet->getStyle("G{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F8D7DA');
-                $sheet->getStyle("G{$row}")->getFont()->setColor(new Color('721C24'));
+                $sheet->getStyle("H{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F8D7DA');
+                $sheet->getStyle("H{$row}")->getFont()->setColor(new Color('721C24'));
             }
 
             $row++;
         }
 
-        // Aplicar formato de tabla
-        $this->styleTable($sheet, "A5:H" . ($row - 1));
+        // Apply table format
+        $this->styleTable($sheet, "A5:I" . ($row - 1));
 
-        // Agregar filtros
-        $sheet->setAutoFilter("A5:H5");
+        // Add filters
+        $sheet->setAutoFilter("A5:I5");
     }
 
     /**
-     * Crear hoja de detalles por tarea
+     * Create task details sheet
      */
     private function createDetailsSheet($spreadsheet, $developers, $startDate, $endDate)
     {
         $sheet = $spreadsheet->createSheet();
-        $sheet->setTitle('Detalles por Tarea');
+        $sheet->setTitle('Task Details');
         
-        // Configurar ancho de columnas
+        // Configure column widths
         $sheet->getColumnDimension('A')->setWidth(25);
         $sheet->getColumnDimension('B')->setWidth(40);
         $sheet->getColumnDimension('C')->setWidth(25);
-        $sheet->getColumnDimension('D')->setWidth(18);
+        $sheet->getColumnDimension('D')->setWidth(15);
         $sheet->getColumnDimension('E')->setWidth(18);
-        $sheet->getColumnDimension('F')->setWidth(15);
-        $sheet->getColumnDimension('G')->setWidth(20);
+        $sheet->getColumnDimension('F')->setWidth(18);
+        $sheet->getColumnDimension('G')->setWidth(15);
         $sheet->getColumnDimension('H')->setWidth(20);
-        $sheet->getColumnDimension('I')->setWidth(15);
+        $sheet->getColumnDimension('I')->setWidth(20);
+        $sheet->getColumnDimension('J')->setWidth(15);
+        $sheet->getColumnDimension('K')->setWidth(20);
 
-        // Título del reporte
-        $sheet->mergeCells('A1:I1');
-        $sheet->setCellValue('A1', 'DETALLES POR TAREA');
-        $this->styleTitle($sheet, 'A1:I1');
+        // Report title
+        $sheet->mergeCells('A1:K1');
+        $sheet->setCellValue('A1', 'TASK DETAILS');
+        $this->styleTitle($sheet, 'A1:K1');
 
-        // Encabezados de tabla
+        // Table headers
         $headers = [
-            'Desarrollador',
-            'Tarea',
-            'Proyecto',
-            'Horas Estimadas',
-            'Horas Reales',
-            'Valor/Hora ($)',
-            'Pago por Tarea ($)',
-            'Eficiencia (%)',
-            'Fecha Completada'
+            'Developer',
+            'Task',
+            'Project',
+            'Type',
+            'Estimated Hours',
+            'Actual Hours',
+            'Hourly Rate ($)',
+            'Task Earnings ($)',
+            'Efficiency (%)',
+            'Completed Date',
+            'QA Tester'
         ];
 
         $sheet->fromArray($headers, null, 'A3');
-        $this->styleTableHeader($sheet, 'A3:I3');
+        $this->styleTableHeader($sheet, 'A3:K3');
 
-        // Datos de tareas
+        // Task data
         $row = 4;
         foreach ($developers as $developer) {
             $completedTasks = $developer['tasks'] ?? [];
             
             foreach ($completedTasks as $task) {
-                $efficiency = $task['estimated_hours'] > 0 ? 
-                    round((($task['estimated_hours'] - $task['actual_hours']) / $task['estimated_hours']) * 100, 1) : 0;
+                // For QA tasks, there are no estimated hours, only actual hours
+                $taskType = $task['type'] ?? 'Task';
+                $isQATask = strpos($taskType, 'QA') !== false;
+                
+                if ($isQATask) {
+                    // For QA, there is no efficiency because there is no estimation
+                    $efficiency = 'N/A';
+                } else {
+                    $efficiency = $task['estimated_hours'] > 0 ? 
+                        round((($task['estimated_hours'] - $task['actual_hours']) / $task['estimated_hours']) * 100, 1) : 0;
+                }
+
+                // Determine the QA tester
+                $qaTester = '';
+                if ($isQATask) {
+                    $qaTester = $developer['name']; // The developer who is doing QA
+                }
 
                 $sheet->setCellValue("A{$row}", $developer['name']);
                 $sheet->setCellValue("B{$row}", $task['name']);
                 $sheet->setCellValue("C{$row}", $task['project']);
-                $sheet->setCellValue("D{$row}", $task['estimated_hours']);
-                $sheet->setCellValue("E{$row}", $task['actual_hours']);
-                $sheet->setCellValue("F{$row}", $developer['hour_value']);
-                $sheet->setCellValue("G{$row}", $task['earnings']);
-                $sheet->setCellValue("H{$row}", $efficiency);
-                $sheet->setCellValue("I{$row}", $task['completed_at'] ? date('Y-m-d', strtotime($task['completed_at'])) : 'N/A');
+                $sheet->setCellValue("D{$row}", $taskType);
+                $sheet->setCellValue("E{$row}", $isQATask ? 'N/A' : $task['estimated_hours']);
+                $sheet->setCellValue("F{$row}", $task['actual_hours']);
+                $sheet->setCellValue("G{$row}", $developer['hour_value']);
+                $sheet->setCellValue("H{$row}", $task['earnings']);
+                $sheet->setCellValue("I{$row}", $efficiency);
+                $sheet->setCellValue("J{$row}", $task['completed_at'] ? date('Y-m-d', strtotime($task['completed_at'])) : 'N/A');
+                $sheet->setCellValue("K{$row}", $qaTester);
 
-                // Aplicar formato de moneda
-                $sheet->getStyle("F{$row}")->getNumberFormat()->setFormatCode('$#,##0.00');
+                // Apply currency format
                 $sheet->getStyle("G{$row}")->getNumberFormat()->setFormatCode('$#,##0.00');
+                $sheet->getStyle("H{$row}")->getNumberFormat()->setFormatCode('$#,##0.00');
 
-                // Aplicar formato de porcentaje
-                $sheet->getStyle("H{$row}")->getNumberFormat()->setFormatCode('0.0%');
+                // Apply percentage format only if not QA
+                if (!$isQATask) {
+                    $sheet->getStyle("I{$row}")->getNumberFormat()->setFormatCode('0.0%');
 
-                // Aplicar formato condicional para eficiencia
-                if ($efficiency > 0) {
-                    $sheet->getStyle("H{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('D4EDDA');
-                    $sheet->getStyle("H{$row}")->getFont()->setColor(new Color('155724'));
-                } elseif ($efficiency < 0) {
-                    $sheet->getStyle("H{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F8D7DA');
-                    $sheet->getStyle("H{$row}")->getFont()->setColor(new Color('721C24'));
+                    // Apply conditional formatting for efficiency
+                    if ($efficiency > 0) {
+                        $sheet->getStyle("I{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('D4EDDA');
+                        $sheet->getStyle("I{$row}")->getFont()->setColor(new Color('155724'));
+                    } elseif ($efficiency < 0) {
+                        $sheet->getStyle("I{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F8D7DA');
+                        $sheet->getStyle("I{$row}")->getFont()->setColor(new Color('721C24'));
+                    }
                 }
 
                 $row++;
             }
         }
 
-        // Aplicar formato de tabla
-        $this->styleTable($sheet, "A3:I" . ($row - 1));
+        // Apply table format
+        $this->styleTable($sheet, "A3:K" . ($row - 1));
 
-        // Agregar filtros
-        $sheet->setAutoFilter("A3:I3");
+        // Add filters
+        $sheet->setAutoFilter("A3:K3");
     }
 
     /**
-     * Crear hoja de estadísticas
+     * Create statistics sheet
      */
     private function createStatisticsSheet($spreadsheet, $developers, $startDate, $endDate)
     {
         $sheet = $spreadsheet->createSheet();
-        $sheet->setTitle('Estadísticas');
+        $sheet->setTitle('Statistics');
         
-        // Configurar ancho de columnas
+        // Configure column widths
         $sheet->getColumnDimension('A')->setWidth(30);
         $sheet->getColumnDimension('B')->setWidth(20);
 
-        // Título del reporte
+        // Report title
         $sheet->mergeCells('A1:B1');
-        $sheet->setCellValue('A1', 'ESTADÍSTICAS GENERALES');
+        $sheet->setCellValue('A1', 'GENERAL STATISTICS');
         $this->styleTitle($sheet, 'A1:B1');
 
-        // Calcular estadísticas
+        // Calculate statistics
         $totalDevelopers = count($developers);
         $totalTasks = collect($developers)->sum(function($dev) {
             return count($dev['tasks'] ?? []);
@@ -445,55 +464,55 @@ class ExcelExportService
         $averageEfficiency = $totalEstimatedHours > 0 ? 
             round((($totalEstimatedHours - $totalActualHours) / $totalEstimatedHours) * 100, 1) : 0;
 
-        // Datos de estadísticas
+        // Statistics data
         $stats = [
-            ['Total Desarrolladores', $totalDevelopers],
-            ['Total Tareas Completadas', $totalTasks],
-            ['Total Horas Estimadas', $totalEstimatedHours],
-            ['Total Horas Reales', $totalActualHours],
-            ['Eficiencia Promedio (%)', $averageEfficiency],
-            ['Total Pagado ($)', $totalEarnings],
+            ['Total Developers', $totalDevelopers],
+            ['Total Completed Tasks', $totalTasks],
+            ['Total Estimated Hours', $totalEstimatedHours],
+            ['Total Actual Hours', $totalActualHours],
+            ['Average Efficiency (%)', $averageEfficiency],
+            ['Total Paid ($)', $totalEarnings],
         ];
 
         $sheet->fromArray($stats, null, 'A3');
         
-        // Aplicar formato
+        // Apply format
         $sheet->getStyle("A3:A8")->getFont()->setBold(true);
         $sheet->getStyle("B3:B8")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
         
-        // Formato de moneda para total pagado
+        // Currency format for total paid
         $sheet->getStyle("B8")->getNumberFormat()->setFormatCode('$#,##0.00');
         
-        // Formato de porcentaje para eficiencia
+        // Percentage format for efficiency
         $sheet->getStyle("B7")->getNumberFormat()->setFormatCode('0.0%');
 
-        // Aplicar formato de tabla
+        // Apply table format
         $this->styleTable($sheet, "A3:B8");
 
-        // Crear gráfico de eficiencia por desarrollador
+        // Create developer efficiency chart
         $this->createEfficiencyChart($sheet, $developers);
     }
 
     /**
-     * Crear gráfico de eficiencia
+     * Create efficiency chart
      */
     private function createEfficiencyChart($sheet, $developers)
     {
-        // Preparar datos para el gráfico
+        // Prepare data for the chart
         $chartData = [];
         $row = 10;
         
-        $sheet->setCellValue("A{$row}", 'Gráfico de Eficiencia por Desarrollador');
+        $sheet->setCellValue("A{$row}", 'Developer Efficiency Chart');
         $sheet->getStyle("A{$row}")->getFont()->setBold(true)->setSize(14);
         $row += 2;
 
-        // Encabezados del gráfico
-        $sheet->setCellValue("A{$row}", 'Desarrollador');
-        $sheet->setCellValue("B{$row}", 'Eficiencia (%)');
+        // Chart headers
+        $sheet->setCellValue("A{$row}", 'Developer');
+        $sheet->setCellValue("B{$row}", 'Efficiency (%)');
         $sheet->getStyle("A{$row}:B{$row}")->getFont()->setBold(true);
         $row++;
 
-        // Datos del gráfico
+        // Chart data
         foreach ($developers as $developer) {
             $completedTasks = $developer['tasks'] ?? [];
             $totalEstimatedHours = collect($completedTasks)->sum('estimated_hours');
@@ -506,17 +525,17 @@ class ExcelExportService
             $row++;
         }
 
-        // Crear gráfico
+        // Create chart
         $dataSeriesLabels = [
-            new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, 'Estadísticas!$B$' . ($row - count($developers)), null, 1),
+            new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, 'Statistics!$B$' . ($row - count($developers)), null, 1),
         ];
         
         $xAxisTickValues = [
-            new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, 'Estadísticas!$A$' . ($row - count($developers)) . ':$A$' . ($row - 1), null, count($developers)),
+            new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, 'Statistics!$A$' . ($row - count($developers)) . ':$A$' . ($row - 1), null, count($developers)),
         ];
         
         $dataSeriesValues = [
-            new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, 'Estadísticas!$B$' . ($row - count($developers)) . ':$B$' . ($row - 1), null, count($developers)),
+            new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, 'Statistics!$B$' . ($row - count($developers)) . ':$B$' . ($row - 1), null, count($developers)),
         ];
 
         $series = new DataSeries(
@@ -530,7 +549,7 @@ class ExcelExportService
 
         $plot = new PlotArea(null, [$series]);
         $legend = new Legend(Legend::POSITION_RIGHT, null, false);
-        $title = new Title('Eficiencia por Desarrollador');
+        $title = new Title('Efficiency by Developer');
 
         $chart = new Chart(
             'chart1',
@@ -546,7 +565,7 @@ class ExcelExportService
     }
 
     /**
-     * Aplicar estilo de título
+     * Apply title style
      */
     private function styleTitle($sheet, $range)
     {
@@ -568,7 +587,7 @@ class ExcelExportService
     }
 
     /**
-     * Aplicar estilo de subtítulo
+     * Apply subtitle style
      */
     private function styleSubtitle($sheet, $range)
     {
@@ -584,7 +603,7 @@ class ExcelExportService
     }
 
     /**
-     * Aplicar estilo de encabezado de tabla
+     * Apply table header style
      */
     private function styleTableHeader($sheet, $range)
     {
@@ -611,7 +630,7 @@ class ExcelExportService
     }
 
     /**
-     * Aplicar estilo de tabla
+     * Apply table style
      */
     private function styleTable($sheet, $range)
     {
@@ -627,7 +646,7 @@ class ExcelExportService
             ],
         ]);
 
-        // Alternar colores de filas
+        // Alternate row colors
         $highestRow = $sheet->getHighestRow();
         $highestColumn = $sheet->getHighestColumn();
         

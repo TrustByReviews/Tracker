@@ -5,12 +5,16 @@ namespace App\Services;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Project;
+use App\Services\NotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 
 class TaskApprovalService
 {
+    public function __construct(private NotificationService $notificationService)
+    {
+    }
     /**
      * Obtener tareas pendientes de aprobación para un team leader
      */
@@ -61,8 +65,14 @@ class TaskApprovalService
                 'reviewed_at' => now(),
                 'rejection_reason' => null
             ]);
+
+            // Marcar la tarea como lista para QA
+            $task->markAsReadyForQa();
             
-            Log::info('Tarea aprobada por team leader', [
+            // Enviar notificación a los QAs del proyecto
+            $this->notificationService->notifyTaskReadyForQa($task->fresh());
+            
+            Log::info('Tarea aprobada por team leader y marcada para QA', [
                 'task_id' => $task->id,
                 'task_name' => $task->name,
                 'developer_id' => $task->user_id,
@@ -221,7 +231,7 @@ class TaskApprovalService
     /**
      * Verificar si un team leader puede revisar tareas en un proyecto
      */
-    private function canTeamLeaderReviewProject(User $teamLeader, Project $project): bool
+    public function canTeamLeaderReviewProject(User $teamLeader, Project $project): bool
     {
         // Verificar que el usuario es team leader
         if (!$teamLeader->roles()->where('name', 'team_leader')->exists()) {

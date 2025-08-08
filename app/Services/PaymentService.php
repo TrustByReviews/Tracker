@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use App\Models\Task;
 use App\Models\PaymentReport;
+use App\Models\Bug; // Added this import for Bug model
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -13,7 +14,7 @@ use Illuminate\Support\Facades\Mail;
 class PaymentService
 {
     /**
-     * Generar reporte de pago para un desarrollador en una semana específica
+     * Generate payment report for a developer in a specific week
      */
     public function generateWeeklyReport(User $user, Carbon $weekStart): PaymentReport
     {
@@ -22,17 +23,17 @@ class PaymentService
     }
 
     /**
-     * Generar reporte de pago para un desarrollador en un rango de fechas específico
+     * Generate payment report for a developer in a specific date range
      */
     public function generateReportForDateRange(User $user, Carbon $startDate, Carbon $endDate): PaymentReport
     {
-        // Obtener tareas completadas en el período
+        // Get completed tasks in the period
         $completedTasks = $user->tasks()
             ->where('status', 'done')
             ->whereBetween('actual_finish', [$startDate, $endDate])
             ->get();
 
-        // Obtener tareas en progreso con horas registradas
+        // Get in-progress tasks with recorded hours
         $inProgressTasks = $user->tasks()
             ->where('status', 'in progress')
             ->where('total_time_seconds', '>', 0)
@@ -42,13 +43,13 @@ class PaymentService
             })
             ->get();
 
-        // Obtener bugs resueltos en el período
+        // Get resolved bugs in the period
         $completedBugs = $user->bugs()
             ->whereIn('status', ['resolved', 'verified', 'closed'])
             ->whereBetween('resolved_at', [$startDate, $endDate])
             ->get();
 
-        // Obtener bugs en progreso con horas registradas
+        // Get in-progress bugs with recorded hours
         $inProgressBugs = $user->bugs()
             ->whereIn('status', ['assigned', 'in progress'])
             ->where('total_time_seconds', '>', 0)
@@ -58,18 +59,33 @@ class PaymentService
             })
             ->get();
 
-        // Calcular horas totales
+        // Get QA work (testing of tasks and bugs)
+        $qaTestingTasks = Task::where('qa_assigned_to', $user->id)
+            ->whereIn('qa_status', ['testing_finished', 'approved', 'rejected'])
+            ->whereBetween('qa_testing_finished_at', [$startDate, $endDate])
+            ->get();
+
+        $qaTestingBugs = Bug::where('qa_assigned_to', $user->id)
+            ->whereIn('qa_status', ['testing_finished', 'approved', 'rejected'])
+            ->whereBetween('qa_testing_finished_at', [$startDate, $endDate])
+            ->get();
+
+        // Calculate total development hours
         $completedTaskHours = $completedTasks->sum('actual_hours');
         $inProgressTaskHours = $inProgressTasks->sum('actual_hours');
         $completedBugHours = $completedBugs->sum('actual_hours');
         $inProgressBugHours = $inProgressBugs->sum('actual_hours');
         
-        $totalHours = $completedTaskHours + $inProgressTaskHours + $completedBugHours + $inProgressBugHours;
+        // Calculate total QA hours
+        $qaTaskHours = $this->calculateQaTestingHours($qaTestingTasks);
+        $qaBugHours = $this->calculateQaTestingHoursBugs($qaTestingBugs);
+        
+        $totalHours = $completedTaskHours + $inProgressTaskHours + $completedBugHours + $inProgressBugHours + $qaTaskHours + $qaBugHours;
 
-        // Calcular pago total
+        // Calculate total payment
         $totalPayment = $totalHours * $user->hour_value;
 
-        // Preparar detalles de tareas
+        // Prepare task details
         $taskDetails = [
             'completed' => $completedTasks->map(function ($task) use ($user) {
                 return [
@@ -95,7 +111,7 @@ class PaymentService
             }),
         ];
 
-        // Preparar detalles de bugs
+        // Prepare bug details
         $bugDetails = [
             'completed' => $completedBugs->map(function ($bug) use ($user) {
                 return [
@@ -125,13 +141,46 @@ class PaymentService
             }),
         ];
 
-        // Combinar detalles de tareas y bugs
+        // Prepare QA details
+        $qaDetails = [
+            'tasks_tested' => $qaTestingTasks->map(function ($task) use ($user) {
+                $testingHours = $this->calculateTaskTestingHours($task);
+                return [
+                    'id' => $task->id,
+                    'name' => $task->name,
+                    'type' => 'qa_task',
+                    'project' => $task->sprint->project->name ?? 'N/A',
+                    'hours' => $testingHours,
+                    'payment' => $testingHours * $user->hour_value,
+                    'testing_finished_at' => $task->qa_testing_finished_at,
+                    'qa_status' => $task->qa_status,
+                    'qa_notes' => $task->qa_notes ?? null,
+                ];
+            }),
+            'bugs_tested' => $qaTestingBugs->map(function ($bug) use ($user) {
+                $testingHours = $this->calculateBugTestingHours($bug);
+                return [
+                    'id' => $bug->id,
+                    'name' => $bug->title,
+                    'type' => 'qa_bug',
+                    'project' => $bug->project->name ?? 'N/A',
+                    'hours' => $testingHours,
+                    'payment' => $testingHours * $user->hour_value,
+                    'testing_finished_at' => $bug->qa_testing_finished_at,
+                    'qa_status' => $bug->qa_status,
+                    'qa_notes' => $bug->qa_notes ?? null,
+                ];
+            }),
+        ];
+
+        // Combine task, bug, and QA details
         $allDetails = [
             'tasks' => $taskDetails,
             'bugs' => $bugDetails,
+            'qa' => $qaDetails,
         ];
 
-        // Crear o actualizar reporte
+        // Create or update report
         return PaymentReport::updateOrCreate(
             [
                 'user_id' => $user->id,
@@ -142,7 +191,7 @@ class PaymentService
                 'total_hours' => $totalHours,
                 'hourly_rate' => $user->hour_value,
                 'total_payment' => $totalPayment,
-                'completed_tasks_count' => $completedTasks->count() + $completedBugs->count(),
+                'completed_tasks_count' => $completedTasks->count() + $completedBugs->count() + $qaTestingTasks->count() + $qaTestingBugs->count(),
                 'in_progress_tasks_count' => $inProgressTasks->count() + $inProgressBugs->count(),
                 'task_details' => $allDetails,
                 'status' => 'pending',
@@ -151,7 +200,7 @@ class PaymentService
     }
 
     /**
-     * Generar reportes semanales para todos los desarrolladores
+     * Generate weekly reports for all developers
      */
     public function generateWeeklyReportsForAllDevelopers(Carbon $weekStart = null): array
     {
@@ -160,7 +209,7 @@ class PaymentService
         }
 
         $developers = User::whereHas('roles', function ($query) {
-            $query->where('name', 'developer');
+            $query->whereIn('name', ['developer', 'qa']);
         })->get();
 
         $reports = [];
@@ -185,12 +234,12 @@ class PaymentService
     }
 
     /**
-     * Generar reportes desde una fecha hasta otra fecha específica
+     * Generate reports from a date to another specific date
      */
     public function generateReportsUntilDate(Carbon $startDate, Carbon $endDate): array
     {
         $developers = User::whereHas('roles', function ($query) {
-            $query->where('name', 'developer');
+            $query->whereIn('name', ['developer', 'qa']);
         })->get();
 
         $reports = [];
@@ -215,7 +264,7 @@ class PaymentService
     }
 
     /**
-     * Obtener el próximo pago para un desarrollador (semana anterior)
+     * Get the next payment for a developer (previous week)
      */
     public function getNextPaymentForUser(User $user): ?PaymentReport
     {
@@ -227,7 +276,7 @@ class PaymentService
     }
 
     /**
-     * Obtener estadísticas de pagos para admin
+     * Get payment statistics for admin
      */
     public function getPaymentStatistics($startDate = null, $endDate = null): array
     {
@@ -236,7 +285,7 @@ class PaymentService
         if ($startDate && $endDate) {
             $query->whereBetween('week_start_date', [$startDate, $endDate]);
         } else {
-            // Últimos 30 días por defecto
+            // Default to last 30 days
             $query->where('week_start_date', '>=', Carbon::now()->subDays(30));
         }
 
@@ -271,7 +320,7 @@ class PaymentService
     }
 
     /**
-     * Enviar reportes por email a los admins
+     * Send payment reports by email to admins
      */
     public function sendWeeklyReportsEmail(array $reportsData): bool
     {
@@ -302,7 +351,7 @@ class PaymentService
     }
 
     /**
-     * Aprobar un reporte de pago
+     * Approve a payment report
      */
     public function approveReport(PaymentReport $report, User $approvedBy): bool
     {
@@ -316,7 +365,7 @@ class PaymentService
     }
 
     /**
-     * Marcar reporte como pagado
+     * Mark report as paid
      */
     public function markReportAsPaid(PaymentReport $report): bool
     {
@@ -327,5 +376,75 @@ class PaymentService
             Log::error('Error marking payment report as paid: ' . $e->getMessage());
             return false;
         }
+    }
+
+    /**
+     * Calculate QA testing hours for a collection of tasks
+     */
+    private function calculateQaTestingHours($tasks)
+    {
+        return $tasks->sum(function ($task) {
+            return $this->calculateTaskTestingHours($task);
+        });
+    }
+
+    /**
+     * Calculate QA testing hours for a specific task
+     */
+    private function calculateTaskTestingHours($task)
+    {
+        if (!$task->qa_testing_started_at || !$task->qa_testing_finished_at) {
+            return 0;
+        }
+
+        $startTime = Carbon::parse($task->qa_testing_started_at);
+        $finishTime = Carbon::parse($task->qa_testing_finished_at);
+        
+        // If there are pauses, calculate the actual testing time
+        if ($task->qa_testing_paused_at) {
+            $pausedTime = Carbon::parse($task->qa_testing_paused_at);
+            $resumeTime = $task->qa_testing_resumed_at ? Carbon::parse($task->qa_testing_resumed_at) : $finishTime;
+            
+            $activeTime = $startTime->diffInSeconds($pausedTime) + $resumeTime->diffInSeconds($finishTime);
+        } else {
+            $activeTime = $startTime->diffInSeconds($finishTime);
+        }
+
+        return round($activeTime / 3600, 2); // Convert seconds to hours
+    }
+
+    /**
+     * Calculate QA testing hours for a collection of bugs
+     */
+    private function calculateQaTestingHoursBugs($bugs)
+    {
+        return $bugs->sum(function ($bug) {
+            return $this->calculateBugTestingHours($bug);
+        });
+    }
+
+    /**
+     * Calculate QA testing hours for a specific bug
+     */
+    private function calculateBugTestingHours($bug)
+    {
+        if (!$bug->qa_testing_started_at || !$bug->qa_testing_finished_at) {
+            return 0;
+        }
+
+        $startTime = Carbon::parse($bug->qa_testing_started_at);
+        $finishTime = Carbon::parse($bug->qa_testing_finished_at);
+        
+        // If there are pauses, calculate the actual testing time
+        if ($bug->qa_testing_paused_at) {
+            $pausedTime = Carbon::parse($bug->qa_testing_paused_at);
+            $resumeTime = $bug->qa_testing_resumed_at ? Carbon::parse($bug->qa_testing_resumed_at) : $finishTime;
+            
+            $activeTime = $startTime->diffInSeconds($pausedTime) + $resumeTime->diffInSeconds($finishTime);
+        } else {
+            $activeTime = $startTime->diffInSeconds($finishTime);
+        }
+
+        return round($activeTime / 3600, 2); // Convert seconds to hours
     }
 } 

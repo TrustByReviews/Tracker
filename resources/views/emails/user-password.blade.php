@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Credenciales de Acceso</title>
+    <title>Access Credentials</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -64,15 +64,15 @@
 </head>
 <body>
     <div class="header">
-        <h1>🎯 Tracker - Credenciales de Acceso</h1>
+        <h1>🎯 Tracker - Access Credentials</h1>
     </div>
     
     <div class="content">
-        <h2>Hola {{ $userName }},</h2>
+        <h2>Hello {{ $userName }},</h2>
         
-        <p>Tu cuenta ha sido creada exitosamente en nuestro sistema de gestión de proyectos <strong>Tracker</strong>.</p>
+        <p>Your account has been successfully created in our project management system <strong>Tracker</strong>.</p>
         
-        <p>A continuación encontrarás tus credenciales de acceso:</p>
+        <p>Below you will find your access credentials:</p>
         
         <div class="credentials">
             <div class="field">
@@ -81,30 +81,30 @@
             </div>
             
             <div class="field">
-                <div class="label">Contraseña:</div>
+                <div class="label">Password:</div>
                 <div class="value">{{ $password }}</div>
             </div>
         </div>
         
         <div class="warning">
-            <strong>⚠️ Importante:</strong>
+            <strong>⚠️ Important:</strong>
             <ul>
-                <li>Guarda estas credenciales en un lugar seguro</li>
-                <li>Te recomendamos cambiar tu contraseña después del primer inicio de sesión</li>
-                <li>No compartas estas credenciales con nadie</li>
+                <li>Keep these credentials in a safe place</li>
+                <li>We recommend changing your password after your first login</li>
+                <li>Do not share these credentials with anyone</li>
             </ul>
         </div>
         
-        <p>Puedes acceder al sistema en: <strong>http://127.0.0.1:8000</strong></p>
+        <p>You can access the system at: <strong>http://127.0.0.1:8000</strong></p>
         
-        <p>Si tienes alguna pregunta, no dudes en contactar al administrador del sistema.</p>
+        <p>If you have any questions, please contact the system administrator.</p>
         
-        <p>¡Bienvenido al equipo!</p>
+        <p>Welcome to the team!</p>
     </div>
     
     <div class="footer">
-        <p>Este es un email automático, por favor no respondas a este mensaje.</p>
-        <p>&copy; {{ date('Y') }} Tracker. Todos los derechos reservados.</p>
+        <p>This is an automated email, please do not reply to this message.</p>
+        <p>&copy; {{ date('Y') }} Tracker. All rights reserved.</p>
     </div>
 </body>
 </html> 

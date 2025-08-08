@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -60,10 +61,21 @@ class TaskController extends Controller
             $sprints = Sprint::whereHas('project.users', function ($query) use ($authUser) {
                 $query->where('users.id', $authUser->id);
             })->with('project')->orderBy('start_date', 'desc')->get();
+        } elseif ($permissions === 'qa') {
+            // QA ve tareas de sus proyectos asignados
+            $tasksQuery = Task::whereHas('project', function ($query) use ($authUser) {
+                $query->whereHas('users', function ($q) use ($authUser) {
+                    $q->where('users.id', $authUser->id);
+                });
+            })->with(['user', 'sprint', 'project']);
+            $projects = $authUser->projects()->orderBy('name')->get();
+            $sprints = Sprint::whereHas('project.users', function ($query) use ($authUser) {
+                $query->where('users.id', $authUser->id);
+            })->with('project')->orderBy('start_date', 'desc')->get();
         } elseif ($permissions === 'developer') {
             // Developer ve solo sus tareas asignadas
             $tasksQuery = Task::where('user_id', $authUser->id)
-                ->with(['user', 'sprint', 'project']);
+                ->with(['user', 'sprint', 'project', 'qaReviewedBy', 'teamLeaderReviewedBy']);
             $projects = $authUser->projects()->orderBy('name')->get();
             $sprints = Sprint::whereHas('project.users', function ($query) use ($authUser) {
                 $query->where('users.id', $authUser->id);
@@ -223,35 +235,55 @@ class TaskController extends Controller
             $validatedData = $request->validate([
                 'name' => 'required|string|max:255',
                 'description' => 'required|string|max:255',
-                'priority' => 'required|string|in:low,medium,high',
+                'priority' => 'required|string|in:low,medium,high,critical',
                 'category' => 'required|string|max:255',
                 'story_points' => 'required|integer|min:1|max:255',
                 'sprint_id' => 'required|string|exists:sprints,id',
                 'project_id' => 'required|string|exists:projects,id',
                 'estimated_hours' => 'required|integer|min:1|max:255',
                 'assigned_user_id' => 'nullable|string|exists:users,id',
-                'estimated_start' => 'nullable|date',
-                'estimated_finish' => 'nullable|date|after_or_equal:estimated_start',
+                // Campos de fechas eliminados por migración 2025_07_29_085000
             ]);
 
             Log::info('Task validation passed', [
                 'validated_data' => $validatedData
             ]);
 
-            $task = Task::create([
+            // Normalizar prioridad/categoría y castear números para ajustarse al esquema actual
+            $allowedPriorities = ['low', 'medium', 'high'];
+            $normalizedPriority = $validatedData['priority'] === 'critical' ? 'high' : $validatedData['priority'];
+            if (!in_array($normalizedPriority, $allowedPriorities, true)) {
+                $normalizedPriority = 'medium';
+            }
+
+            $allowedCategories = ['frontend', 'backend', 'full stack', 'design', 'deployment', 'fixes'];
+            $normalizedCategory = in_array($validatedData['category'], $allowedCategories, true)
+                ? $validatedData['category']
+                : 'full stack';
+
+            $storyPoints = (int) $validatedData['story_points'];
+            $estimatedHours = (int) $validatedData['estimated_hours'];
+
+            $taskData = [
                 'name' => $validatedData['name'],
                 'description' => $validatedData['description'],
-                'priority' => $validatedData['priority'],
-                'category' => $validatedData['category'],
-                'story_points' => $validatedData['story_points'],
+                'priority' => $normalizedPriority,
+                'category' => $normalizedCategory,
+                'story_points' => $storyPoints,
                 'sprint_id' => $validatedData['sprint_id'],
-                'project_id' => $validatedData['project_id'],
-                'estimated_hours' => $validatedData['estimated_hours'],
-                'user_id' => $validatedData['assigned_user_id'] ?? null,
-                'estimated_start' => $request->input('estimated_start'),
-                'estimated_finish' => $request->input('estimated_finish'),
-                'status' => 'to do', // Default status
-            ]);
+                'estimated_hours' => $estimatedHours,
+                'user_id' => $request->filled('assigned_user_id') ? $validatedData['assigned_user_id'] : null,
+                'status' => 'to do',
+                // La BD no permite 'pending' (ver migración 2025_08_06_*), usar 'ready_for_test'
+                'qa_status' => 'ready_for_test',
+            ];
+
+            // Solo asignar project_id si existe la columna (compatibilidad con DB sin migración aplicada)
+            if (Schema::hasColumn('tasks', 'project_id')) {
+                $taskData['project_id'] = $validatedData['project_id'];
+            }
+
+            $task = Task::create($taskData);
 
             Log::info('Task created successfully', [
                 'task_id' => $task->id,
@@ -277,9 +309,13 @@ class TaskController extends Controller
                 'request_data' => $request->all()
             ]);
             
+            $message = $e->getMessage();
+            if ($e instanceof \Illuminate\Database\QueryException) {
+                $message = $e->getMessage();
+            }
             return redirect()->back()
                 ->withInput()
-                ->withErrors(['error' => 'Failed to create task. Please try again.']);
+                ->withErrors(['error' => $message]);
         }
     }
 

@@ -3,8 +3,8 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <!-- Header -->
       <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900">Gestión de Permisos de Tareas Simultáneas</h1>
-        <p class="mt-2 text-gray-600">Administra los permisos para trabajar en múltiples tareas simultáneamente</p>
+        <h1 class="text-3xl font-bold text-gray-900">Simultaneous Tasks Permission Management</h1>
+        <p class="mt-2 text-gray-600">Manage permissions to work on multiple tasks simultaneously</p>
       </div>
 
       <!-- Stats Cards -->
@@ -19,7 +19,7 @@
               </div>
             </div>
             <div class="ml-4">
-              <p class="text-sm font-medium text-gray-500">Total Usuarios</p>
+              <p class="text-sm font-medium text-gray-500">Total Users</p>
               <p class="text-2xl font-semibold text-gray-900">{{ stats.total_users }}</p>
             </div>
           </div>
@@ -35,7 +35,7 @@
               </div>
             </div>
             <div class="ml-4">
-              <p class="text-sm font-medium text-gray-500">Con Permiso</p>
+              <p class="text-sm font-medium text-gray-500">With Permission</p>
               <p class="text-2xl font-semibold text-green-600">{{ stats.users_with_permission }}</p>
             </div>
           </div>
@@ -51,7 +51,7 @@
               </div>
             </div>
             <div class="ml-4">
-              <p class="text-sm font-medium text-gray-500">Sin Permiso</p>
+              <p class="text-sm font-medium text-gray-500">Without Permission</p>
               <p class="text-2xl font-semibold text-yellow-600">{{ stats.users_without_permission }}</p>
             </div>
           </div>
@@ -67,7 +67,7 @@
               </div>
             </div>
             <div class="ml-4">
-              <p class="text-sm font-medium text-gray-500">Proyectos</p>
+              <p class="text-sm font-medium text-gray-500">Projects</p>
               <p class="text-2xl font-semibold text-gray-900">{{ stats.total_projects }}</p>
             </div>
           </div>
@@ -77,15 +77,15 @@
       <!-- Team Management Section -->
       <div class="bg-white rounded-lg shadow mb-8">
         <div class="px-6 py-4 border-b border-gray-200">
-          <h2 class="text-lg font-semibold text-gray-900">Gestión por Equipos</h2>
-          <p class="text-sm text-gray-600">Otorga o revoca permisos a equipos completos</p>
+          <h2 class="text-lg font-semibold text-gray-900">Team Management</h2>
+          <p class="text-sm text-gray-600">Grant or revoke permissions to entire teams</p>
         </div>
         <div class="p-6">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Seleccionar Proyecto</label>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Select Project</label>
               <select v-model="selectedProject" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">Seleccionar un proyecto...</option>
+                <option value="">Select a project...</option>
                 <option v-for="project in projects" :key="project.id" :value="project.id">
                   {{ project.name }}
                 </option>
@@ -101,14 +101,14 @@
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Otorgar a Equipo
+                Grant to Team
               </button>
               <button
                 @click="revokePermissionFromTeam"
                 :disabled="!selectedProject || loading"
                 class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Revocar de Equipo
+                Revoke from Team
               </button>
             </div>
           </div>
@@ -118,19 +118,19 @@
       <!-- Users Table -->
       <div class="bg-white rounded-lg shadow">
         <div class="px-6 py-4 border-b border-gray-200">
-          <h2 class="text-lg font-semibold text-gray-900">Usuarios</h2>
-          <p class="text-sm text-gray-600">Gestiona permisos individuales</p>
+          <h2 class="text-lg font-semibold text-gray-900">Users</h2>
+          <p class="text-sm text-gray-600">Manage individual permissions</p>
         </div>
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
               <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proyectos</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tareas Activas</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Permiso</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Roleeeeeeeeeee</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Projects</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Active Tasks</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Permission</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
@@ -155,11 +155,11 @@
                       'bg-blue-100 text-blue-800': user.roles[0]?.name === 'team_leader',
                       'bg-green-100 text-green-800': user.roles[0]?.name === 'developer'
                     }">
-                    {{ user.roles[0]?.name || 'Sin rol' }}
+                    {{ user.roles[0]?.name || 'No role' }}
                   </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ user.projects?.length || 0 }} proyectos
+                  {{ user.projects?.length || 0 }} projects
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
@@ -168,7 +168,7 @@
                       'bg-yellow-100 text-yellow-800': user.active_tasks_count === 2,
                       'bg-green-100 text-green-800': user.active_tasks_count <= 1
                     }">
-                    {{ user.active_tasks_count }} activas
+                    {{ user.active_tasks_count }} active
                   </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
@@ -177,7 +177,7 @@
                       'bg-green-100 text-green-800': user.has_unlimited_tasks,
                       'bg-gray-100 text-gray-800': !user.has_unlimited_tasks
                     }">
-                    {{ user.has_unlimited_tasks ? 'Sí' : 'No' }}
+                    {{ user.has_unlimited_tasks ? 'Yes' : 'No' }}
                   </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -188,7 +188,7 @@
                       :disabled="loading"
                       class="text-green-600 hover:text-green-900 disabled:opacity-50"
                     >
-                      Otorgar
+                      Grant
                     </button>
                     <button
                       v-if="user.has_unlimited_tasks && user.roles[0]?.name !== 'admin'"
@@ -196,13 +196,13 @@
                       :disabled="loading"
                       class="text-red-600 hover:text-red-900 disabled:opacity-50"
                     >
-                      Revocar
+                      Revoke
                     </button>
                     <button
                       @click="showUserHistory(user.id)"
                       class="text-blue-600 hover:text-blue-900"
                     >
-                      Historial
+                      History
                     </button>
                   </div>
                 </td>
@@ -217,19 +217,19 @@
     <div v-if="showGrantModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
       <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
         <div class="mt-3">
-          <h3 class="text-lg font-medium text-gray-900 mb-4">Otorgar Permiso</h3>
+          <h3 class="text-lg font-medium text-gray-900 mb-4">Grant Permission</h3>
           <form @submit.prevent="confirmGrantPermission">
             <div class="mb-4">
-              <label class="block text-sm font-medium text-gray-700 mb-2">Razón (opcional)</label>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Reason (optional)</label>
               <textarea
                 v-model="grantForm.reason"
                 rows="3"
                 class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Explica por qué se otorga este permiso..."
+                placeholder="Explain why this permission is being granted..."
               ></textarea>
             </div>
             <div class="mb-4">
-              <label class="block text-sm font-medium text-gray-700 mb-2">Fecha de expiración (opcional)</label>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Expiration date (optional)</label>
               <input
                 v-model="grantForm.expires_at"
                 type="datetime-local"
@@ -242,14 +242,14 @@
                 @click="showGrantModal = false"
                 class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
               >
-                Cancelar
+                Cancel
               </button>
               <button
                 type="submit"
                 :disabled="loading"
                 class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
               >
-                Otorgar
+                Grant
               </button>
             </div>
           </form>
@@ -262,7 +262,7 @@
       <div class="relative top-20 mx-auto p-5 border w-3/4 max-w-4xl shadow-lg rounded-md bg-white">
         <div class="mt-3">
           <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-medium text-gray-900">Historial de Permisos</h3>
+            <h3 class="text-lg font-medium text-gray-900">Permission History</h3>
             <button @click="showHistoryModal = false" class="text-gray-400 hover:text-gray-600">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -273,10 +273,10 @@
             <table class="min-w-full divide-y divide-gray-200">
               <thead class="bg-gray-50">
                 <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acción</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Razón</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expira</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expires</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
@@ -287,12 +287,12 @@
                         'bg-green-100 text-green-800': permission.action === 'granted',
                         'bg-red-100 text-red-800': permission.action === 'revoked'
                       }">
-                      {{ permission.action === 'granted' ? 'Otorgado' : 'Revocado' }}
+                      {{ permission.action === 'granted' ? 'Granted' : 'Revoked' }}
                     </span>
                   </td>
-                  <td class="px-6 py-4 text-sm text-gray-900">{{ permission.reason || 'Sin razón especificada' }}</td>
+                  <td class="px-6 py-4 text-sm text-gray-900">{{ permission.reason || 'No reason specified' }}</td>
                   <td class="px-6 py-4 text-sm text-gray-900">
-                    {{ permission.expires_at ? new Date(permission.expires_at).toLocaleDateString() : 'Sin expiración' }}
+                    {{ permission.expires_at ? new Date(permission.expires_at).toLocaleDateString() : 'No expiration' }}
                   </td>
                   <td class="px-6 py-4 text-sm text-gray-900">{{ new Date(permission.created_at).toLocaleString() }}</td>
                 </tr>
@@ -300,7 +300,7 @@
             </table>
           </div>
           <div v-else class="text-center py-8 text-gray-500">
-            No hay historial de permisos para este usuario.
+            No permission history for this user.
           </div>
         </div>
       </div>
@@ -372,21 +372,21 @@ const confirmGrantPermission = async () => {
       toast.success(data.message)
       showGrantModal.value = false
       grantForm.value = { reason: '', expires_at: '' }
-      // Recargar la página para actualizar los datos
+      // Reload the page to update the data
       window.location.reload()
     } else {
       toast.error(data.message)
     }
   } catch (error) {
     console.error('Error:', error)
-    toast.error('Error al otorgar el permiso')
+    toast.error('Error granting permission')
   } finally {
     loading.value = false
   }
 }
 
 const revokePermission = async (userId) => {
-  if (!confirm('¿Estás seguro de que quieres revocar este permiso?')) {
+  if (!confirm('Are you sure you want to revoke this permission?')) {
     return
   }
 
@@ -408,14 +408,14 @@ const revokePermission = async (userId) => {
 
     if (data.success) {
       toast.success(data.message)
-      // Recargar la página para actualizar los datos
+      // Reload the page to update the data
       window.location.reload()
     } else {
       toast.error(data.message)
     }
   } catch (error) {
     console.error('Error:', error)
-    toast.error('Error al revocar el permiso')
+    toast.error('Error revoking permission')
   } finally {
     loading.value = false
   }
@@ -423,11 +423,11 @@ const revokePermission = async (userId) => {
 
 const grantPermissionToTeam = async () => {
   if (!selectedProject.value) {
-    toast.error('Por favor selecciona un proyecto')
+    toast.error('Please select a project')
     return
   }
 
-  if (!confirm('¿Estás seguro de que quieres otorgar permisos a todo el equipo?')) {
+  if (!confirm('Are you sure you want to grant permissions to the entire team?')) {
     return
   }
 
@@ -442,7 +442,7 @@ const grantPermissionToTeam = async () => {
       },
       body: JSON.stringify({
         project_id: selectedProject.value,
-        reason: 'Otorgado a todo el equipo',
+        reason: 'Granted to entire team',
         expires_at: null
       })
     })
@@ -452,14 +452,14 @@ const grantPermissionToTeam = async () => {
     if (data.success) {
       toast.success(data.message)
       selectedProject.value = ''
-      // Recargar la página para actualizar los datos
+      // Reload the page to update the data
       window.location.reload()
     } else {
       toast.error(data.message)
     }
   } catch (error) {
     console.error('Error:', error)
-    toast.error('Error al otorgar permisos al equipo')
+    toast.error('Error granting team permissions')
   } finally {
     loading.value = false
   }
@@ -467,11 +467,11 @@ const grantPermissionToTeam = async () => {
 
 const revokePermissionFromTeam = async () => {
   if (!selectedProject.value) {
-    toast.error('Por favor selecciona un proyecto')
+    toast.error('Please select a project')
     return
   }
 
-  if (!confirm('¿Estás seguro de que quieres revocar permisos a todo el equipo?')) {
+  if (!confirm('Are you sure you want to revoke permissions from the entire team?')) {
     return
   }
 
@@ -494,14 +494,14 @@ const revokePermissionFromTeam = async () => {
     if (data.success) {
       toast.success(data.message)
       selectedProject.value = ''
-      // Recargar la página para actualizar los datos
+      // Reload the page to update the data
       window.location.reload()
     } else {
       toast.error(data.message)
     }
   } catch (error) {
     console.error('Error:', error)
-    toast.error('Error al revocar permisos del equipo')
+    toast.error('Error revoking team permissions')
   } finally {
     loading.value = false
   }

@@ -3,8 +3,8 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <!-- Header -->
       <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900">Mi Tablero Kanban</h1>
-        <p class="mt-2 text-gray-600">Gestiona tus tareas y rastrea tu tiempo de trabajo</p>
+        <h1 class="text-3xl font-bold text-gray-900">My Kanban Board</h1>
+        <p class="mt-2 text-gray-600">Manage your tasks and track your work time</p>
       </div>
 
       <!-- Stats Cards -->
@@ -19,7 +19,7 @@
               </div>
             </div>
             <div class="ml-4">
-              <p class="text-sm font-medium text-gray-500">Tareas Pendientes</p>
+              <p class="text-sm font-medium text-gray-500">Pending Tasks</p>
               <p class="text-2xl font-semibold text-gray-900">{{ stats.pending }}</p>
             </div>
           </div>
@@ -35,7 +35,7 @@
               </div>
             </div>
             <div class="ml-4">
-              <p class="text-sm font-medium text-gray-500">En Progreso</p>
+              <p class="text-sm font-medium text-gray-500">In Progress</p>
               <p class="text-2xl font-semibold text-gray-900">{{ stats.inProgress }}</p>
             </div>
           </div>
@@ -51,7 +51,7 @@
               </div>
             </div>
             <div class="ml-4">
-              <p class="text-sm font-medium text-gray-500">Completadas</p>
+              <p class="text-sm font-medium text-gray-500">Completed</p>
               <p class="text-2xl font-semibold text-gray-900">{{ stats.completed }}</p>
             </div>
           </div>
@@ -67,7 +67,7 @@
               </div>
             </div>
             <div class="ml-4">
-              <p class="text-sm font-medium text-gray-500">Tiempo Total</p>
+              <p class="text-sm font-medium text-gray-500">Total Time</p>
               <p class="text-2xl font-semibold text-gray-900">{{ stats.totalTime }}</p>
             </div>
           </div>
@@ -81,7 +81,7 @@
           <div class="p-6 border-b border-gray-200">
             <h3 class="text-lg font-semibold text-gray-900 flex items-center">
               <span class="w-3 h-3 bg-gray-400 rounded-full mr-3"></span>
-              Por Hacer
+              To Do
               <span class="ml-auto bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-sm font-medium">
                 {{ columns.toDo.length }}
               </span>
@@ -109,7 +109,7 @@
               <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
               </svg>
-              <p class="mt-2">No hay tareas pendientes</p>
+              <p class="mt-2">No pending tasks</p>
             </div>
           </div>
         </div>
@@ -119,7 +119,7 @@
           <div class="p-6 border-b border-gray-200">
             <h3 class="text-lg font-semibold text-gray-900 flex items-center">
               <span class="w-3 h-3 bg-yellow-500 rounded-full mr-3"></span>
-              En Progreso
+              In Progress
               <span class="ml-auto bg-yellow-100 text-yellow-600 px-2 py-1 rounded-full text-sm font-medium">
                 {{ columns.inProgress.length }}
               </span>
@@ -149,7 +149,7 @@
               <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
-              <p class="mt-2">No hay tareas en progreso</p>
+              <p class="mt-2">No tasks in progress</p>
             </div>
           </div>
         </div>
@@ -159,7 +159,7 @@
           <div class="p-6 border-b border-gray-200">
             <h3 class="text-lg font-semibold text-gray-900 flex items-center">
               <span class="w-3 h-3 bg-green-500 rounded-full mr-3"></span>
-              Completadas
+              Completed
               <span class="ml-auto bg-green-100 text-green-600 px-2 py-1 rounded-full text-sm font-medium">
                 {{ columns.done.length }}
               </span>
@@ -186,7 +186,7 @@
               <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
               </svg>
-              <p class="mt-2">No hay tareas completadas</p>
+              <p class="mt-2">No completed tasks</p>
             </div>
           </div>
         </div>
@@ -210,7 +210,7 @@
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <span>Cargando...</span>
+          <span>Loading...</span>
         </div>
       </div>
     </div>
@@ -261,11 +261,11 @@ const loadTasks = async () => {
     if (data.success) {
       tasks.value = data.tasks
     } else {
-      toast.error('Error al cargar las tareas')
+      toast.error('Error loading tasks')
     }
   } catch (error) {
     console.error('Error loading tasks:', error)
-    toast.error('Error al cargar las tareas')
+    toast.error('Error loading tasks')
   } finally {
     loading.value = false
   }
@@ -285,13 +285,13 @@ const startWork = async (taskId) => {
     
     if (data.success) {
       await loadTasks()
-      toast.success('Trabajo iniciado correctamente')
+      toast.success('Work started successfully')
     } else {
-      toast.error(data.message || 'Error al iniciar trabajo')
+      toast.error(data.message || 'Error starting work')
     }
   } catch (error) {
     console.error('Error starting work:', error)
-    toast.error('Error al iniciar trabajo')
+    toast.error('Error starting work')
   }
 }
 
@@ -309,13 +309,13 @@ const pauseWork = async (taskId) => {
     
     if (data.success) {
       await loadTasks()
-      toast.success('Trabajo pausado correctamente')
+      toast.success('Work paused successfully')
     } else {
-      toast.error(data.message || 'Error al pausar trabajo')
+      toast.error(data.message || 'Error pausing work')
     }
   } catch (error) {
     console.error('Error pausing work:', error)
-    toast.error('Error al pausar trabajo')
+    toast.error('Error pausing work')
   }
 }
 
@@ -333,13 +333,13 @@ const resumeWork = async (taskId) => {
     
     if (data.success) {
       await loadTasks()
-      toast.success('Trabajo reanudado correctamente')
+      toast.success('Work resumed successfully')
     } else {
-      toast.error(data.message || 'Error al reanudar trabajo')
+      toast.error(data.message || 'Error resuming work')
     }
   } catch (error) {
     console.error('Error resuming work:', error)
-    toast.error('Error al reanudar trabajo')
+    toast.error('Error resuming work')
   }
 }
 
@@ -357,13 +357,13 @@ const finishWork = async (taskId) => {
     
     if (data.success) {
       await loadTasks()
-      toast.success('Tarea completada correctamente')
+      toast.success('Task completed successfully')
     } else {
-      toast.error(data.message || 'Error al completar tarea')
+      toast.error(data.message || 'Error completing task')
     }
   } catch (error) {
     console.error('Error finishing work:', error)
-    toast.error('Error al completar tarea')
+    toast.error('Error completing task')
   }
 }
 
@@ -381,13 +381,13 @@ const selfAssignTask = async (taskId) => {
     
     if (data.success) {
       await loadTasks()
-      toast.success('Tarea auto-asignada correctamente')
+      toast.success('Task self-assigned successfully')
     } else {
-      toast.error(data.message || 'Error al auto-asignar tarea')
+      toast.error(data.message || 'Error self-assigning task')
     }
   } catch (error) {
     console.error('Error self-assigning task:', error)
-    toast.error('Error al auto-asignar tarea')
+    toast.error('Error self-assigning task')
   }
 }
 
@@ -405,13 +405,13 @@ const resumeAutoPaused = async (taskId) => {
     
     if (data.success) {
       await loadTasks()
-      toast.success('Tarea auto-pausada reanudada correctamente')
+      toast.success('Auto-paused task resumed successfully')
     } else {
-      toast.error(data.message || 'Error al reanudar tarea auto-pausada')
+      toast.error(data.message || 'Error resuming auto-paused task')
     }
   } catch (error) {
     console.error('Error resuming auto-paused task:', error)
-    toast.error('Error al reanudar tarea auto-pausada')
+    toast.error('Error resuming auto-paused task')
   }
 }
 
@@ -454,13 +454,13 @@ const onDrop = async (event, targetColumnName) => {
     
     if (data.success) {
       await loadTasks()
-      toast.success('Tarea movida correctamente')
+      toast.success('Task moved successfully')
     } else {
-      toast.error(data.message || 'Error al mover tarea')
+      toast.error(data.message || 'Error moving task')
     }
   } catch (error) {
     console.error('Error moving task:', error)
-    toast.error('Error al mover tarea')
+    toast.error('Error moving task')
   }
   
   draggedTask.value = null

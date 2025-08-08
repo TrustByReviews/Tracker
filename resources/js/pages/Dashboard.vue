@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
 import DashboardStats from '@/components/DashboardStats.vue';
+import QaDashboardStats from '@/components/QaDashboardStats.vue';
+import TeamLeaderDashboardStats from '@/components/TeamLeaderDashboardStats.vue';
 import TaskList from '@/components/TaskList.vue';
 import ProjectList from '@/components/ProjectList.vue';
 import AdminStats from '@/components/AdminStats.vue';
@@ -21,6 +23,8 @@ const breadcrumbs: BreadcrumbItem[] = [
 interface Props {
     user: any;
     isAdmin: boolean;
+    isQa?: boolean;
+    isTeamLeader?: boolean;
     // Developer props
     assignedProjects?: any[];
     tasksInProgress?: any[];
@@ -34,6 +38,17 @@ interface Props {
     tasksRequiringAttention?: any[];
     activeProjectsSummary?: any[];
     developerMetrics?: any[];
+    // QA props
+    tasksReadyForTesting?: any[];
+    bugsReadyForTesting?: any[];
+    tasksInTesting?: any[];
+    bugsInTesting?: any[];
+    existingTasks?: any[];
+    existingBugs?: any[];
+    // Team Leader props
+    pendingTasks?: any[];
+    qaApprovedTasks?: any[];
+    qaApprovedBugs?: any[];
     // Bugs props
     bugs?: any[];
     bugStats?: any;
@@ -86,6 +101,60 @@ const viewTaskDetails = (taskId: string) => {
 const viewProjectDetails = (projectId: string) => {
     router.visit(`/projects/${projectId}`);
 };
+
+// QA Functions
+const assignTaskToQa = (task: any) => {
+    router.post(`/qa/tasks/${task.id}/assign`);
+};
+
+const assignBugToQa = (bug: any) => {
+    router.post(`/qa/bugs/${bug.id}/assign`);
+};
+
+const approveTask = (task: any, notes?: string) => {
+    router.post(`/qa/tasks/${task.id}/approve`, { notes });
+};
+
+const rejectTask = (task: any, reason: string) => {
+    router.post(`/qa/tasks/${task.id}/reject`, { reason });
+};
+
+const approveBug = (bug: any, notes?: string) => {
+    router.post(`/qa/bugs/${bug.id}/approve`, { notes });
+};
+
+const rejectBug = (bug: any, reason: string) => {
+    router.post(`/qa/bugs/${bug.id}/reject`, { reason });
+};
+
+// Team Leader Functions
+const approveTaskFinal = (task: any, notes?: string) => {
+    router.post(`/team-leader/tasks/${task.id}/review-qa-approval`, { 
+        action: 'approve',
+        notes 
+    });
+};
+
+const requestTaskChanges = (task: any, notes: string) => {
+    router.post(`/team-leader/tasks/${task.id}/review-qa-approval`, { 
+        action: 'request_changes',
+        notes 
+    });
+};
+
+const approveBugFinal = (bug: any, notes?: string) => {
+    router.post(`/team-leader/bugs/${bug.id}/review-qa-approval`, { 
+        action: 'approve',
+        notes 
+    });
+};
+
+const requestBugChanges = (bug: any, notes: string) => {
+    router.post(`/team-leader/bugs/${bug.id}/review-qa-approval`, { 
+        action: 'request_changes',
+        notes 
+    });
+};
 </script>
 
 <template>
@@ -93,8 +162,291 @@ const viewProjectDetails = (projectId: string) => {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 p-4">
+            <!-- QA Dashboard -->
+            <div v-if="isQa">
+                <!-- Welcome Section -->
+                <div class="bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg p-4 text-white">
+                    <h1 class="text-xl font-bold mb-1">QA Dashboard - {{ user.name }}</h1>
+                    <p class="text-purple-100 text-sm">Manage testing workflow and quality assurance tasks.</p>
+                </div>
+
+                <!-- Statistics Cards -->
+                <QaDashboardStats :stats="stats" />
+
+                <!-- Tasks Ready for Testing -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+                    <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Tasks Ready for Testing</h3>
+                        <p class="text-xs text-gray-600 dark:text-gray-400">Tasks that need QA review</p>
+                    </div>
+                    <div class="p-4">
+                        <div v-if="tasksReadyForTesting?.length === 0" class="text-center py-8">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <p class="mt-2 text-sm text-gray-500">No tasks ready for testing</p>
+                        </div>
+                        <div v-else class="space-y-3">
+                            <div v-for="task in tasksReadyForTesting" :key="task.id" 
+                                 class="border border-gray-200 dark:border-gray-600 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex-1">
+                                        <h4 class="text-sm font-medium text-gray-900 dark:text-white">{{ task.name }}</h4>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ task.project?.name }} - {{ task.sprint?.name }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Developer: {{ task.user?.name }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">{{ task.description }}</p>
+                                    </div>
+                                    <div class="ml-4 flex-shrink-0">
+                                        <button @click="assignTaskToQa(task)" 
+                                                class="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                                            Assign to Me
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tasks In Testing -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+                    <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Tasks In Testing</h3>
+                        <p class="text-xs text-gray-600 dark:text-gray-400">Tasks currently being tested by you</p>
+                    </div>
+                    <div class="p-4">
+                        <div v-if="tasksInTesting?.length === 0" class="text-center py-8">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                            </svg>
+                            <p class="mt-2 text-sm text-gray-500">No tasks in testing</p>
+                        </div>
+                        <div v-else class="space-y-3">
+                            <div v-for="task in tasksInTesting" :key="task.id" 
+                                 class="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex-1">
+                                        <h4 class="text-sm font-medium text-gray-900 dark:text-white">{{ task.name }}</h4>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ task.project?.name }} - {{ task.sprint?.name }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Developer: {{ task.user?.name }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">{{ task.description }}</p>
+                                    </div>
+                                    <div class="ml-4 flex-shrink-0 space-x-2">
+                                        <button @click="approveTask(task)" 
+                                                class="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
+                                            Approve
+                                        </button>
+                                        <button @click="rejectTask(task, '')" 
+                                                class="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700">
+                                            Reject
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Existing Tasks (Read Only) -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+                    <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Existing Tasks</h3>
+                        <p class="text-xs text-gray-600 dark:text-gray-400">All tasks in your projects (read only)</p>
+                    </div>
+                    <div class="p-4">
+                        <div v-if="existingTasks?.length === 0" class="text-center py-8">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                            </svg>
+                            <p class="mt-2 text-sm text-gray-500">No existing tasks</p>
+                        </div>
+                        <div v-else class="space-y-3">
+                            <div v-for="task in existingTasks" :key="task.id" 
+                                 class="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex-1">
+                                        <h4 class="text-sm font-medium text-gray-900 dark:text-white">{{ task.name }}</h4>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ task.project?.name }} - {{ task.sprint?.name }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Developer: {{ task.user?.name }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Status: {{ task.status }} | QA Status: {{ task.qa_status }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">{{ task.description }}</p>
+                                    </div>
+                                    <div class="ml-4 flex-shrink-0">
+                                        <button @click="viewTaskDetails(task.id)" 
+                                                class="inline-flex items-center px-3 py-1 border border-gray-300 dark:border-gray-600 text-xs font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                            View Details
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bugs Ready for Testing -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+                    <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Bugs Ready for Testing</h3>
+                        <p class="text-xs text-gray-600 dark:text-gray-400">Bugs that need QA review</p>
+                    </div>
+                    <div class="p-4">
+                        <div v-if="bugsReadyForTesting?.length === 0" class="text-center py-8">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <p class="mt-2 text-sm text-gray-500">No bugs ready for testing</p>
+                        </div>
+                        <div v-else class="space-y-3">
+                            <div v-for="bug in bugsReadyForTesting" :key="bug.id" 
+                                 class="border border-gray-200 dark:border-gray-600 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex-1">
+                                        <h4 class="text-sm font-medium text-gray-900 dark:text-white">{{ bug.title }}</h4>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ bug.project?.name }} - {{ bug.sprint?.name }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Developer: {{ bug.user?.name }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">{{ bug.description }}</p>
+                                    </div>
+                                    <div class="ml-4 flex-shrink-0">
+                                        <button @click="assignBugToQa(bug)" 
+                                                class="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                                            Assign to Me
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bugs In Testing -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+                    <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Bugs In Testing</h3>
+                        <p class="text-xs text-gray-600 dark:text-gray-400">Bugs currently being tested by you</p>
+                    </div>
+                    <div class="p-4">
+                        <div v-if="bugsInTesting?.length === 0" class="text-center py-8">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                            </svg>
+                            <p class="mt-2 text-sm text-gray-500">No bugs in testing</p>
+                        </div>
+                        <div v-else class="space-y-3">
+                            <div v-for="bug in bugsInTesting" :key="bug.id" 
+                                 class="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex-1">
+                                        <h4 class="text-sm font-medium text-gray-900 dark:text-white">{{ bug.title }}</h4>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ bug.project?.name }} - {{ bug.sprint?.name }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Developer: {{ bug.user?.name }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">{{ bug.description }}</p>
+                                    </div>
+                                    <div class="ml-4 flex-shrink-0 space-x-2">
+                                        <button @click="approveBug(bug)" 
+                                                class="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
+                                            Approve
+                                        </button>
+                                        <button @click="rejectBug(bug, '')" 
+                                                class="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700">
+                                            Reject
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Team Leader Dashboard -->
+            <div v-else-if="isTeamLeader">
+                <!-- Welcome Section -->
+                <div class="bg-gradient-to-r from-orange-600 to-red-600 rounded-lg p-4 text-white">
+                    <h1 class="text-xl font-bold mb-1">Team Leader Dashboard - {{ user.name }}</h1>
+                    <p class="text-orange-100 text-sm">Manage team workflow and final approvals.</p>
+                </div>
+
+                <!-- Statistics Cards -->
+                <TeamLeaderDashboardStats :stats="stats" />
+
+                <!-- Pending Tasks -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+                    <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Pending Tasks</h3>
+                        <p class="text-xs text-gray-600 dark:text-gray-400">Tasks completed by developers awaiting approval</p>
+                    </div>
+                    <div class="p-4">
+                        <div v-if="pendingTasks?.length === 0" class="text-center py-8">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <p class="mt-2 text-sm text-gray-500">No pending tasks</p>
+                        </div>
+                        <div v-else class="space-y-3">
+                            <div v-for="task in pendingTasks" :key="task.id" 
+                                 class="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex-1">
+                                        <h4 class="text-sm font-medium text-gray-900 dark:text-white">{{ task.name }}</h4>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ task.project?.name }} - {{ task.sprint?.name }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Developer: {{ task.user?.name }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">{{ task.description }}</p>
+                                    </div>
+                                    <div class="ml-4 flex-shrink-0">
+                                        <button @click="viewTaskDetails(task.id)" 
+                                                class="inline-flex items-center px-3 py-1 border border-gray-300 dark:border-gray-600 text-xs font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                            Review
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- QA Approved Tasks -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+                    <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">QA Approved Tasks</h3>
+                        <p class="text-xs text-gray-600 dark:text-gray-400">Tasks approved by QA awaiting final review</p>
+                    </div>
+                    <div class="p-4">
+                        <div v-if="qaApprovedTasks?.length === 0" class="text-center py-8">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <p class="mt-2 text-sm text-gray-500">No QA approved tasks</p>
+                        </div>
+                        <div v-else class="space-y-3">
+                            <div v-for="task in qaApprovedTasks" :key="task.id" 
+                                 class="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex-1">
+                                        <h4 class="text-sm font-medium text-gray-900 dark:text-white">{{ task.name }}</h4>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ task.project?.name }} - {{ task.sprint?.name }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Developer: {{ task.user?.name }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">QA: {{ task.qaReviewedBy?.name }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">{{ task.description }}</p>
+                                    </div>
+                                    <div class="ml-4 flex-shrink-0 space-x-2">
+                                        <button @click="approveTaskFinal(task)" 
+                                                class="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
+                                            Final Approve
+                                        </button>
+                                        <button @click="requestTaskChanges(task, '')" 
+                                                class="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700">
+                                            Request Changes
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Developer Dashboard -->
-            <div v-if="!isAdmin">
+            <div v-else-if="!isAdmin">
                 <!-- Welcome Section -->
                 <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-4 text-white">
                     <h1 class="text-xl font-bold mb-1">Welcome back, {{ user.name }}!</h1>
@@ -154,15 +506,15 @@ const viewProjectDetails = (projectId: string) => {
                     <div class="xl:col-span-2">
                         <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
                             <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Tareas que Requieren Atención</h3>
-                                <p class="text-xs text-gray-600 dark:text-gray-400">Tareas que exceden el tiempo estimado en más del 20%</p>
+                                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Tasks Requiring Attention</h3>
+                                <p class="text-xs text-gray-600 dark:text-gray-400">Tasks that exceed estimated time by more than 20%</p>
                             </div>
                             <div class="p-4 max-h-64 overflow-y-auto">
                                 <div v-if="tasksRequiringAttention?.length === 0" class="text-center py-4">
                                     <svg class="mx-auto h-8 w-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                     </svg>
-                                    <p class="mt-1 text-xs text-gray-500">¡Excelente! No hay tareas que requieran atención</p>
+                                    <p class="mt-1 text-xs text-gray-500">Excellent! No tasks require attention</p>
                                 </div>
                                 
                                 <div v-else class="space-y-3">
@@ -178,7 +530,7 @@ const viewProjectDetails = (projectId: string) => {
                                                 <p class="text-xs text-gray-500 dark:text-gray-400">Dev: {{ task.user?.name }}</p>
                                                 <div class="mt-2 flex items-center space-x-3 text-xs">
                                                     <span class="text-red-600 dark:text-red-400 font-medium">
-                                                        Real: {{ formatTime(task.total_time_seconds || 0) }}
+                                                        Actual: {{ formatTime(task.total_time_seconds || 0) }}
                                                     </span>
                                                     <span v-if="task.estimated_hours" class="text-gray-500 dark:text-gray-400">
                                                         Est: {{ task.estimated_hours }}h
@@ -193,7 +545,7 @@ const viewProjectDetails = (projectId: string) => {
                                                     @click="viewTaskDetails(task.id)"
                                                     class="inline-flex items-center px-2 py-1 border border-gray-300 dark:border-gray-600 text-xs font-medium rounded text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
                                                 >
-                                                    Ver
+                                                    View
                                                 </button>
                                             </div>
                                         </div>
@@ -207,15 +559,15 @@ const viewProjectDetails = (projectId: string) => {
                     <div class="xl:col-span-1">
                         <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
                             <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Proyectos Activos</h3>
-                                <p class="text-xs text-gray-600 dark:text-gray-400">Resumen de proyectos en curso</p>
+                                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Active Projects</h3>
+                                <p class="text-xs text-gray-600 dark:text-gray-400">Summary of ongoing projects</p>
                             </div>
                             <div class="p-4 max-h-64 overflow-y-auto">
                                 <div v-if="activeProjectsSummary?.length === 0" class="text-center py-4">
                                     <svg class="mx-auto h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
                                     </svg>
-                                    <p class="mt-1 text-xs text-gray-500">No hay proyectos activos</p>
+                                    <p class="mt-1 text-xs text-gray-500">No active projects</p>
                                 </div>
                                 
                                 <div v-else class="space-y-3">
@@ -231,11 +583,11 @@ const viewProjectDetails = (projectId: string) => {
                                         
                                         <div class="space-y-1">
                                             <div class="flex justify-between text-xs">
-                                                <span class="text-gray-500 dark:text-gray-400">En progreso:</span>
+                                                <span class="text-gray-500 dark:text-gray-400">In progress:</span>
                                                 <span class="font-medium text-gray-900 dark:text-white">{{ project.in_progress_tasks_count }}</span>
                                             </div>
                                             <div class="flex justify-between text-xs">
-                                                <span class="text-gray-500 dark:text-gray-400">Pendientes:</span>
+                                                <span class="text-gray-500 dark:text-gray-400">Pending:</span>
                                                 <span class="font-medium text-gray-900 dark:text-white">{{ project.pending_tasks_count }}</span>
                                             </div>
                                         </div>
@@ -245,7 +597,7 @@ const viewProjectDetails = (projectId: string) => {
                                                 @click="viewProjectDetails(project.id)"
                                                 class="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
                                             >
-                                                Ver detalles →
+                                                View details →
                                             </button>
                                         </div>
                                     </div>
@@ -258,15 +610,15 @@ const viewProjectDetails = (projectId: string) => {
                 <!-- Developer Performance Metrics -->
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
                     <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Métricas de Rendimiento por Desarrollador</h3>
-                        <p class="text-xs text-gray-600 dark:text-gray-400">Eficiencia y productividad del equipo</p>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Developer Performance Metrics</h3>
+                        <p class="text-xs text-gray-600 dark:text-gray-400">Team efficiency and productivity</p>
                     </div>
                     <div class="p-4 max-h-64 overflow-y-auto">
                         <div v-if="developerMetrics?.length === 0" class="text-center py-4">
                             <svg class="mx-auto h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                             </svg>
-                            <p class="mt-1 text-xs text-gray-500">No hay métricas disponibles</p>
+                            <p class="mt-1 text-xs text-gray-500">No metrics available</p>
                         </div>
                         
                         <div v-else class="overflow-x-auto">
@@ -274,10 +626,10 @@ const viewProjectDetails = (projectId: string) => {
                                 <thead class="bg-gray-50 dark:bg-gray-700">
                                     <tr>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Dev</th>
-                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tareas</th>
-                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tiempo</th>
-                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Eficiencia</th>
-                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Promedio</th>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tasks</th>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Time</th>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Efficiency</th>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Average</th>
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
@@ -288,7 +640,7 @@ const viewProjectDetails = (projectId: string) => {
                                         </td>
                                         <td class="px-3 py-2 whitespace-nowrap">
                                             <div class="text-xs text-gray-900 dark:text-white">{{ metric.total_tasks }}</div>
-                                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ metric.completed_tasks }} completadas</div>
+                                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ metric.completed_tasks }} completed</div>
                                         </td>
                                         <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900 dark:text-white">
                                             {{ metric.formatted_time_spent }}
@@ -322,8 +674,8 @@ const viewProjectDetails = (projectId: string) => {
                 <!-- Quick Actions -->
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
                     <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Acciones Rápidas</h3>
-                        <p class="text-xs text-gray-600 dark:text-gray-400">Acceso directo a las funciones principales</p>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Quick Actions</h3>
+                        <p class="text-xs text-gray-600 dark:text-gray-400">Direct access to main functions</p>
                     </div>
                     <div class="p-4">
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">

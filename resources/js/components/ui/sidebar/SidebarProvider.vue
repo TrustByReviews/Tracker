@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { cn } from '@/lib/utils';
-import { useEventListener, useMediaQuery, useVModel } from '@vueuse/core';
+import { useEventListener, useMediumQuery, useVModel } from '@vueuse/core';
 import { TooltipProvider } from 'reka-ui';
 import { computed, ref, type HTMLAttributes, type Ref } from 'vue';
 import {
@@ -28,7 +28,7 @@ const emits = defineEmits<{
     'update:open': [open: boolean];
 }>();
 
-const isMobile = useMediaQuery('(max-width: 768px)');
+const isMobile = useMediumQuery('(max-width: 768px)');
 const openMobile = ref(false);
 
 const open = useVModel(props, 'open', emits, {
@@ -40,7 +40,7 @@ function setOpen(value: boolean) {
     open.value = value; // emits('update:open', value)
 
     // This sets the cookie to keep the sidebar state.
-    document.cookie = `${SIDEBAR_COOKIE_NAME}=${open.value}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+    document.cookie = `${SIDEBAR_COOKIE_NAME}=${value ? 'true' : 'false'}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
 }
 
 function setOpenMobile(value: boolean) {

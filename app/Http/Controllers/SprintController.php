@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Sprint;
 use App\Models\User;
 use App\Models\Project;
+use App\Models\Task;
+use App\Models\Bug;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -36,6 +38,18 @@ class SprintController extends Controller
         if ($permissions === 'admin') {
             $sprintsQuery = Sprint::with(['tasks', 'bugs', 'project']);
             $projects = Project::all();
+        } elseif ($permissions === 'qa') {
+            // QA puede ver sprints de proyectos a los que está asignado
+            $sprintsQuery = Sprint::whereHas('project.users', function ($query) use ($authUser) {
+                $query->where('users.id', $authUser->id);
+            })->with(['tasks', 'bugs', 'project']);
+            $projects = $authUser->projects;
+        } elseif ($permissions === 'team_leader') {
+            // Team Leader puede ver sprints de proyectos a los que está asignado
+            $sprintsQuery = Sprint::whereHas('project.users', function ($query) use ($authUser) {
+                $query->where('users.id', $authUser->id);
+            })->with(['tasks', 'bugs', 'project', 'project.users']);
+            $projects = $authUser->projects;
         } elseif ($permissions === 'developer') {
             $sprintsQuery = Sprint::whereHas('project.users', function ($query) use ($authUser) {
                 $query->where('users.id', $authUser->id);
@@ -76,6 +90,8 @@ class SprintController extends Controller
                     break;
             }
         }
+
+
 
         $sprints = $sprintsQuery->get();
 
@@ -302,5 +318,101 @@ class SprintController extends Controller
         $sprint->delete();
 
         return response()->json(['message' => 'Sprint deleted'], 200);
+    }
+
+    /**
+     * Crear una nueva tarea en el sprint
+     */
+    public function createTask(Request $request, Sprint $sprint): JsonResponse
+    {
+        $authUser = Auth::user();
+        
+        if (!$authUser || !$authUser->hasPermission('create-sprint-tasks')) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        // Verificar que el TL pertenece al proyecto del sprint
+        if (!$sprint->project->users->contains($authUser->id)) {
+            return response()->json(['error' => 'You can only create tasks in sprints from your projects'], 403);
+        }
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'required|string',
+            'assigned_to' => 'required|exists:users,id',
+            'priority' => 'required|in:low,medium,high',
+            'story_points' => 'required|integer|min:1|max:13',
+        ]);
+
+        // Verificar que el usuario asignado es un desarrollador del proyecto
+        if (!$sprint->project->users()->where('users.id', $request->assigned_to)->exists()) {
+            return response()->json(['error' => 'The assigned user must be a member of the project'], 422);
+        }
+
+        $task = Task::create([
+            'name' => $request->name,
+            'description' => $request->description,
+            'project_id' => $sprint->project_id,
+            'sprint_id' => $sprint->id,
+            'assigned_to' => $request->assigned_to,
+            'created_by' => $authUser->id,
+            'status' => 'pending',
+            'priority' => $request->priority,
+            'story_points' => $request->story_points,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Task created successfully',
+            'task' => $task->load(['user', 'project', 'sprint'])
+        ]);
+    }
+
+    /**
+     * Crear un nuevo bug en el sprint
+     */
+    public function createBug(Request $request, Sprint $sprint): JsonResponse
+    {
+        $authUser = Auth::user();
+        
+        if (!$authUser || !$authUser->hasPermission('create-sprint-bugs')) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        // Verificar que el TL pertenece al proyecto del sprint
+        if (!$sprint->project->users->contains($authUser->id)) {
+            return response()->json(['error' => 'You can only create bugs in sprints from your projects'], 403);
+        }
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'required|string',
+            'assigned_to' => 'required|exists:users,id',
+            'priority' => 'required|in:low,medium,high',
+            'severity' => 'required|in:low,medium,high,critical',
+        ]);
+
+        // Verificar que el usuario asignado es un desarrollador del proyecto
+        if (!$sprint->project->users()->where('users.id', $request->assigned_to)->exists()) {
+            return response()->json(['error' => 'The assigned user must be a member of the project'], 422);
+        }
+
+        $bug = Bug::create([
+            'name' => $request->name,
+            'description' => $request->description,
+            'project_id' => $sprint->project_id,
+            'sprint_id' => $sprint->id,
+            'assigned_to' => $request->assigned_to,
+            'created_by' => $authUser->id,
+            'status' => 'pending',
+            'priority' => $request->priority,
+            'severity' => $request->severity,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Bug created successfully',
+            'bug' => $bug->load(['user', 'project', 'sprint'])
+        ]);
     }
 }

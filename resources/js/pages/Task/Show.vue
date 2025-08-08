@@ -440,7 +440,7 @@ const openAttachment = (attachment: any) => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div class="grid grid-cols-2 gap-4">
+              <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Status</label>
                 <div class="mt-1">
@@ -459,6 +459,30 @@ const openAttachment = (attachment: any) => {
                 </div>
               </div>
               
+              <!-- Assign to Developer (project developers) -->
+              <div class="mt-4">
+                <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Assign To</label>
+                <div class="mt-1">
+                  <div v-if="!isEditing">
+                    <span class="text-sm text-gray-900 dark:text-white">{{ task.user?.name || 'Unassigned' }}</span>
+                  </div>
+                  <select 
+                    v-else 
+                    v-model="form.assigned_user_id" 
+                    class="w-full border border-gray-300 rounded-md px-3 py-2"
+                  >
+                    <option value="">Unassigned</option>
+                    <option 
+                      v-for="dev in (props.developers || [])" 
+                      :key="dev.id" 
+                      :value="dev.id"
+                    >
+                      {{ dev.name }}
+                    </option>
+                  </select>
+                </div>
+              </div>
+
               <div>
                 <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Priority</label>
                 <div class="mt-1">

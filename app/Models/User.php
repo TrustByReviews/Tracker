@@ -78,6 +78,62 @@ class User extends Authenticatable
         return $this->hasMany(Task::class);
     }
 
+    public function notifications(): HasMany
+    {
+        return $this->hasMany(Notification::class);
+    }
+
+    public function qaTasks(): HasMany
+    {
+        return $this->hasMany(Task::class, 'qa_assigned_to');
+    }
+
+    public function qaBugs(): HasMany
+    {
+        return $this->hasMany(Bug::class, 'qa_assigned_to');
+    }
+
+    /**
+     * Verificar si el usuario es admin
+     */
+    public function isAdmin(): bool
+    {
+        return $this->roles()->where('value', 'admin')->exists();
+    }
+
+    /**
+     * Verificar si el usuario es team leader
+     */
+    public function isTeamLeader(): bool
+    {
+        return $this->roles()->where('value', 'team_leader')->exists();
+    }
+
+    /**
+     * Verificar si el usuario es developer
+     */
+    public function isDeveloper(): bool
+    {
+        return $this->roles()->where('value', 'developer')->exists();
+    }
+
+    /**
+     * Verificar si el usuario es QA
+     */
+    public function isQa(): bool
+    {
+        return $this->roles()->where('value', 'qa')->exists();
+    }
+
+    /**
+     * Obtener el rol principal del usuario
+     */
+    public function getMainRole(): ?string
+    {
+        $role = $this->roles()->first();
+        return $role ? $role->value : null;
+    }
+
     public function bugs(): HasMany
     {
         return $this->hasMany(Bug::class);

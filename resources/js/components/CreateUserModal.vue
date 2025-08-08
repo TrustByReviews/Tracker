@@ -24,18 +24,18 @@ const open = ref(false)
 const { success, error } = useToast()
 
 const submit = () => {
-    // Validar que si es manual, la contraseña esté presente
+    // Validar que se ingrese contraseña si se selecciona crear manualmente
     if (form.password_option === 'manual' && !form.password) {
-        error('Error', 'Debes ingresar una contraseña cuando seleccionas "Crear manualmente"');
+        error('Error', 'You must enter a password when selecting "Create manually"');
         return;
     }
 
     form.post('/users', {
         onSuccess: () => {
             if (form.password_option === 'email') {
-                success('Usuario creado', `El usuario ${form.name} ha sido creado exitosamente. La contraseña ha sido enviada a su correo.`);
+                success('User created', `User ${form.name} has been created successfully. Password has been sent to their email.`);
             } else {
-                success('Usuario creado', `El usuario ${form.name} ha sido creado exitosamente.`);
+                success('User created', `User ${form.name} has been created successfully.`);
             }
             form.reset();
             form.password_option = 'manual';
@@ -43,7 +43,7 @@ const submit = () => {
             router.reload();
         },
         onError: () => {
-            error('Error al crear usuario', 'Hubo un problema al crear el usuario. Por favor, verifica los datos.');
+            error('Error creating user', 'There was a problem creating the user. Please verify the data.');
         }
     })
 }
@@ -62,24 +62,24 @@ const submit = () => {
                      <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
                         <Input v-model="form.name" class="w-full border-gray-300 text-black bg-white" />
-                     </div>
-                     <!-- Nickname -->
-                     <div>
+                    </div>
+                    <!-- Nickname -->
+                    <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Nickname</label>
                         <Input v-model="form.nickname" class="w-full border-gray-300 text-black bg-white" />
-                     </div>
-                     <!-- Email -->
-                     <div>
+                    </div>
+                    <!-- Email -->
+                    <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
                         <Input v-model="form.email" type="email" class="w-full border-gray-300 text-black bg-white" />
-                     </div>
-                     <!-- hour value -->
-                     <div>
+                    </div>
+                    <!-- hour value -->
+                    <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Hour Value</label>
                         <Input v-model="form.hour_value" type="number" min="0" class="w-full border-gray-300 text-black bg-white" />
-                     </div>
-                     <!-- work time -->
-                     <div>
+                    </div>
+                    <!-- work time -->
+                    <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Work time</label>
                         <select
                             v-model="form.work_time"
@@ -93,23 +93,23 @@ const submit = () => {
                     
                     <!-- Password option -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Opción de contraseña</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Password Option</label>
                         <select
                             v-model="form.password_option"
                             :class="['border h-9 border-gray-300 rounded bg-white px-2']"
                         >
-                            <option value="manual">Crear manualmente</option>
-                            <option value="email">Enviar por email</option>
+                            <option value="manual">Create manually</option>
+                            <option value="email">Send by email</option>
                         </select>
                     </div>
                     
                     <!-- Password (only show if manual) -->
                     <div v-if="form.password_option === 'manual'">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
                         <Input 
                             v-model="form.password" 
                             type="password" 
-                            placeholder="Ingresa la contraseña" 
+                            placeholder="Enter password" 
                             class="w-full border-gray-300 text-black bg-white" 
                         />
                     </div>

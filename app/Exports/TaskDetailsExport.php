@@ -11,7 +11,7 @@ class TaskDetailsExport implements FromArray, WithHeadings, WithTitle
     protected $data;
     protected $title;
 
-    public function __construct($data, $title = 'Detalles por Tarea')
+    public function __construct($data, $title = 'Task Details')
     {
         $this->data = $data;
         $this->title = $title;
@@ -25,15 +25,15 @@ class TaskDetailsExport implements FromArray, WithHeadings, WithTitle
     public function headings(): array
     {
         return [
-            'Desarrollador',
-            'Tarea',
-            'Proyecto',
-            'Horas Estimadas',
-            'Horas Reales',
-            'Valor/Hora ($)',
-            'Pago por Tarea ($)',
-            'Eficiencia (%)',
-            'Fecha Completada'
+            'Developer',
+            'Task',
+            'Project',
+            'Estimated Hours',
+            'Actual Hours',
+            'Hourly Rate ($)',
+            'Task Payment ($)',
+            'Efficiency (%)',
+            'Completion Date'
         ];
     }
 

@@ -17,6 +17,7 @@ export interface User {
   roles?: {
     id: string
     name: string
+    value: string
     permissions?: Permission[]
   }[]
   directPermissions?: Permission[]
