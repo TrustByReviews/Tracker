@@ -3,416 +3,605 @@
 namespace App\Http\Controllers;
 
 use App\Models\Sprint;
-use App\Models\User;
 use App\Models\Project;
-use App\Models\Task;
-use App\Models\Bug;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
-use Inertia\Response;
 
 class SprintController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request)
     {
-        $authUser = Auth::user();
-        
-        if (!$authUser) {
-            return redirect()->route('login');
-        }
-        
-        $role = $authUser->roles;
-        $permissions = 'developer'; // Default permission
-
-        if ($role && $role->count() > 0) {
-            $permissions = $role->first()->name;
-        }
-
-        $sprints = [];
-        $projects = [];
-
-        if ($permissions === 'admin') {
-            $sprintsQuery = Sprint::with(['tasks', 'bugs', 'project']);
-            $projects = Project::all();
-        } elseif ($permissions === 'qa') {
-            // QA puede ver sprints de proyectos a los que está asignado
-            $sprintsQuery = Sprint::whereHas('project.users', function ($query) use ($authUser) {
-                $query->where('users.id', $authUser->id);
-            })->with(['tasks', 'bugs', 'project']);
-            $projects = $authUser->projects;
-        } elseif ($permissions === 'team_leader') {
-            // Team Leader puede ver sprints de proyectos a los que está asignado
-            $sprintsQuery = Sprint::whereHas('project.users', function ($query) use ($authUser) {
-                $query->where('users.id', $authUser->id);
-            })->with(['tasks', 'bugs', 'project', 'project.users']);
-            $projects = $authUser->projects;
-        } elseif ($permissions === 'developer') {
-            $sprintsQuery = Sprint::whereHas('project.users', function ($query) use ($authUser) {
-                $query->where('users.id', $authUser->id);
-            })->with(['tasks', 'bugs', 'project']);
-            $projects = $authUser->projects;
-        }
+        $query = Sprint::with(['project', 'tasks', 'bugs']);
 
         // Aplicar filtros
-        $filters = $request->only(['project_id', 'sort_by', 'sort_order', 'status', 'item_type']);
-
-        // Filtro por proyecto
-        if (!empty($filters['project_id'])) {
-            $sprintsQuery->where('project_id', $filters['project_id']);
+        if ($request->filled('project_id')) {
+            $query->where('project_id', $request->project_id);
         }
 
-        // Filtro por tipo de elemento
-        if (!empty($filters['item_type']) && $filters['item_type'] !== 'all') {
-            if ($filters['item_type'] === 'tasks') {
-                $sprintsQuery->whereHas('tasks');
-            } elseif ($filters['item_type'] === 'bugs') {
-                $sprintsQuery->whereHas('bugs');
-            }
-        }
-
-        // Filtro por estado
-        if (!empty($filters['status'])) {
-            $today = now();
-            switch ($filters['status']) {
-                case 'active':
-                    $sprintsQuery->where('start_date', '<=', $today)
-                                ->where('end_date', '>=', $today);
-                    break;
-                case 'upcoming':
-                    $sprintsQuery->where('start_date', '>', $today);
-                    break;
-                case 'completed':
-                    $sprintsQuery->where('end_date', '<', $today);
-                    break;
-            }
-        }
-
-
-
-        $sprints = $sprintsQuery->get();
-
-        // Aplicar ordenamiento personalizado
-        if (!empty($filters['sort_by'])) {
-            $sprints = $sprints->sortBy(function ($sprint) use ($filters) {
-                switch ($filters['sort_by']) {
-                    case 'task_count':
-                        return $sprint->tasks->count() + $sprint->bugs->count();
-                    case 'completed_tasks':
-                        $completedTasks = $sprint->tasks->where('status', 'done')->count();
-                        $completedBugs = $sprint->bugs->whereIn('status', ['resolved', 'verified', 'closed'])->count();
-                        return $completedTasks + $completedBugs;
-                    case 'pending_tasks':
-                        $pendingTasks = $sprint->tasks->whereNotIn('status', ['done'])->count();
-                        $pendingBugs = $sprint->bugs->whereNotIn('status', ['resolved', 'verified', 'closed'])->count();
-                        return $pendingTasks + $pendingBugs;
-                    case 'completion_rate':
-                        $totalTasks = $sprint->tasks->count();
-                        $completedTasks = $sprint->tasks->where('status', 'done')->count();
-                        $totalBugs = $sprint->bugs->count();
-                        $completedBugs = $sprint->bugs->whereIn('status', ['resolved', 'verified', 'closed'])->count();
-                        $total = $totalTasks + $totalBugs;
-                        return $total > 0 ? (($completedTasks + $completedBugs) / $total) * 100 : 0;
-                    case 'days_to_end':
-                        return now()->diffInDays($sprint->end_date, false);
-                    case 'priority_score':
-                        // Calcular prioridad basada en tareas y bugs pendientes vs días restantes
-                        $pendingTasks = $sprint->tasks->whereNotIn('status', ['done'])->count();
-                        $pendingBugs = $sprint->bugs->whereNotIn('status', ['resolved', 'verified', 'closed'])->count();
-                        $pendingItems = $pendingTasks + $pendingBugs;
-                        $daysToEnd = max(1, now()->diffInDays($sprint->end_date, false));
-                        return $pendingItems / $daysToEnd;
-                    case 'recent':
-                        return $sprint->created_at;
-                    default:
-                        return $sprint->created_at;
+        if ($request->filled('status')) {
+            $status = $request->status;
+            $query->where(function ($q) use ($status) {
+                $today = now();
+                switch ($status) {
+                    case 'active':
+                        $q->where('start_date', '<=', $today)
+                          ->where('end_date', '>=', $today);
+                        break;
+                    case 'upcoming':
+                        $q->where('start_date', '>', $today);
+                        break;
+                    case 'completed':
+                        $q->where('end_date', '<', $today);
+                        break;
                 }
             });
-
-            // Aplicar orden
-            if ($filters['sort_order'] === 'desc') {
-                $sprints = $sprints->reverse();
-            }
         }
+
+        // Ordenamiento
+        $sortBy = $request->get('sort_by', 'recent');
+        $sortOrder = $request->get('sort_order', 'desc');
+
+        switch ($sortBy) {
+            case 'task_count':
+                $query->withCount('tasks')->orderBy('tasks_count', $sortOrder);
+                break;
+            case 'completed_tasks':
+                $query->withCount(['tasks as completed_tasks_count' => function ($q) {
+                    $q->where('status', 'done');
+                }])->orderBy('completed_tasks_count', $sortOrder);
+                break;
+            case 'pending_tasks':
+                $query->withCount(['tasks as pending_tasks_count' => function ($q) {
+                    $q->whereNotIn('status', ['done']);
+                }])->orderBy('pending_tasks_count', $sortOrder);
+                break;
+            case 'completion_rate':
+                $query->orderBy('progress_percentage', $sortOrder);
+                break;
+            case 'days_to_end':
+                $query->orderBy('end_date', $sortOrder);
+                break;
+            case 'priority_score':
+                // Ordenar por fecha de fin (más cercana = mayor prioridad)
+                $query->orderBy('end_date', 'asc');
+                break;
+            case 'velocity_deviation':
+                $query->orderBy('velocity_deviation', $sortOrder);
+                break;
+            case 'bug_resolution_rate':
+                $query->orderBy('bug_resolution_rate', $sortOrder);
+                break;
+            case 'progress_percentage':
+                $query->orderBy('progress_percentage', $sortOrder);
+                break;
+            default:
+                $query->orderBy('created_at', $sortOrder);
+        }
+
+        $sprints = $query->get();
+        $projects = Project::all();
 
         return Inertia::render('Sprint/Index', [
             'sprints' => $sprints,
-            'permissions' => $permissions,
             'projects' => $projects,
-            'filters' => $filters,
+            'permissions' => auth()->user()->role,
+            'filters' => $request->only(['project_id', 'sort_by', 'sort_order', 'status', 'item_type'])
         ]);
     }
 
-    public function show($project_id, $sprint_id): Response
+    public function store(Request $request)
     {
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'goal' => 'required|string|max:500',
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after:start_date',
+            'project_id' => 'required|exists:projects,id',
+            
+            // Fase 1: Campos esenciales
+            'description' => 'nullable|string|max:1000',
+            'sprint_type' => 'nullable|in:regular,release,hotfix',
+            'planned_start_date' => 'nullable|date',
+            'planned_end_date' => 'nullable|date',
+            'actual_start_date' => 'nullable|date',
+            'actual_end_date' => 'nullable|date',
+            'duration_days' => 'nullable|integer|min:1',
+            'sprint_objective' => 'nullable|string|max:1000',
+            'user_stories_included' => 'nullable|array',
+            'user_stories_included.*' => 'string|max:100',
+            'assigned_tasks' => 'nullable|array',
+            'assigned_tasks.*' => 'string|max:100',
+            'acceptance_criteria' => 'nullable|string|max:1000',
+            
+            // Fase 2: Campos de seguimiento avanzado
+            'planned_velocity' => 'nullable|integer|min:0',
+            'actual_velocity' => 'nullable|integer|min:0',
+            'velocity_deviation' => 'nullable|numeric',
+            'progress_percentage' => 'nullable|numeric|min:0|max:100',
+            'blockers' => 'nullable|array',
+            'blockers.*' => 'string|max:200',
+            'risks' => 'nullable|array',
+            'risks.*' => 'string|max:200',
+            'blocker_resolution_notes' => 'nullable|string|max:1000',
+            'detailed_acceptance_criteria' => 'nullable|array',
+            'detailed_acceptance_criteria.*' => 'string|max:200',
+            'definition_of_done' => 'nullable|array',
+            'definition_of_done.*' => 'string|max:200',
+            'quality_gates' => 'nullable|array',
+            'quality_gates.*' => 'string|max:200',
+            'bugs_found' => 'nullable|integer|min:0',
+            'bugs_resolved' => 'nullable|integer|min:0',
+            'bug_resolution_rate' => 'nullable|numeric|min:0|max:100',
+            'code_reviews_completed' => 'nullable|integer|min:0',
+            'code_reviews_pending' => 'nullable|integer|min:0',
+            'daily_scrums_held' => 'nullable|integer|min:0',
+            'daily_scrums_missed' => 'nullable|integer|min:0',
+            'daily_scrum_attendance_rate' => 'nullable|numeric|min:0|max:100',
+            
+            // Fase 3: Retrospectiva y Mejoras
+            'achievements' => 'nullable|array',
+            'achievements.*' => 'string|max:200',
+            'problems' => 'nullable|array',
+            'problems.*' => 'string|max:200',
+            'actions_to_take' => 'nullable|array',
+            'actions_to_take.*' => 'string|max:200',
+            'retrospective_notes' => 'nullable|string|max:2000',
+            'lessons_learned' => 'nullable|array',
+            'lessons_learned.*' => 'string|max:200',
+            'improvement_areas' => 'nullable|array',
+            'improvement_areas.*' => 'string|max:200',
+            'team_feedback' => 'nullable|array',
+            'team_feedback.*' => 'string|max:200',
+            'stakeholder_feedback' => 'nullable|array',
+            'stakeholder_feedback.*' => 'string|max:200',
+            'team_satisfaction_score' => 'nullable|numeric|min:1|max:10',
+            'stakeholder_satisfaction_score' => 'nullable|numeric|min:1|max:10',
+            'process_improvements' => 'nullable|array',
+            'process_improvements.*' => 'string|max:200',
+            'tool_improvements' => 'nullable|array',
+            'tool_improvements.*' => 'string|max:200',
+            'communication_improvements' => 'nullable|array',
+            'communication_improvements.*' => 'string|max:200',
+            'technical_debt_added' => 'nullable|array',
+            'technical_debt_added.*' => 'string|max:200',
+            'technical_debt_resolved' => 'nullable|array',
+            'technical_debt_resolved.*' => 'string|max:200',
+            'knowledge_shared' => 'nullable|array',
+            'knowledge_shared.*' => 'string|max:200',
+            'skills_developed' => 'nullable|array',
+            'skills_developed.*' => 'string|max:200',
+            'mentoring_sessions' => 'nullable|array',
+            'mentoring_sessions.*' => 'string|max:200',
+            'team_velocity_trend' => 'nullable|integer',
+            'sprint_efficiency_score' => 'nullable|numeric|min:0|max:100',
+            'sprint_goals_achieved' => 'nullable|array',
+            'sprint_goals_achieved.*' => 'string|max:200',
+            'sprint_goals_partially_achieved' => 'nullable|array',
+            'sprint_goals_partially_achieved.*' => 'string|max:200',
+            'sprint_goals_not_achieved' => 'nullable|array',
+            'sprint_goals_not_achieved.*' => 'string|max:200',
+            'goal_achievement_rate' => 'nullable|numeric|min:0|max:100',
+            'next_sprint_recommendations' => 'nullable|string|max:1000',
+            'sprint_ceremony_effectiveness' => 'nullable|array',
+            'sprint_ceremony_effectiveness.*' => 'string|max:200',
+            'overall_sprint_rating' => 'nullable|numeric|min:1|max:10'
+        ]);
 
-        
-        // Validar que project_id sea un UUID válido
-        if (!$project_id || $project_id === 'NaN' || !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $project_id)) {
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
 
-            abort(400, 'Invalid project ID');
-        }
-        
-        // Validar que sprint_id sea un UUID válido
-        if (!$sprint_id || !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $sprint_id)) {
+        $data = $validator->validated();
 
-            abort(400, 'Invalid sprint ID');
+        // Calcular duración automáticamente si no se proporciona
+        if (!isset($data['duration_days'])) {
+            if (isset($data['planned_start_date']) && isset($data['planned_end_date'])) {
+                $data['duration_days'] = \Carbon\Carbon::parse($data['planned_start_date'])
+                    ->diffInDays(\Carbon\Carbon::parse($data['planned_end_date'])) + 1;
+            } elseif (isset($data['start_date']) && isset($data['end_date'])) {
+                $data['duration_days'] = \Carbon\Carbon::parse($data['start_date'])
+                    ->diffInDays(\Carbon\Carbon::parse($data['end_date'])) + 1;
+            }
         }
-        
-        $authUser = Auth::user();
-        
-        if (!$authUser) {
-            return redirect()->route('login');
+
+        // Calcular desviación de velocidad si se proporcionan ambos valores
+        if (isset($data['planned_velocity']) && isset($data['actual_velocity']) && $data['planned_velocity'] > 0) {
+            $data['velocity_deviation'] = round((($data['actual_velocity'] - $data['planned_velocity']) / $data['planned_velocity']) * 100, 2);
         }
-        
-        $role = $authUser->roles;
-        $permissions = 'developer'; // Default permission
-        
-        if ($role && $role->count() > 0) {
-            $permissions = $role->first()->name;
+
+        // Calcular tasa de resolución de bugs si se proporcionan ambos valores
+        if (isset($data['bugs_found']) && isset($data['bugs_resolved']) && $data['bugs_found'] > 0) {
+            $data['bug_resolution_rate'] = round(($data['bugs_resolved'] / $data['bugs_found']) * 100, 2);
         }
-        
-        $sprint = Sprint::with(['tasks.user', 'bugs.user'])->findOrFail($sprint_id);
-        $tasks = $sprint->tasks;
-        $bugs = $sprint->bugs;
-        
-        // Get developers from the project
-        $project = \App\Models\Project::findOrFail($project_id);
-        $developers = $project->users;
+
+        // Calcular tasa de asistencia a Daily Scrums si se proporcionan ambos valores
+        if (isset($data['daily_scrums_held']) && isset($data['daily_scrums_missed'])) {
+            $totalScrums = $data['daily_scrums_held'] + $data['daily_scrums_missed'];
+            if ($totalScrums > 0) {
+                $data['daily_scrum_attendance_rate'] = round(($data['daily_scrums_held'] / $totalScrums) * 100, 2);
+            }
+        }
+
+        $sprint = Sprint::create($data);
+
+        return redirect()->route('sprints.index')->with('success', 'Sprint created successfully.');
+    }
+
+    /**
+     * Mostrar detalles de un sprint específico
+     */
+    public function show(Sprint $sprint)
+    {
+        // Cargar el sprint con todas sus relaciones
+        $sprint->load([
+            'project',
+            'tasks.user',
+            'tasks.qaReviewedBy',
+            'bugs.user',
+            'bugs.qaReviewedBy'
+        ]);
+
+        // Obtener desarrolladores disponibles del proyecto
+        $developers = $sprint->project->users()
+            ->whereHas('roles', function($query) {
+                $query->where('name', 'developer');
+            })->get();
 
         return Inertia::render('Sprint/Show', [
             'sprint' => $sprint,
-            'tasks' => $tasks,
-            'bugs' => $bugs,
-            'permissions' => $permissions,
-            'project_id' => $project_id,
+            'project' => $sprint->project,
+            'tasks' => $sprint->tasks,
+            'bugs' => $sprint->bugs,
             'developers' => $developers,
+            'permissions' => auth()->user()->roles->first()->name ?? 'developer'
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function update(Request $request, Sprint $sprint)
     {
-        try {
-            Log::info('Sprint creation started', [
-                'request_data' => $request->all(),
-                'user_id' => Auth::id()
-            ]);
-
-            $validatedData = $request->validate([
-                'name' => 'required|string|max:255',
-                'goal' => 'required|string|max:255',
-                'start_date' => 'required|date',
-                'end_date' => 'required|date|after:start_date',
-                'project_id' => 'required|string|exists:projects,id',
-            ]);
-
-            Log::info('Sprint validation passed', [
-                'validated_data' => $validatedData
-            ]);
-
-            $sprint = Sprint::create([
-                'name' => $validatedData['name'],
-                'goal' => $validatedData['goal'],
-                'start_date' => $validatedData['start_date'],
-                'end_date' => $validatedData['end_date'],
-                'project_id' => $validatedData['project_id'],
-            ]);
-
-            Log::info('Sprint created successfully', [
-                'sprint_id' => $sprint->id,
-                'sprint_name' => $sprint->name,
-                'project_id' => $sprint->project_id,
-                'user_id' => Auth::id()
-            ]);
-
-            return redirect()->route('projects.show', $validatedData['project_id'])
-                ->with('success', 'Sprint created successfully');
-
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            Log::error('Sprint validation failed', [
-                'errors' => $e->errors(),
-                'request_data' => $request->all(),
-                'user_id' => Auth::id()
-            ]);
-            throw $e;
-        } catch (\Exception $e) {
-            Log::error('Sprint creation failed', [
-                'error' => $e->getMessage(),
-                'request_data' => $request->all(),
-                'user_id' => Auth::id()
-            ]);
+        $validator = Validator::make($request->all(), [
+            'name' => 'sometimes|required|string|max:255',
+            'goal' => 'sometimes|required|string|max:500',
+            'start_date' => 'sometimes|required|date',
+            'end_date' => 'sometimes|required|date|after:start_date',
             
-            return redirect()->back()
-                ->withInput()
-                ->withErrors(['error' => 'Failed to create sprint. Please try again.']);
+            // Fase 1: Campos esenciales
+            'description' => 'nullable|string|max:1000',
+            'sprint_type' => 'nullable|in:regular,release,hotfix',
+            'planned_start_date' => 'nullable|date',
+            'planned_end_date' => 'nullable|date',
+            'actual_start_date' => 'nullable|date',
+            'actual_end_date' => 'nullable|date',
+            'duration_days' => 'nullable|integer|min:1',
+            'sprint_objective' => 'nullable|string|max:1000',
+            'user_stories_included' => 'nullable|array',
+            'user_stories_included.*' => 'string|max:100',
+            'assigned_tasks' => 'nullable|array',
+            'assigned_tasks.*' => 'string|max:100',
+            'acceptance_criteria' => 'nullable|string|max:1000',
+            
+            // Fase 2: Campos de seguimiento avanzado
+            'planned_velocity' => 'nullable|integer|min:0',
+            'actual_velocity' => 'nullable|integer|min:0',
+            'velocity_deviation' => 'nullable|numeric',
+            'progress_percentage' => 'nullable|numeric|min:0|max:100',
+            'blockers' => 'nullable|array',
+            'blockers.*' => 'string|max:200',
+            'risks' => 'nullable|array',
+            'risks.*' => 'string|max:200',
+            'blocker_resolution_notes' => 'nullable|string|max:1000',
+            'detailed_acceptance_criteria' => 'nullable|array',
+            'detailed_acceptance_criteria.*' => 'string|max:200',
+            'definition_of_done' => 'nullable|array',
+            'definition_of_done.*' => 'string|max:200',
+            'quality_gates' => 'nullable|array',
+            'quality_gates.*' => 'string|max:200',
+            'bugs_found' => 'nullable|integer|min:0',
+            'bugs_resolved' => 'nullable|integer|min:0',
+            'bug_resolution_rate' => 'nullable|numeric|min:0|max:100',
+            'code_reviews_completed' => 'nullable|integer|min:0',
+            'code_reviews_pending' => 'nullable|integer|min:0',
+            'daily_scrums_held' => 'nullable|integer|min:0',
+            'daily_scrums_missed' => 'nullable|integer|min:0',
+            'daily_scrum_attendance_rate' => 'nullable|numeric|min:0|max:100',
+            
+            // Fase 3: Retrospectiva y Mejoras
+            'achievements' => 'nullable|array',
+            'achievements.*' => 'string|max:200',
+            'problems' => 'nullable|array',
+            'problems.*' => 'string|max:200',
+            'actions_to_take' => 'nullable|array',
+            'actions_to_take.*' => 'string|max:200',
+            'retrospective_notes' => 'nullable|string|max:2000',
+            'lessons_learned' => 'nullable|array',
+            'lessons_learned.*' => 'string|max:200',
+            'improvement_areas' => 'nullable|array',
+            'improvement_areas.*' => 'string|max:200',
+            'team_feedback' => 'nullable|array',
+            'team_feedback.*' => 'string|max:200',
+            'stakeholder_feedback' => 'nullable|array',
+            'stakeholder_feedback.*' => 'string|max:200',
+            'team_satisfaction_score' => 'nullable|numeric|min:1|max:10',
+            'stakeholder_satisfaction_score' => 'nullable|numeric|min:1|max:10',
+            'process_improvements' => 'nullable|array',
+            'process_improvements.*' => 'string|max:200',
+            'tool_improvements' => 'nullable|array',
+            'tool_improvements.*' => 'string|max:200',
+            'communication_improvements' => 'nullable|array',
+            'communication_improvements.*' => 'string|max:200',
+            'technical_debt_added' => 'nullable|array',
+            'technical_debt_added.*' => 'string|max:200',
+            'technical_debt_resolved' => 'nullable|array',
+            'technical_debt_resolved.*' => 'string|max:200',
+            'knowledge_shared' => 'nullable|array',
+            'knowledge_shared.*' => 'string|max:200',
+            'skills_developed' => 'nullable|array',
+            'skills_developed.*' => 'string|max:200',
+            'mentoring_sessions' => 'nullable|array',
+            'mentoring_sessions.*' => 'string|max:200',
+            'team_velocity_trend' => 'nullable|integer',
+            'sprint_efficiency_score' => 'nullable|numeric|min:0|max:100',
+            'sprint_goals_achieved' => 'nullable|array',
+            'sprint_goals_achieved.*' => 'string|max:200',
+            'sprint_goals_partially_achieved' => 'nullable|array',
+            'sprint_goals_partially_achieved.*' => 'string|max:200',
+            'sprint_goals_not_achieved' => 'nullable|array',
+            'sprint_goals_not_achieved.*' => 'string|max:200',
+            'goal_achievement_rate' => 'nullable|numeric|min:0|max:100',
+            'next_sprint_recommendations' => 'nullable|string|max:1000',
+            'sprint_ceremony_effectiveness' => 'nullable|array',
+            'sprint_ceremony_effectiveness.*' => 'string|max:200',
+            'overall_sprint_rating' => 'nullable|numeric|min:1|max:10'
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
         }
+
+        $data = $validator->validated();
+
+        // Recalcular métricas automáticas
+        if (isset($data['planned_velocity']) && isset($data['actual_velocity']) && $data['planned_velocity'] > 0) {
+            $data['velocity_deviation'] = round((($data['actual_velocity'] - $data['planned_velocity']) / $data['planned_velocity']) * 100, 2);
+        }
+
+        if (isset($data['bugs_found']) && isset($data['bugs_resolved']) && $data['bugs_found'] > 0) {
+            $data['bug_resolution_rate'] = round(($data['bugs_resolved'] / $data['bugs_found']) * 100, 2);
+        }
+
+        if (isset($data['daily_scrums_held']) && isset($data['daily_scrums_missed'])) {
+            $totalScrums = $data['daily_scrums_held'] + $data['daily_scrums_missed'];
+            if ($totalScrums > 0) {
+                $data['daily_scrum_attendance_rate'] = round(($data['daily_scrums_held'] / $totalScrums) * 100, 2);
+            }
+        }
+
+        $sprint->update($data);
+
+        return back()->with('success', 'Sprint updated successfully.');
     }
 
-    public function update(Request $request, $project_id, $sprint_id): RedirectResponse
+    public function destroy(Sprint $sprint)
     {
-        try {
-            Log::info('Sprint update started', [
-                'sprint_id' => $sprint_id,
-                'project_id' => $project_id,
-                'request_data' => $request->all(),
-                'user_id' => Auth::id()
-            ]);
-
-            $validatedData = $request->validate([
-                'name' => 'required|string|max:255',
-                'goal' => 'required|string|max:255',
-                'start_date' => 'required|date',
-                'end_date' => 'required|date|after:start_date',
-            ]);
-
-            Log::info('Sprint update validation passed', [
-                'validated_data' => $validatedData
-            ]);
-
-            $sprint = Sprint::findOrFail($sprint_id);
-
-            $sprint->update([
-               'name' => $validatedData['name'],
-               'goal' => $validatedData['goal'],
-               'start_date' => $validatedData['start_date'],
-               'end_date' => $validatedData['end_date'],
-            ]);
-
-            Log::info('Sprint updated successfully', [
-                'sprint_id' => $sprint->id,
-                'sprint_name' => $sprint->name,
-                'project_id' => $project_id,
-                'user_id' => Auth::id()
-            ]);
-
-            return redirect()->route('sprints.show', ['project' => $project_id, 'sprint' => $sprint->id])
-                ->with('success', 'Sprint updated successfully');
-
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            Log::error('Sprint update validation failed', [
-                'sprint_id' => $sprint_id,
-                'errors' => $e->errors(),
-                'request_data' => $request->all(),
-                'user_id' => Auth::id()
-            ]);
-            throw $e;
-        } catch (\Exception $e) {
-            Log::error('Sprint update failed', [
-                'sprint_id' => $sprint_id,
-                'error' => $e->getMessage(),
-                'request_data' => $request->all(),
-                'user_id' => Auth::id()
-            ]);
-            
-            return redirect()->back()
-                ->withInput()
-                ->withErrors(['error' => 'Failed to update sprint. Please try again.']);
-        }
-    }
-    public function destroy($proyect_id, $sprint_id): JsonResponse
-    {
-        $sprint = Sprint::where('id', $sprint_id)->firstOrFail();
         $sprint->delete();
+        return redirect()->route('sprints.index')->with('success', 'Sprint deleted successfully.');
+    }
 
-        return response()->json(['message' => 'Sprint deleted'], 200);
+    // Nuevos métodos para Fase 3
+    public function finishSprint(Request $request, Sprint $sprint)
+    {
+        // Verificar que el usuario tiene permisos para finalizar sprints
+        if (auth()->user()->role !== 'admin' && auth()->user()->role !== 'team_leader') {
+            return back()->with('error', 'You do not have permission to finish sprints.');
+        }
+
+        // Verificar que el sprint no esté ya finalizado
+        if ($sprint->isCompleted()) {
+            return back()->with('error', 'Sprint is already completed.');
+        }
+
+        // Verificar que todas las tareas estén completadas
+        if (!$sprint->canBeFinished()) {
+            $finishStatus = $sprint->getFinishStatus();
+            $pendingTasksList = $finishStatus['pending_tasks_list']->take(5)->pluck('name')->implode(', ');
+            
+            $message = "Cannot finish sprint. {$finishStatus['pending_tasks']} task(s) still pending. ";
+            if ($finishStatus['pending_tasks'] > 5) {
+                $message .= "First 5: {$pendingTasksList}...";
+            } else {
+                $message .= "Pending: {$pendingTasksList}";
+            }
+            
+            return back()->with('error', $message);
+        }
+
+        // Finalizar el sprint
+        $success = $sprint->finishSprint();
+
+        if ($success) {
+            return back()->with('success', 'Sprint finished successfully.');
+        } else {
+            return back()->with('error', 'Failed to finish sprint.');
+        }
+    }
+
+    public function addRetrospective(Request $request, Sprint $sprint)
+    {
+        // Verificar que el usuario tiene permisos para agregar retrospectivas
+        if (auth()->user()->role !== 'admin' && auth()->user()->role !== 'team_leader') {
+            return back()->with('error', 'You do not have permission to add retrospectives.');
+        }
+
+        // Verificar que el sprint esté finalizado
+        if (!$sprint->isCompleted()) {
+            return back()->with('error', 'Sprint must be completed before adding retrospective.');
+        }
+
+        $validator = Validator::make($request->all(), [
+            'achievements' => 'nullable|array',
+            'achievements.*' => 'string|max:200',
+            'problems' => 'nullable|array',
+            'problems.*' => 'string|max:200',
+            'actions_to_take' => 'nullable|array',
+            'actions_to_take.*' => 'string|max:200',
+            'retrospective_notes' => 'nullable|string|max:2000',
+            'lessons_learned' => 'nullable|array',
+            'lessons_learned.*' => 'string|max:200',
+            'improvement_areas' => 'nullable|array',
+            'improvement_areas.*' => 'string|max:200',
+            'team_feedback' => 'nullable|array',
+            'team_feedback.*' => 'string|max:200',
+            'stakeholder_feedback' => 'nullable|array',
+            'stakeholder_feedback.*' => 'string|max:200',
+            'team_satisfaction_score' => 'nullable|numeric|min:1|max:10',
+            'stakeholder_satisfaction_score' => 'nullable|numeric|min:1|max:10',
+            'process_improvements' => 'nullable|array',
+            'process_improvements.*' => 'string|max:200',
+            'tool_improvements' => 'nullable|array',
+            'tool_improvements.*' => 'string|max:200',
+            'communication_improvements' => 'nullable|array',
+            'communication_improvements.*' => 'string|max:200',
+            'technical_debt_added' => 'nullable|array',
+            'technical_debt_added.*' => 'string|max:200',
+            'technical_debt_resolved' => 'nullable|array',
+            'technical_debt_resolved.*' => 'string|max:200',
+            'knowledge_shared' => 'nullable|array',
+            'knowledge_shared.*' => 'string|max:200',
+            'skills_developed' => 'nullable|array',
+            'skills_developed.*' => 'string|max:200',
+            'mentoring_sessions' => 'nullable|array',
+            'mentoring_sessions.*' => 'string|max:200',
+            'sprint_goals_achieved' => 'nullable|array',
+            'sprint_goals_achieved.*' => 'string|max:200',
+            'sprint_goals_partially_achieved' => 'nullable|array',
+            'sprint_goals_partially_achieved.*' => 'string|max:200',
+            'sprint_goals_not_achieved' => 'nullable|array',
+            'sprint_goals_not_achieved.*' => 'string|max:200',
+            'sprint_ceremony_effectiveness' => 'nullable|array',
+            'sprint_ceremony_effectiveness.*' => 'string|max:200'
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
+
+        $retrospectiveData = $validator->validated();
+        
+        // Agregar la retrospectiva
+        $success = $sprint->addRetrospective($retrospectiveData);
+
+        if ($success) {
+            return back()->with('success', 'Retrospective added successfully.');
+        } else {
+            return back()->with('error', 'Failed to add retrospective.');
+        }
+    }
+
+    public function finishSprintWithRetrospective(Request $request, Sprint $sprint)
+    {
+        // Verificar permisos
+        if (auth()->user()->role !== 'admin' && auth()->user()->role !== 'team_leader') {
+            return back()->with('error', 'You do not have permission to finish sprints.');
+        }
+
+        // Verificar que el sprint no esté ya finalizado
+        if ($sprint->isCompleted()) {
+            return back()->with('error', 'Sprint is already completed.');
+        }
+
+        // Verificar que todas las tareas estén completadas
+        if (!$sprint->canBeFinished()) {
+            $finishStatus = $sprint->getFinishStatus();
+            $pendingTasksList = $finishStatus['pending_tasks_list']->take(5)->pluck('name')->implode(', ');
+            
+            $message = "Cannot finish sprint. {$finishStatus['pending_tasks']} task(s) still pending. ";
+            if ($finishStatus['pending_tasks'] > 5) {
+                $message .= "First 5: {$pendingTasksList}...";
+            } else {
+                $message .= "Pending: {$pendingTasksList}";
+            }
+            
+            return back()->with('error', $message);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'achievements' => 'nullable|array',
+            'achievements.*' => 'string|max:200',
+            'problems' => 'nullable|array',
+            'problems.*' => 'string|max:200',
+            'actions_to_take' => 'nullable|array',
+            'actions_to_take.*' => 'string|max:200',
+            'retrospective_notes' => 'nullable|string|max:2000',
+            'lessons_learned' => 'nullable|array',
+            'lessons_learned.*' => 'string|max:200',
+            'improvement_areas' => 'nullable|array',
+            'improvement_areas.*' => 'string|max:200',
+            'team_feedback' => 'nullable|array',
+            'team_feedback.*' => 'string|max:200',
+            'stakeholder_feedback' => 'nullable|array',
+            'stakeholder_feedback.*' => 'string|max:200',
+            'team_satisfaction_score' => 'nullable|numeric|min:1|max:10',
+            'stakeholder_satisfaction_score' => 'nullable|numeric|min:1|max:10',
+            'process_improvements' => 'nullable|array',
+            'process_improvements.*' => 'string|max:200',
+            'tool_improvements' => 'nullable|array',
+            'tool_improvements.*' => 'string|max:200',
+            'communication_improvements' => 'nullable|array',
+            'communication_improvements.*' => 'string|max:200',
+            'technical_debt_added' => 'nullable|array',
+            'technical_debt_added.*' => 'string|max:200',
+            'technical_debt_resolved' => 'nullable|array',
+            'technical_debt_resolved.*' => 'string|max:200',
+            'knowledge_shared' => 'nullable|array',
+            'knowledge_shared.*' => 'string|max:200',
+            'skills_developed' => 'nullable|array',
+            'skills_developed.*' => 'string|max:200',
+            'mentoring_sessions' => 'nullable|array',
+            'mentoring_sessions.*' => 'string|max:200',
+            'sprint_goals_achieved' => 'nullable|array',
+            'sprint_goals_achieved.*' => 'string|max:200',
+            'sprint_goals_partially_achieved' => 'nullable|array',
+            'sprint_goals_partially_achieved.*' => 'string|max:200',
+            'sprint_goals_not_achieved' => 'nullable|array',
+            'sprint_goals_not_achieved.*' => 'string|max:200',
+            'sprint_ceremony_effectiveness' => 'nullable|array',
+            'sprint_ceremony_effectiveness.*' => 'string|max:200'
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
+
+        $retrospectiveData = $validator->validated();
+        
+        // Finalizar sprint con retrospectiva
+        $success = $sprint->finishSprint($retrospectiveData);
+
+        if ($success) {
+            return back()->with('success', 'Sprint finished with retrospective successfully.');
+        } else {
+            return back()->with('error', 'Failed to finish sprint with retrospective.');
+        }
+    }
+
+    public function getRetrospectiveSummary(Sprint $sprint)
+    {
+        if (!$sprint->isCompleted()) {
+            return response()->json(['error' => 'Sprint is not completed'], 400);
+        }
+
+        return response()->json([
+            'summary' => $sprint->getRetrospectiveSummary(),
+            'has_retrospective' => $sprint->hasRetrospective()
+        ]);
     }
 
     /**
-     * Crear una nueva tarea en el sprint
+     * Obtiene el estado de finalización del sprint
      */
-    public function createTask(Request $request, Sprint $sprint): JsonResponse
+    public function getFinishStatus(Sprint $sprint)
     {
-        $authUser = Auth::user();
-        
-        if (!$authUser || !$authUser->hasPermission('create-sprint-tasks')) {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
-
-        // Verificar que el TL pertenece al proyecto del sprint
-        if (!$sprint->project->users->contains($authUser->id)) {
-            return response()->json(['error' => 'You can only create tasks in sprints from your projects'], 403);
-        }
-
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'required|string',
-            'assigned_to' => 'required|exists:users,id',
-            'priority' => 'required|in:low,medium,high',
-            'story_points' => 'required|integer|min:1|max:13',
-        ]);
-
-        // Verificar que el usuario asignado es un desarrollador del proyecto
-        if (!$sprint->project->users()->where('users.id', $request->assigned_to)->exists()) {
-            return response()->json(['error' => 'The assigned user must be a member of the project'], 422);
-        }
-
-        $task = Task::create([
-            'name' => $request->name,
-            'description' => $request->description,
-            'project_id' => $sprint->project_id,
-            'sprint_id' => $sprint->id,
-            'assigned_to' => $request->assigned_to,
-            'created_by' => $authUser->id,
-            'status' => 'pending',
-            'priority' => $request->priority,
-            'story_points' => $request->story_points,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Task created successfully',
-            'task' => $task->load(['user', 'project', 'sprint'])
-        ]);
-    }
-
-    /**
-     * Crear un nuevo bug en el sprint
-     */
-    public function createBug(Request $request, Sprint $sprint): JsonResponse
-    {
-        $authUser = Auth::user();
-        
-        if (!$authUser || !$authUser->hasPermission('create-sprint-bugs')) {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
-
-        // Verificar que el TL pertenece al proyecto del sprint
-        if (!$sprint->project->users->contains($authUser->id)) {
-            return response()->json(['error' => 'You can only create bugs in sprints from your projects'], 403);
-        }
-
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'required|string',
-            'assigned_to' => 'required|exists:users,id',
-            'priority' => 'required|in:low,medium,high',
-            'severity' => 'required|in:low,medium,high,critical',
-        ]);
-
-        // Verificar que el usuario asignado es un desarrollador del proyecto
-        if (!$sprint->project->users()->where('users.id', $request->assigned_to)->exists()) {
-            return response()->json(['error' => 'The assigned user must be a member of the project'], 422);
-        }
-
-        $bug = Bug::create([
-            'name' => $request->name,
-            'description' => $request->description,
-            'project_id' => $sprint->project_id,
-            'sprint_id' => $sprint->id,
-            'assigned_to' => $request->assigned_to,
-            'created_by' => $authUser->id,
-            'status' => 'pending',
-            'priority' => $request->priority,
-            'severity' => $request->severity,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Bug created successfully',
-            'bug' => $bug->load(['user', 'project', 'sprint'])
-        ]);
+        return response()->json($sprint->getFinishStatus());
     }
 }

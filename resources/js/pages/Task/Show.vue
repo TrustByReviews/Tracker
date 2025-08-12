@@ -80,7 +80,37 @@ interface Task {
     tags?: string,
     attachments?: any[],
     created_at?: string,
-    updated_at?: string
+    updated_at?: string,
+    // QA fields
+    qa_status?: string,
+    qa_assigned_to?: string,
+    qa_assigned_at?: string,
+    qa_started_at?: string,
+    qa_completed_at?: string,
+    qa_notes?: string,
+    qa_rejection_reason?: string,
+    qa_reviewed_by?: string,
+    qa_reviewed_at?: string,
+    qa_testing_started_at?: string,
+    qa_testing_paused_at?: string,
+    qa_testing_finished_at?: string,
+    // Team Leader fields
+    team_leader_final_approval?: boolean,
+    team_leader_final_approval_at?: string,
+    team_leader_final_notes?: string,
+    team_leader_requested_changes?: boolean,
+    team_leader_requested_changes_at?: string,
+    team_leader_change_notes?: string,
+    team_leader_reviewed_by?: string,
+    // Re-work tracking fields
+    original_time_seconds?: number,
+    retwork_time_seconds?: number,
+    original_work_finished_at?: string,
+    retwork_started_at?: string,
+    has_been_returned?: boolean,
+    return_count?: number,
+    last_returned_by?: string,
+    last_returned_at?: string
 }
 
 const props = defineProps<{
@@ -357,7 +387,7 @@ const openAttachment = (attachment: any) => {
           <Button 
             v-if="!isEditing" 
             @click="startEditing" 
-            class="border-blue-500 text-white bg-blue-500 hover:bg-blue-600 transition-colors"
+            class="border-green-500 text-white bg-green-500 hover:bg-green-600 transition-colors"
           >
             Edit Task
           </Button>
@@ -657,6 +687,160 @@ const openAttachment = (attachment: any) => {
           </CardContent>
         </Card>
 
+        <!-- Task Workflow Logs -->
+        <Card>
+          <CardHeader>
+            <CardTitle class="flex items-center">
+              <Icon name="activity" class="h-5 w-5 mr-2" />
+              Workflow History & Logs
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div class="space-y-6">
+              <!-- Original Developer Work Time -->
+              <div v-if="task.total_time_seconds || task.work_started_at" class="border-l-4 border-blue-500 pl-4">
+                <h4 class="font-medium text-gray-900 dark:text-gray-100 mb-2 flex items-center">
+                  <Icon name="user" class="h-4 w-4 mr-2 text-blue-500" />
+                  Original Development Work
+                </h4>
+                <div class="space-y-2 text-sm">
+                  <div v-if="task.original_time_seconds" class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Original time worked:</span>
+                    <span class="font-medium text-blue-600 dark:text-blue-400">{{ formatTime(task.original_time_seconds) }}</span>
+                  </div>
+                  <div v-if="!task.original_time_seconds && task.total_time_seconds" class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Total time worked:</span>
+                    <span class="font-medium text-blue-600 dark:text-blue-400">{{ formatTime(task.total_time_seconds) }}</span>
+                  </div>
+                  <div v-if="task.work_started_at" class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">First started:</span>
+                    <span class="font-medium">{{ formatDateTime(task.work_started_at) }}</span>
+                  </div>
+                  <div v-if="task.original_work_finished_at" class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Original work completed:</span>
+                    <span class="font-medium">{{ formatDateTime(task.original_work_finished_at || null) }}</span>
+                  </div>
+                  <div v-if="!task.original_work_finished_at && task.work_finished_at" class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">First completed:</span>
+                    <span class="font-medium">{{ formatDateTime(task.work_finished_at) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- QA Testing Time -->
+              <div v-if="task.qa_started_at || task.qa_completed_at" class="border-l-4 border-green-500 pl-4">
+                <h4 class="font-medium text-gray-900 dark:text-gray-100 mb-2 flex items-center">
+                  <Icon name="shield" class="h-4 w-4 mr-2 text-green-500" />
+                  QA Testing
+                </h4>
+                <div class="space-y-2 text-sm">
+                  <div v-if="task.qa_assigned_at" class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Assigned to QA:</span>
+                    <span class="font-medium">{{ formatDateTime(task.qa_assigned_at || null) }}</span>
+                  </div>
+                  <div v-if="task.qa_started_at" class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Testing started:</span>
+                    <span class="font-medium">{{ formatDateTime(task.qa_started_at || null) }}</span>
+                  </div>
+                  <div v-if="task.qa_completed_at" class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Testing completed:</span>
+                    <span class="font-medium">{{ formatDateTime(task.qa_completed_at || null) }}</span>
+                  </div>
+                  <div v-if="task.qa_notes" class="mt-2 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded">
+                    <span class="text-gray-600 dark:text-gray-400 text-xs">QA Notes:</span>
+                    <p class="text-sm text-green-800 dark:text-green-300 mt-1">{{ task.qa_notes }}</p>
+                  </div>
+                  <div v-if="task.qa_rejection_reason" class="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded">
+                    <span class="text-gray-600 dark:text-gray-400 text-xs">Rejection Reason:</span>
+                    <p class="text-sm text-red-800 dark:text-red-300 mt-1">{{ task.qa_rejection_reason }}</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Team Leader Review -->
+              <div v-if="task.team_leader_final_approval_at || task.team_leader_requested_changes_at" class="border-l-4 border-purple-500 pl-4">
+                <h4 class="font-medium text-gray-900 dark:text-gray-100 mb-2 flex items-center">
+                  <Icon name="award" class="h-4 w-4 mr-2 text-purple-500" />
+                  Team Leader Review
+                </h4>
+                <div class="space-y-2 text-sm">
+                  <div v-if="task.team_leader_final_approval_at" class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Final approval:</span>
+                    <span class="font-medium text-green-600 dark:text-green-400">{{ formatDateTime(task.team_leader_final_approval_at || null) }}</span>
+                  </div>
+                  <div v-if="task.team_leader_requested_changes_at" class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Changes requested:</span>
+                    <span class="font-medium text-orange-600 dark:text-orange-400">{{ formatDateTime(task.team_leader_requested_changes_at || null) }}</span>
+                  </div>
+                  <div v-if="task.team_leader_final_notes" class="mt-2 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded">
+                    <span class="text-gray-600 dark:text-gray-400 text-xs">Approval Notes:</span>
+                    <p class="text-sm text-green-800 dark:text-green-300 mt-1">{{ task.team_leader_final_notes }}</p>
+                  </div>
+                  <div v-if="task.team_leader_change_notes" class="mt-2 p-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded">
+                    <span class="text-gray-600 dark:text-gray-400 text-xs">Change Request Notes:</span>
+                    <p class="text-sm text-orange-800 dark:text-orange-300 mt-1">{{ task.team_leader_change_notes }}</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Re-work Time (if task was returned) -->
+              <div v-if="(task.qa_rejection_reason || task.team_leader_change_notes) && task.work_started_at" class="border-l-4 border-red-500 pl-4">
+                <h4 class="font-medium text-gray-900 dark:text-gray-100 mb-2 flex items-center">
+                  <Icon name="refresh-cw" class="h-4 w-4 mr-2 text-red-500" />
+                  Re-work Information
+                </h4>
+                <div class="space-y-2 text-sm">
+                  <div v-if="task.qa_rejection_reason" class="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded">
+                    <span class="text-gray-600 dark:text-gray-400 text-xs">Returned by QA:</span>
+                    <p class="text-sm text-red-800 dark:text-red-300 mt-1">{{ task.qa_rejection_reason }}</p>
+                  </div>
+                  <div v-if="task.team_leader_change_notes" class="mt-2 p-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded">
+                    <span class="text-gray-600 dark:text-gray-400 text-xs">Returned by Team Leader:</span>
+                    <p class="text-sm text-orange-800 dark:text-orange-300 mt-1">{{ task.team_leader_change_notes }}</p>
+                  </div>
+                  <div v-if="task.work_started_at" class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Re-work started:</span>
+                    <span class="font-medium">{{ formatDateTime(task.work_started_at || null) }}</span>
+                  </div>
+                  <!-- Re-work Time Tracking -->
+                  <div v-if="task.is_working" class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Currently working on re-work:</span>
+                    <span class="font-medium text-blue-600 dark:text-blue-400">Yes</span>
+                  </div>
+                  <div v-if="task.total_time_seconds && (task.qa_rejection_reason || task.team_leader_change_notes)" class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Additional time spent:</span>
+                    <span class="font-medium text-red-600 dark:text-red-400">{{ formatTime(task.total_time_seconds) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Current Re-work Session (if actively working) -->
+              <div v-if="task.is_working && (task.qa_rejection_reason || task.team_leader_change_notes)" class="border-l-4 border-orange-500 pl-4">
+                <h4 class="font-medium text-gray-900 dark:text-gray-100 mb-2 flex items-center">
+                  <Icon name="clock" class="h-4 w-4 mr-2 text-orange-500" />
+                  Current Re-work Session
+                </h4>
+                <div class="space-y-2 text-sm">
+                  <div class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Session started:</span>
+                    <span class="font-medium">{{ formatDateTime(task.work_started_at || null) }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Current session time:</span>
+                    <span class="font-medium text-orange-600 dark:text-orange-400 animate-pulse">{{ formatTime(task.total_time_seconds || 0) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- No logs message -->
+              <div v-if="!task.total_time_seconds && !task.qa_started_at && !task.team_leader_final_approval_at && !task.team_leader_requested_changes_at" class="text-center py-4 text-gray-500 dark:text-gray-400">
+                <Icon name="activity" class="h-8 w-8 mx-auto mb-2 text-gray-300 dark:text-gray-600" />
+                <p class="text-sm">No workflow activity recorded yet.</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <!-- Tags -->
         <Card>
           <CardHeader>
@@ -728,7 +912,7 @@ const openAttachment = (attachment: any) => {
                 <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Actual Start</label>
                 <div class="mt-1">
                   <div v-if="!isEditing">
-                    <p class="text-sm text-gray-900 dark:text-white">{{ formatDate(task.actual_start) }}</p>
+                    <p class="text-sm text-gray-900 dark:text-white">{{ formatDate(task.actual_start || null) }}</p>
                   </div>
                   <input v-else v-model="form.actual_start" type="date" class="w-full border border-gray-300 rounded-md px-3 py-2">
                 </div>
@@ -738,7 +922,7 @@ const openAttachment = (attachment: any) => {
                 <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Actual Finish</label>
                 <div class="mt-1">
                   <div v-if="!isEditing">
-                    <p class="text-sm text-gray-900 dark:text-white">{{ formatDate(task.actual_finish) }}</p>
+                    <p class="text-sm text-gray-900 dark:text-white">{{ formatDate(task.actual_finish || null) }}</p>
                   </div>
                   <input v-else v-model="form.actual_finish" type="date" :min="form.actual_start" class="w-full border border-gray-300 rounded-md px-3 py-2">
                 </div>
@@ -746,6 +930,7 @@ const openAttachment = (attachment: any) => {
             </div>
           </CardContent>
         </Card>
+
       </div>
 
       <!-- Sidebar -->
@@ -978,7 +1163,7 @@ const openAttachment = (attachment: any) => {
               
               <div>
                 <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Created</label>
-                <p class="mt-1 text-sm text-gray-900 dark:text-white">{{ formatDate(task.created_at) }}</p>
+                                  <p class="mt-1 text-sm text-gray-900 dark:text-white">{{ formatDate(task.created_at || null) }}</p>
               </div>
               
               <div v-if="task.updated_at">
@@ -988,6 +1173,8 @@ const openAttachment = (attachment: any) => {
             </div>
           </CardContent>
         </Card>
+
+
       </div>
     </div>
   </AppLayout>

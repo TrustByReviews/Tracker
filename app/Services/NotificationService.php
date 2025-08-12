@@ -7,14 +7,39 @@ use App\Models\Task;
 use App\Models\Bug;
 use App\Models\User;
 
+/**
+ * Notification Service Class
+ * 
+ * This service handles all notification operations throughout the task management system.
+ * It manages notifications for task and bug lifecycle events, QA testing, approvals,
+ * and team communications.
+ * 
+ * Features:
+ * - Task and bug lifecycle notifications
+ * - QA testing workflow notifications
+ * - Team leader approval notifications
+ * - Developer completion notifications
+ * - Notification management (read/unread status)
+ * - Multi-user notification targeting
+ * 
+ * @package App\Services
+ * @author System
+ * @version 1.0
+ */
 class NotificationService
 {
     /**
-     * Crear notificación de tarea lista para QA
+     * Create notification for task ready for QA testing
+     * 
+     * Notifies all QA users assigned to the project that a task is ready
+     * for testing. This is triggered when a team leader approves a task.
+     * 
+     * @param Task $task The task that is ready for QA testing
+     * @return void
      */
     public function notifyTaskReadyForQa(Task $task): void
     {
-        // Obtener todos los QAs del proyecto
+        // Get all QA users assigned to the project
         $qaUsers = User::whereHas('roles', function ($query) {
             $query->where('value', 'qa');
         })->whereHas('projects', function ($query) use ($task) {
@@ -38,11 +63,18 @@ class NotificationService
     }
 
     /**
-     * Crear notificación de tarea aprobada por QA
+     * Create notification for task approved by QA
+     * 
+     * Notifies team leaders and the original developer when a task
+     * has been approved by QA testing.
+     * 
+     * @param Task $task The task that was approved
+     * @param User $qaUser The QA user who approved the task
+     * @return void
      */
     public function notifyTaskApprovedByQa(Task $task, User $qaUser): void
     {
-        // Notificar al team leader del proyecto
+        // Notify project team leaders
         $teamLeaders = User::whereHas('roles', function ($query) {
             $query->where('value', 'team_leader');
         })->whereHas('projects', function ($query) use ($task) {
@@ -66,7 +98,7 @@ class NotificationService
             ]);
         }
 
-        // Notificar al desarrollador original
+        // Notify the original developer
         if ($task->user) {
             Notification::create([
                 'user_id' => $task->user_id,
@@ -86,11 +118,19 @@ class NotificationService
     }
 
     /**
-     * Crear notificación de tarea rechazada por QA
+     * Create notification for task rejected by QA
+     * 
+     * Notifies the original developer when a task has been rejected
+     * by QA testing, including the rejection reason.
+     * 
+     * @param Task $task The task that was rejected
+     * @param User $qaUser The QA user who rejected the task
+     * @param string $reason The reason for rejection
+     * @return void
      */
     public function notifyTaskRejectedByQa(Task $task, User $qaUser, string $reason): void
     {
-        // Notificar al desarrollador original
+        // Notify the original developer
         if ($task->user) {
             Notification::create([
                 'user_id' => $task->user_id,
@@ -109,7 +149,7 @@ class NotificationService
             ]);
         }
 
-        // Notificar al team leader del proyecto
+        // Notify project team leaders
         $teamLeaders = User::whereHas('roles', function ($query) {
             $query->where('value', 'team_leader');
         })->whereHas('projects', function ($query) use ($task) {
@@ -136,11 +176,17 @@ class NotificationService
     }
 
     /**
-     * Crear notificación de bug lista para QA
+     * Create notification for bug ready for QA testing
+     * 
+     * Notifies all QA users assigned to the project that a bug is ready
+     * for testing. This is triggered when a team leader approves a bug.
+     * 
+     * @param Bug $bug The bug that is ready for QA testing
+     * @return void
      */
     public function notifyBugReadyForQa(Bug $bug): void
     {
-        // Obtener todos los QAs del proyecto
+        // Get all QA users assigned to the project
         $qaUsers = User::whereHas('roles', function ($query) {
             $query->where('value', 'qa');
         })->whereHas('projects', function ($query) use ($bug) {
@@ -164,11 +210,18 @@ class NotificationService
     }
 
     /**
-     * Crear notificación de bug aprobado por QA
+     * Create notification for bug approved by QA
+     * 
+     * Notifies team leaders and the original developer when a bug
+     * has been approved by QA testing.
+     * 
+     * @param Bug $bug The bug that was approved
+     * @param User $qaUser The QA user who approved the bug
+     * @return void
      */
     public function notifyBugApprovedByQa(Bug $bug, User $qaUser): void
     {
-        // Notificar al team leader del proyecto
+        // Notify project team leaders
         $teamLeaders = User::whereHas('roles', function ($query) {
             $query->where('value', 'team_leader');
         })->whereHas('projects', function ($query) use ($bug) {
@@ -192,7 +245,7 @@ class NotificationService
             ]);
         }
 
-        // Notificar al desarrollador original
+        // Notify the original developer
         if ($bug->user) {
             Notification::create([
                 'user_id' => $bug->user_id,
@@ -212,11 +265,19 @@ class NotificationService
     }
 
     /**
-     * Crear notificación de bug rechazado por QA
+     * Create notification for bug rejected by QA
+     * 
+     * Notifies the original developer when a bug has been rejected
+     * by QA testing, including the rejection reason.
+     * 
+     * @param Bug $bug The bug that was rejected
+     * @param User $qaUser The QA user who rejected the bug
+     * @param string $reason The reason for rejection
+     * @return void
      */
     public function notifyBugRejectedByQa(Bug $bug, User $qaUser, string $reason): void
     {
-        // Notificar al desarrollador original
+        // Notify the original developer
         if ($bug->user) {
             Notification::create([
                 'user_id' => $bug->user_id,
@@ -235,7 +296,7 @@ class NotificationService
             ]);
         }
 
-        // Notificar al team leader del proyecto
+        // Notify project team leaders
         $teamLeaders = User::whereHas('roles', function ($query) {
             $query->where('value', 'team_leader');
         })->whereHas('projects', function ($query) use ($bug) {
@@ -262,7 +323,13 @@ class NotificationService
     }
 
     /**
-     * Marcar todas las notificaciones de un usuario como leídas
+     * Mark all notifications as read for a user
+     * 
+     * Updates the 'read' and 'read_at' status of all unread notifications
+     * for a given user.
+     * 
+     * @param User $user The user whose notifications to mark as read
+     * @return void
      */
     public function markAllAsRead(User $user): void
     {
@@ -275,7 +342,14 @@ class NotificationService
     }
 
     /**
-     * Obtener notificaciones no leídas de un usuario
+     * Get unread notifications for a user
+     * 
+     * Retrieves a collection of unread notifications for a user,
+     * ordered by creation date in descending order.
+     * 
+     * @param User $user The user to retrieve notifications for
+     * @param int $limit The maximum number of notifications to return
+     * @return \Illuminate\Database\Eloquent\Collection
      */
     public function getUnreadNotifications(User $user, int $limit = 10): \Illuminate\Database\Eloquent\Collection
     {
@@ -287,7 +361,12 @@ class NotificationService
     }
 
     /**
-     * Obtener el conteo de notificaciones no leídas de un usuario
+     * Get unread notification count for a user
+     * 
+     * Counts the number of unread notifications for a given user.
+     * 
+     * @param User $user The user to count notifications for
+     * @return int
      */
     public function getUnreadCount(User $user): int
     {
@@ -297,7 +376,14 @@ class NotificationService
     }
 
     /**
-     * Notificar al desarrollador que su tarea fue aprobada completamente
+     * Notify the developer that their task was finally approved
+     * 
+     * Creates a notification for the original developer when a task
+     * has been approved by the team leader.
+     * 
+     * @param Task $task The task that was finally approved
+     * @param User $teamLeader The team leader who approved the task
+     * @return void
      */
     public function notifyTaskFinalApproved(Task $task, User $teamLeader): void
     {
@@ -320,7 +406,15 @@ class NotificationService
     }
 
     /**
-     * Notificar al desarrollador que se solicitaron cambios en su tarea
+     * Notify the developer that changes were requested for their task
+     * 
+     * Creates a notification for the original developer when changes
+     * were requested by the team leader for their task.
+     * 
+     * @param Task $task The task for which changes were requested
+     * @param User $teamLeader The team leader requesting changes
+     * @param string $notes Notes provided by the team leader
+     * @return void
      */
     public function notifyTaskChangesRequested(Task $task, User $teamLeader, string $notes): void
     {
@@ -344,7 +438,14 @@ class NotificationService
     }
 
     /**
-     * Notificar al desarrollador que su bug fue aprobado completamente
+     * Notify the developer that their bug was finally approved
+     * 
+     * Creates a notification for the original developer when a bug
+     * has been approved by the team leader.
+     * 
+     * @param Bug $bug The bug that was finally approved
+     * @param User $teamLeader The team leader who approved the bug
+     * @return void
      */
     public function notifyBugFinalApproved(Bug $bug, User $teamLeader): void
     {
@@ -367,7 +468,15 @@ class NotificationService
     }
 
     /**
-     * Notificar al desarrollador que se solicitaron cambios en su bug
+     * Notify the developer that changes were requested for their bug
+     * 
+     * Creates a notification for the original developer when changes
+     * were requested by the team leader for their bug.
+     * 
+     * @param Bug $bug The bug for which changes were requested
+     * @param User $teamLeader The team leader requesting changes
+     * @param string $notes Notes provided by the team leader
+     * @return void
      */
     public function notifyBugChangesRequested(Bug $bug, User $teamLeader, string $notes): void
     {
@@ -391,11 +500,17 @@ class NotificationService
     }
 
     /**
-     * Notificar tarea lista para revisión del Team Leader
+     * Notify task ready for team leader review
+     * 
+     * Creates a notification for the team leader of the project
+     * when a task is ready for their review after QA testing.
+     * 
+     * @param Task $task The task ready for review
+     * @return void
      */
     public function notifyTaskReadyForTeamLeaderReview(Task $task): void
     {
-        // Notificar al team leader del proyecto
+        // Notify project team leaders
         $teamLeaders = User::whereHas('roles', function ($query) {
             $query->where('value', 'team_leader');
         })->whereHas('projects', function ($query) use ($task) {
@@ -420,11 +535,17 @@ class NotificationService
     }
 
     /**
-     * Notificar bug listo para revisión del Team Leader
+     * Notify bug ready for team leader review
+     * 
+     * Creates a notification for the team leader of the project
+     * when a bug is ready for their review after QA testing.
+     * 
+     * @param Bug $bug The bug ready for review
+     * @return void
      */
     public function notifyBugReadyForTeamLeaderReview(Bug $bug): void
     {
-        // Notificar al team leader del proyecto
+        // Notify project team leaders
         $teamLeaders = User::whereHas('roles', function ($query) {
             $query->where('value', 'team_leader');
         })->whereHas('projects', function ($query) use ($bug) {
@@ -449,11 +570,17 @@ class NotificationService
     }
 
     /**
-     * Notificar tarea finalizada por desarrollador
+     * Notify task finished by developer
+     * 
+     * Creates a notification for QA users assigned to the project
+     * when a task has been finished by the developer.
+     * 
+     * @param Task $task The task finished by the developer
+     * @return void
      */
     public function notifyTaskFinishedByDeveloper(Task $task): void
     {
-        // Obtener todos los QAs del proyecto
+        // Get all QA users assigned to the project
         $qaUsers = User::whereHas('roles', function ($query) {
             $query->where('value', 'qa');
         })->whereHas('projects', function ($query) use ($task) {
@@ -479,11 +606,17 @@ class NotificationService
     }
 
     /**
-     * Notificar bug finalizado por desarrollador
+     * Notify bug finished by developer
+     * 
+     * Creates a notification for QA users assigned to the project
+     * when a bug has been finished by the developer.
+     * 
+     * @param Bug $bug The bug finished by the developer
+     * @return void
      */
     public function notifyBugFinishedByDeveloper(Bug $bug): void
     {
-        // Obtener todos los QAs del proyecto
+        // Get all QA users assigned to the project
         $qaUsers = User::whereHas('roles', function ($query) {
             $query->where('value', 'qa');
         })->whereHas('projects', function ($query) use ($bug) {
@@ -509,11 +642,18 @@ class NotificationService
     }
 
     /**
-     * Notificar al Team Leader que una tarea fue completada por QA
+     * Notify team leader that a task was completed by QA
+     * 
+     * Creates a notification for the team leader of the project
+     * when a task has been completed by QA.
+     * 
+     * @param Task $task The task completed by QA
+     * @param User $qaUser The QA user who completed the task
+     * @return void
      */
     public function notifyTaskCompletedByQa(Task $task, User $qaUser): void
     {
-        // Notificar al team leader del proyecto
+        // Notify project team leaders
         $teamLeaders = User::whereHas('roles', function ($query) {
             $query->where('value', 'team_leader');
         })->whereHas('projects', function ($query) use ($task) {
@@ -539,11 +679,18 @@ class NotificationService
     }
 
     /**
-     * Notificar al Team Leader que un bug fue completado por QA
+     * Notify team leader that a bug was completed by QA
+     * 
+     * Creates a notification for the team leader of the project
+     * when a bug has been completed by QA.
+     * 
+     * @param Bug $bug The bug completed by QA
+     * @param User $qaUser The QA user who completed the bug
+     * @return void
      */
     public function notifyBugCompletedByQa(Bug $bug, User $qaUser): void
     {
-        // Notificar al team leader del proyecto
+        // Notify project team leaders
         $teamLeaders = User::whereHas('roles', function ($query) {
             $query->where('value', 'team_leader');
         })->whereHas('projects', function ($query) use ($bug) {
@@ -569,7 +716,15 @@ class NotificationService
     }
 
     /**
-     * Notificar al desarrollador que su tarea fue aprobada pero se solicitaron cambios
+     * Notify the developer that their task was approved but changes were requested
+     * 
+     * Creates a notification for the original developer when a task
+     * was approved by QA but changes were requested by the team leader.
+     * 
+     * @param Task $task The task approved with changes
+     * @param User $teamLeader The team leader requesting changes
+     * @param string $notes Notes provided by the team leader
+     * @return void
      */
     public function notifyTaskApprovedWithChanges(Task $task, User $teamLeader, string $notes): void
     {
@@ -593,7 +748,15 @@ class NotificationService
     }
 
     /**
-     * Notificar al desarrollador que su bug fue aprobado pero se solicitaron cambios
+     * Notify the developer that their bug was approved but changes were requested
+     * 
+     * Creates a notification for the original developer when a bug
+     * was approved by QA but changes were requested by the team leader.
+     * 
+     * @param Bug $bug The bug approved with changes
+     * @param User $teamLeader The team leader requesting changes
+     * @param string $notes Notes provided by the team leader
+     * @return void
      */
     public function notifyBugApprovedWithChanges(Bug $bug, User $teamLeader, string $notes): void
     {

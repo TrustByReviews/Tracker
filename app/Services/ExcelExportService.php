@@ -30,9 +30,12 @@ class ExcelExportService
         // Usar la hoja por defecto para el resumen
         $this->createSummarySheet($spreadsheet, $developers, $startDate, $endDate);
 
-        // Create Details sheet
+                // Create Details sheet
         $this->createDetailsSheet($spreadsheet, $developers, $startDate, $endDate);
-
+        
+        // Create Rework sheet
+        $this->createReworkSheet($spreadsheet, $developers, $startDate, $endDate);
+        
         // Create Statistics sheet
         $this->createStatisticsSheet($spreadsheet, $developers, $startDate, $endDate);
 
@@ -269,6 +272,7 @@ class ExcelExportService
             'Email',
             'Hourly Rate ($)',
             'Completed Tasks',
+            'Rework Items',
             'Estimated Hours',
             'Actual Hours',
             'Efficiency (%)',
@@ -276,12 +280,16 @@ class ExcelExportService
         ];
 
         $sheet->fromArray($headers, null, 'A5');
-        $this->styleTableHeader($sheet, 'A5:I5');
+        $this->styleTableHeader($sheet, 'A5:J5');
 
         // Developer data
         $row = 6;
         foreach ($developers as $developer) {
             $completedTasks = $developer['tasks'] ?? [];
+            $reworkTasks = $developer['rework_tasks'] ?? [];
+            $reworkBugs = $developer['rework_bugs'] ?? [];
+            $totalReworkItems = count($reworkTasks) + count($reworkBugs);
+            
             $totalEstimatedHours = collect($completedTasks)->sum('estimated_hours');
             $totalActualHours = collect($completedTasks)->sum('actual_hours');
             $efficiency = $totalEstimatedHours > 0 ? 
@@ -292,35 +300,42 @@ class ExcelExportService
             $sheet->setCellValue("C{$row}", $developer['email']);
             $sheet->setCellValue("D{$row}", $developer['hour_value']);
             $sheet->setCellValue("E{$row}", count($completedTasks));
-            $sheet->setCellValue("F{$row}", $totalEstimatedHours);
-            $sheet->setCellValue("G{$row}", $totalActualHours);
-            $sheet->setCellValue("H{$row}", $efficiency);
-            $sheet->setCellValue("I{$row}", $developer['total_earnings']);
+            $sheet->setCellValue("F{$row}", $totalReworkItems);
+            $sheet->setCellValue("G{$row}", $totalEstimatedHours);
+            $sheet->setCellValue("H{$row}", $totalActualHours);
+            $sheet->setCellValue("I{$row}", $efficiency);
+            $sheet->setCellValue("J{$row}", $developer['total_earnings']);
 
             // Apply currency format
             $sheet->getStyle("D{$row}")->getNumberFormat()->setFormatCode('$#,##0.00');
-            $sheet->getStyle("I{$row}")->getNumberFormat()->setFormatCode('$#,##0.00');
+            $sheet->getStyle("J{$row}")->getNumberFormat()->setFormatCode('$#,##0.00');
 
             // Apply percentage format
-            $sheet->getStyle("H{$row}")->getNumberFormat()->setFormatCode('0.0%');
+            $sheet->getStyle("I{$row}")->getNumberFormat()->setFormatCode('0.0%');
 
             // Apply conditional formatting for efficiency
             if ($efficiency > 0) {
-                $sheet->getStyle("H{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('D4EDDA');
-                $sheet->getStyle("H{$row}")->getFont()->setColor(new Color('155724'));
+                $sheet->getStyle("I{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('D4EDDA');
+                $sheet->getStyle("I{$row}")->getFont()->setColor(new Color('155724'));
             } elseif ($efficiency < 0) {
-                $sheet->getStyle("H{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F8D7DA');
-                $sheet->getStyle("H{$row}")->getFont()->setColor(new Color('721C24'));
+                $sheet->getStyle("I{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F8D7DA');
+                $sheet->getStyle("I{$row}")->getFont()->setColor(new Color('721C24'));
+            }
+
+            // Apply conditional formatting for rework items
+            if ($totalReworkItems > 0) {
+                $sheet->getStyle("F{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFF3CD');
+                $sheet->getStyle("F{$row}")->getFont()->setColor(new Color('856404'));
             }
 
             $row++;
         }
 
         // Apply table format
-        $this->styleTable($sheet, "A5:I" . ($row - 1));
+        $this->styleTable($sheet, "A5:J" . ($row - 1));
 
         // Add filters
-        $sheet->setAutoFilter("A5:I5");
+        $sheet->setAutoFilter("A5:J5");
     }
 
     /**
@@ -433,6 +448,128 @@ class ExcelExportService
     }
 
     /**
+     * Create rework details sheet
+     */
+    private function createReworkSheet($spreadsheet, $developers, $startDate, $endDate)
+    {
+        $sheet = $spreadsheet->createSheet();
+        $sheet->setTitle('Rework Details');
+        
+        // Configure column widths
+        $sheet->getColumnDimension('A')->setWidth(25);
+        $sheet->getColumnDimension('B')->setWidth(40);
+        $sheet->getColumnDimension('C')->setWidth(25);
+        $sheet->getColumnDimension('D')->setWidth(20);
+        $sheet->getColumnDimension('E')->setWidth(25);
+        $sheet->getColumnDimension('F')->setWidth(18);
+        $sheet->getColumnDimension('G')->setWidth(15);
+        $sheet->getColumnDimension('H')->setWidth(20);
+        $sheet->getColumnDimension('I')->setWidth(20);
+        $sheet->getColumnDimension('J')->setWidth(20);
+        $sheet->getColumnDimension('K')->setWidth(20);
+        $sheet->getColumnDimension('L')->setWidth(30);
+
+        // Report title
+        $sheet->mergeCells('A1:L1');
+        $sheet->setCellValue('A1', 'REWORK DETAILS');
+        $this->styleTitle($sheet, 'A1:L1');
+
+        // Table headers
+        $headers = [
+            'Developer',
+            'Task/Bug',
+            'Project',
+            'Type',
+            'Rework Type',
+            'Rework Hours',
+            'Hourly Rate ($)',
+            'Rework Earnings ($)',
+            'Original Completion',
+            'Rework Date',
+            'Status',
+            'Rework Reason'
+        ];
+
+        $sheet->fromArray($headers, null, 'A3');
+        $this->styleTableHeader($sheet, 'A3:L3');
+
+        // Rework data
+        $row = 4;
+        foreach ($developers as $developer) {
+            $reworkTasks = $developer['rework_tasks'] ?? [];
+            $reworkBugs = $developer['rework_bugs'] ?? [];
+            
+            // Process rework tasks
+            foreach ($reworkTasks as $task) {
+                $sheet->setCellValue("A{$row}", $developer['name']);
+                $sheet->setCellValue("B{$row}", $task['name']);
+                $sheet->setCellValue("C{$row}", $task['project']);
+                $sheet->setCellValue("D{$row}", 'Task');
+                $sheet->setCellValue("E{$row}", $task['rework_type']);
+                $sheet->setCellValue("F{$row}", $task['hours']);
+                $sheet->setCellValue("G{$row}", $developer['hour_value']);
+                $sheet->setCellValue("H{$row}", $task['payment']);
+                $sheet->setCellValue("I{$row}", $task['original_completion'] ? date('Y-m-d', strtotime($task['original_completion'])) : 'N/A');
+                $sheet->setCellValue("J{$row}", $task['rework_date'] ? date('Y-m-d', strtotime($task['rework_date'])) : 'N/A');
+                $sheet->setCellValue("K{$row}", 'Completed');
+                $sheet->setCellValue("L{$row}", $task['rework_reason']);
+
+                // Apply currency format
+                $sheet->getStyle("G{$row}")->getNumberFormat()->setFormatCode('$#,##0.00');
+                $sheet->getStyle("H{$row}")->getNumberFormat()->setFormatCode('$#,##0.00');
+
+                // Apply conditional formatting for rework type
+                if (strpos($task['rework_type'], 'QA') !== false) {
+                    $sheet->getStyle("E{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F8D7DA');
+                    $sheet->getStyle("E{$row}")->getFont()->setColor(new Color('721C24'));
+                } elseif (strpos($task['rework_type'], 'Team Leader') !== false) {
+                    $sheet->getStyle("E{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFF3CD');
+                    $sheet->getStyle("E{$row}")->getFont()->setColor(new Color('856404'));
+                }
+
+                $row++;
+            }
+            
+            // Process rework bugs
+            foreach ($reworkBugs as $bug) {
+                $sheet->setCellValue("A{$row}", $developer['name']);
+                $sheet->setCellValue("B{$row}", $bug['name']);
+                $sheet->setCellValue("C{$row}", $bug['project']);
+                $sheet->setCellValue("D{$row}", 'Bug');
+                $sheet->setCellValue("E{$row}", $bug['rework_type']);
+                $sheet->setCellValue("F{$row}", $bug['hours']);
+                $sheet->setCellValue("G{$row}", $developer['hour_value']);
+                $sheet->setCellValue("H{$row}", $bug['payment']);
+                $sheet->setCellValue("I{$row}", $bug['original_completion'] ? date('Y-m-d', strtotime($bug['original_completion'])) : 'N/A');
+                $sheet->setCellValue("J{$row}", $bug['rework_date'] ? date('Y-m-d', strtotime($bug['rework_date'])) : 'N/A');
+                $sheet->setCellValue("K{$row}", 'Completed');
+                $sheet->setCellValue("L{$row}", $bug['rework_reason']);
+
+                // Apply currency format
+                $sheet->getStyle("G{$row}")->getNumberFormat()->setFormatCode('$#,##0.00');
+                $sheet->getStyle("H{$row}")->getNumberFormat()->setFormatCode('$#,##0.00');
+
+                // Apply conditional formatting for rework type
+                if (strpos($bug['rework_type'], 'QA') !== false) {
+                    $sheet->getStyle("E{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F8D7DA');
+                    $sheet->getStyle("E{$row}")->getFont()->setColor(new Color('721C24'));
+                } elseif (strpos($bug['rework_type'], 'Team Leader') !== false) {
+                    $sheet->getStyle("E{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFF3CD');
+                    $sheet->getStyle("E{$row}")->getFont()->setColor(new Color('856404'));
+                }
+
+                $row++;
+            }
+        }
+
+        // Apply table format
+        $this->styleTable($sheet, "A3:L" . ($row - 1));
+
+        // Add filters
+        $sheet->setAutoFilter("A3:L3");
+    }
+
+    /**
      * Create statistics sheet
      */
     private function createStatisticsSheet($spreadsheet, $developers, $startDate, $endDate)
@@ -454,6 +591,9 @@ class ExcelExportService
         $totalTasks = collect($developers)->sum(function($dev) {
             return count($dev['tasks'] ?? []);
         });
+        $totalReworkItems = collect($developers)->sum(function($dev) {
+            return count($dev['rework_tasks'] ?? []) + count($dev['rework_bugs'] ?? []);
+        });
         $totalEstimatedHours = collect($developers)->sum(function($dev) {
             return collect($dev['tasks'] ?? [])->sum('estimated_hours');
         });
@@ -468,6 +608,7 @@ class ExcelExportService
         $stats = [
             ['Total Developers', $totalDevelopers],
             ['Total Completed Tasks', $totalTasks],
+            ['Total Rework Items', $totalReworkItems],
             ['Total Estimated Hours', $totalEstimatedHours],
             ['Total Actual Hours', $totalActualHours],
             ['Average Efficiency (%)', $averageEfficiency],
@@ -477,17 +618,17 @@ class ExcelExportService
         $sheet->fromArray($stats, null, 'A3');
         
         // Apply format
-        $sheet->getStyle("A3:A8")->getFont()->setBold(true);
-        $sheet->getStyle("B3:B8")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+        $sheet->getStyle("A3:A9")->getFont()->setBold(true);
+        $sheet->getStyle("B3:B9")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
         
         // Currency format for total paid
-        $sheet->getStyle("B8")->getNumberFormat()->setFormatCode('$#,##0.00');
+        $sheet->getStyle("B9")->getNumberFormat()->setFormatCode('$#,##0.00');
         
         // Percentage format for efficiency
-        $sheet->getStyle("B7")->getNumberFormat()->setFormatCode('0.0%');
+        $sheet->getStyle("B8")->getNumberFormat()->setFormatCode('0.0%');
 
         // Apply table format
-        $this->styleTable($sheet, "A3:B8");
+        $this->styleTable($sheet, "A3:B9");
 
         // Create developer efficiency chart
         $this->createEfficiencyChart($sheet, $developers);

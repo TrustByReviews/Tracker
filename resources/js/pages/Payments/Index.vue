@@ -36,6 +36,17 @@
                             >
                                 Generate Reports
                             </button>
+                            <button 
+                                @click="activeTab = 'rework'"
+                                :class="[
+                                    'py-4 px-1 border-b-2 font-medium text-sm',
+                                    activeTab === 'rework'
+                                        ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500'
+                                ]"
+                            >
+                                Rework Analysis
+                            </button>
                         </nav>
                     </div>
                 </div>
@@ -384,13 +395,13 @@
                                 <!-- Roleeeeeee Selection (when report type is role) -->
                                 <div v-if="reportType === 'role'">
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Select Roleeeeeee
+                                        Select Role
                                     </label>
                                     <select 
-                                        v-model="selectedRoleeeeeee" 
+                                        v-model="selectedRole" 
                                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                                     >
-                                        <option value="">All Roleeeeeees</option>
+                                        <option value="">All Roles</option>
                                         <option value="admin">Admin</option>
                                         <option value="team_leader">Team Leader</option>
                                         <option value="developer">Developer</option>
@@ -434,47 +445,90 @@
                                     </div>
                                 </div>
 
-                                <!-- Developer Selection -->
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Select Developers
-                                    </label>
-                                    <div class="flex gap-2 mb-2">
-                                        <button 
-                                            type="button" 
-                                            @click="selectAll"
-                                            class="px-3 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800"
-                                        >
-                                            Select All
-                                        </button>
-                                        <button 
-                                            type="button" 
-                                            @click="deselectAll"
-                                            class="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
-                                        >
-                                            Deselect All
-                                        </button>
-                                    </div>
-                                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-64 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg p-4 dark:bg-gray-700">
-                                        <label 
-                                            v-for="developer in developers" 
-                                            :key="developer.id"
-                                            class="flex items-center space-x-3 p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer"
-                                        >
-                                            <input 
-                                                type="checkbox" 
-                                                :value="developer.id" 
-                                                v-model="selectedDevelopers"
-                                                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
-                                            >
-                                            <div class="flex-1 min-w-0">
-                                                <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ developer.name }}</p>
-                                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ developer.email }}</p>
-                                                <p class="text-xs text-gray-500 dark:text-gray-400">${{ developer.hour_value }}/hr</p>
-                                            </div>
-                                        </label>
-                                    </div>
-                                </div>
+                                                                 <!-- Developer Selection -->
+                                 <div>
+                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                         Select Developers
+                                     </label>
+                                     
+                                     <!-- Show loading indicator when loading users -->
+                                     <div v-if="loadingUsers" class="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                                         <div class="flex items-center">
+                                             <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                             </svg>
+                                             <span class="text-blue-800 dark:text-blue-200">Loading users for selected project...</span>
+                                         </div>
+                                     </div>
+                                     
+                                     <!-- Show message when no users found -->
+                                     <div v-else-if="reportType === 'project' && selectedProject && projectUsers.length === 0" class="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+                                         <p class="text-yellow-800 dark:text-yellow-200">
+                                             No users found for the selected project. Please select a different project or role.
+                                         </p>
+                                     </div>
+                                     
+                                     <div class="flex gap-2 mb-2">
+                                         <button 
+                                             type="button" 
+                                             @click="selectAll"
+                                             class="px-3 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800"
+                                         >
+                                             Select All
+                                         </button>
+                                         <button 
+                                             type="button" 
+                                             @click="deselectAll"
+                                             class="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+                                         >
+                                             Deselect All
+                                         </button>
+                                     </div>
+                                     
+                                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-64 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg p-4 dark:bg-gray-700">
+                                         <!-- Show project users when project is selected -->
+                                         <label 
+                                             v-if="reportType === 'project' && selectedProject"
+                                             v-for="developer in projectUsers" 
+                                             :key="`project-${developer.id}`"
+                                             class="flex items-center space-x-3 p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer"
+                                         >
+                                             <input 
+                                                 type="checkbox" 
+                                                 :value="developer.id" 
+                                                 v-model="selectedDevelopers"
+                                                 class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
+                                             >
+                                             <div class="flex-1 min-w-0">
+                                                 <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ developer.name }}</p>
+                                                 <p class="text-xs text-gray-500 dark:text-gray-400">{{ developer.email }}</p>
+                                                 <p class="text-xs text-gray-500 dark:text-gray-400">${{ developer.hour_value }}/hr</p>
+                                                 <p class="text-xs text-gray-500 dark:text-gray-400">{{ developer.roles.join(', ') }}</p>
+                                             </div>
+                                         </label>
+                                         
+                                         <!-- Show all developers when no project is selected -->
+                                         <label 
+                                             v-else
+                                             v-for="developer in developers" 
+                                             :key="`all-${developer.id}`"
+                                             class="flex items-center space-x-3 p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer"
+                                         >
+                                             <input 
+                                                 type="checkbox" 
+                                                 :value="developer.id" 
+                                                 v-model="selectedDevelopers"
+                                                 class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
+                                             >
+                                             <div class="flex-1 min-w-0">
+                                                 <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ developer.name }}</p>
+                                                 <p class="text-xs text-gray-500 dark:text-gray-400">{{ developer.email }}</p>
+                                                 <p class="text-xs text-gray-500 dark:text-gray-400">${{ developer.hour_value }}/hr</p>
+                                             </div>
+                                         </label>
+                                     </div>
+                                 </div>
 
                                 <!-- Date Range Selection -->
                                 <div>
@@ -838,6 +892,155 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Tab Rework Analysis -->
+            <div v-if="activeTab === 'rework'">
+                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
+                    <div class="p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Rework Analysis</h3>
+                        
+                        <!-- Project Selection -->
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Select Project
+                            </label>
+                            <select 
+                                v-model="selectedProject" 
+                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                            >
+                                <option value="">Select a project</option>
+                                <option v-for="project in projects" :key="project.id" :value="project.id">
+                                    {{ project.name }}
+                                </option>
+                            </select>
+                        </div>
+
+                        <!-- Date Range -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Start Date
+                                </label>
+                                <input 
+                                    v-model="startDate" 
+                                    type="date" 
+                                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                >
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    End Date
+                                </label>
+                                <input 
+                                    v-model="endDate" 
+                                    type="date" 
+                                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                >
+                            </div>
+                        </div>
+
+                        <!-- Load Button -->
+                        <div class="mb-6">
+                            <button 
+                                @click="loadReworkData"
+                                :disabled="!selectedProject || loadingRework"
+                                class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <span v-if="loadingRework">Loading...</span>
+                                <span v-else>Load Rework Data</span>
+                            </button>
+                        </div>
+
+                        <!-- Rework Statistics -->
+                        <div v-if="reworkStats" class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                            <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                                <h4 class="text-sm font-medium text-blue-600 dark:text-blue-400">Total Rework Tasks</h4>
+                                <p class="text-2xl font-bold text-blue-900 dark:text-blue-100">{{ reworkStats.total_tasks || 0 }}</p>
+                            </div>
+                            <div class="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
+                                <h4 class="text-sm font-medium text-red-600 dark:text-red-400">Total Rework Bugs</h4>
+                                <p class="text-2xl font-bold text-red-900 dark:text-red-100">{{ reworkStats.total_bugs || 0 }}</p>
+                            </div>
+                            <div class="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
+                                <h4 class="text-sm font-medium text-yellow-600 dark:text-yellow-400">Total Rework Hours</h4>
+                                <p class="text-2xl font-bold text-yellow-900 dark:text-yellow-100">{{ formatNumber(reworkStats.total_hours || 0) }}</p>
+                            </div>
+                            <div class="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                                <h4 class="text-sm font-medium text-green-600 dark:text-green-400">Total Rework Cost</h4>
+                                <p class="text-2xl font-bold text-green-900 dark:text-green-100">${{ formatNumber(reworkStats.total_cost || 0) }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Rework Items Table -->
+                        <div v-if="reworkItems.length > 0" class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+                            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-600">
+                                <h4 class="text-lg font-medium text-gray-900 dark:text-white">Rework Items</h4>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                    <thead class="bg-gray-50 dark:bg-gray-700">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                                Developer
+                                            </th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                                Item Name
+                                            </th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                                Type
+                                            </th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                                Rework Type
+                                            </th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                                Hours
+                                            </th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                                Cost
+                                            </th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                                Reason
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                        <tr v-for="item in reworkItems" :key="item.id">
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                                {{ item.developer_name }}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                                {{ item.name }}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                                {{ item.type }}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                                {{ item.rework_type }}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                                {{ formatNumber(item.hours) }}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600 dark:text-green-400">
+                                                ${{ formatNumber(item.cost) }}
+                                            </td>
+                                            <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                                                <div class="max-w-xs truncate" :title="item.rework_reason">
+                                                    {{ item.rework_reason }}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- No Data Message -->
+                        <div v-else-if="!loadingRework && selectedProject" class="text-center py-8">
+                            <p class="text-gray-500 dark:text-gray-400">No rework data found for the selected project and date range.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </AppLayout>
 </template>
@@ -845,7 +1048,7 @@
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 
 const props = defineProps({
     statistics: Object,
@@ -876,7 +1079,7 @@ const email = ref('');
 // Nuevas variables para tipos de reporte
 const reportType = ref('developers');
 const selectedProject = ref('');
-const selectedRoleeeeeeeeeeeeee = ref('');
+const selectedRole = ref('');
 const selectedMonth = ref('');
 const selectedWeek = ref('');
 
@@ -889,6 +1092,15 @@ const loadingReport = ref(false);
 const projects = ref([]);
 const availableMonths = ref([]);
 const availableWeeks = ref([]);
+
+// Variables para usuarios filtrados por proyecto
+const projectUsers = ref([]);
+const loadingUsers = ref(false);
+
+// Variables para análisis de rework
+const reworkStats = ref(null);
+const reworkItems = ref([]);
+const loadingRework = ref(false);
 
 const isFormValid = computed(() => {
     return selectedDevelopers.value.length > 0 && 
@@ -968,18 +1180,129 @@ const getWeekDates = () => {
 // Function to load projects
 const loadProjects = async () => {
     try {
-        const response = await fetch('/api/projects');
+        console.log('Loading projects...');
+        const response = await fetch('/api/projects', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'Accept': 'application/json',
+            },
+        });
+        
+        console.log('Response status:', response.status);
+        
         if (response.ok) {
             const data = await response.json();
+            console.log('Projects data:', data);
             projects.value = data.projects || [];
+            console.log('Projects loaded:', projects.value.length);
+        } else {
+            console.error('Error response:', response.status, response.statusText);
+            const errorText = await response.text();
+            console.error('Error details:', errorText);
         }
     } catch (error) {
         console.error('Error loading projects:', error);
     }
 };
 
+// Function to load rework data
+const loadReworkData = async () => {
+    if (!selectedProject.value) {
+        reworkItems.value = [];
+        reworkStats.value = null;
+        return;
+    }
+
+    try {
+        loadingRework.value = true;
+        
+        const params = new URLSearchParams({
+            project_id: selectedProject.value,
+            start_date: startDate.value || new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            end_date: endDate.value || new Date().toISOString().split('T')[0]
+        });
+        
+        const response = await fetch(`/api/payments/rework?${params}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'Accept': 'application/json',
+            },
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            reworkStats.value = data.stats;
+            reworkItems.value = data.items || [];
+        } else {
+            console.error('Error loading rework data:', response.status);
+            reworkItems.value = [];
+            reworkStats.value = null;
+        }
+    } catch (error) {
+        console.error('Error loading rework data:', error);
+        reworkItems.value = [];
+        reworkStats.value = null;
+    } finally {
+        loadingRework.value = false;
+    }
+};
+
+// Function to load users by project
+const loadUsersByProject = async (projectId, role = null) => {
+    if (!projectId) {
+        projectUsers.value = [];
+        return;
+    }
+
+    try {
+        loadingUsers.value = true;
+        console.log('Loading users for project:', projectId, 'role:', role);
+        
+        const params = new URLSearchParams({ project_id: projectId });
+        if (role) {
+            params.append('role', role);
+        }
+        
+        const response = await fetch(`/api/projects/users?${params}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'Accept': 'application/json',
+            },
+        });
+        
+        console.log('Users response status:', response.status);
+        
+        if (response.ok) {
+            const data = await response.json();
+            console.log('Users data:', data);
+            projectUsers.value = data.users || [];
+            console.log('Users loaded:', projectUsers.value.length);
+        } else {
+            console.error('Error response:', response.status, response.statusText);
+            const errorText = await response.text();
+            console.error('Error details:', errorText);
+            projectUsers.value = [];
+        }
+    } catch (error) {
+        console.error('Error loading users:', error);
+        projectUsers.value = [];
+    } finally {
+        loadingUsers.value = false;
+    }
+};
+
 const selectAll = () => {
-    selectedDevelopers.value = props.developers.map(d => d.id);
+    if (reportType.value === 'project' && selectedProject.value) {
+        selectedDevelopers.value = projectUsers.value.map(d => d.id);
+    } else {
+        selectedDevelopers.value = props.developers.map(d => d.id);
+    }
 };
 
 const deselectAll = () => {
@@ -1062,7 +1385,7 @@ const generateReport = () => {
         end_date: reportEndDate,
         report_type: reportType.value,
         project_id: selectedProject.value || null,
-        role: selectedRoleeeeeeeeeeeeee.value || null,
+        role: selectedRole.value || null,
         month: selectedMonth.value || null,
         week: selectedWeek.value || null
     };
@@ -1107,7 +1430,7 @@ const generateReport = () => {
             email.value = '';
             reportType.value = 'developers';
             selectedProject.value = '';
-            selectedRoleeeeeeeeeeeeee.value = '';
+            selectedRole.value = '';
             selectedMonth.value = '';
             selectedWeek.value = '';
         })
@@ -1164,7 +1487,7 @@ const generateReport = () => {
             email.value = '';
             reportType.value = 'developers';
             selectedProject.value = '';
-            selectedRoleeeeeeeeeeeeee.value = '';
+            selectedRole.value = '';
             selectedMonth.value = '';
             selectedWeek.value = '';
         })
@@ -1273,9 +1596,54 @@ const markAsPaid = (reportId) => {
     router.post(route('payments.reports.mark-paid', reportId));
 };
 
+// Watch for report type changes to load projects when needed
+watch(reportType, (newType) => {
+    if (newType === 'project') {
+        loadProjects();
+    } else {
+        // Clear project users when switching away from project type
+        projectUsers.value = [];
+        selectedDevelopers.value = [];
+    }
+});
+
+// Watch for project selection changes
+watch(selectedProject, (newProjectId) => {
+    if (newProjectId && reportType.value === 'project') {
+        loadUsersByProject(newProjectId, selectedRole.value);
+    } else {
+        projectUsers.value = [];
+        selectedDevelopers.value = [];
+    }
+});
+
+// Watch for role selection changes
+watch(selectedRole, (newRole) => {
+    if (selectedProject.value && reportType.value === 'project') {
+        loadUsersByProject(selectedProject.value, newRole);
+    }
+});
+
+// Watch for active tab changes to load rework data
+watch(activeTab, (newTab) => {
+    if (newTab === 'rework' && selectedProject.value) {
+        loadReworkData();
+    }
+});
+
+// Watch for project selection in rework tab
+watch(selectedProject, (newProjectId) => {
+    if (activeTab.value === 'rework' && newProjectId) {
+        loadReworkData();
+    }
+});
+
 // Initialize options when component mounts
 onMounted(() => {
     initializeDateOptions();
-    loadProjects();
+    // Load projects immediately if report type is already set to project
+    if (reportType.value === 'project') {
+        loadProjects();
+    }
 });
 </script> 

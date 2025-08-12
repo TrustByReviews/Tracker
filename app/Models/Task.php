@@ -72,6 +72,15 @@ class Task extends Model
         'qa_testing_started_at',
         'qa_testing_paused_at',
         'qa_testing_finished_at',
+        // Re-work tracking fields
+        'original_time_seconds',
+        'retwork_time_seconds',
+        'original_work_finished_at',
+        'retwork_started_at',
+        'has_been_returned',
+        'return_count',
+        'last_returned_by',
+        'last_returned_at',
     ];
 
     protected $casts = [
@@ -131,6 +140,15 @@ class Task extends Model
         'qa_testing_started_at' => 'datetime',
         'qa_testing_paused_at' => 'datetime',
         'qa_testing_finished_at' => 'datetime',
+        // Re-work tracking casts
+        'original_time_seconds' => 'integer',
+        'retwork_time_seconds' => 'integer',
+        'original_work_finished_at' => 'datetime',
+        'retwork_started_at' => 'datetime',
+        'has_been_returned' => 'boolean',
+        'return_count' => 'integer',
+        'last_returned_by' => 'string',
+        'last_returned_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

@@ -4,6 +4,7 @@ import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
 import { Head, router } from '@inertiajs/vue3'
 import ProjectCreateModal from '@/components/CreateProjectModal.vue'
+import EditProjectModal from '@/components/EditProjectModal.vue'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -48,7 +49,26 @@ const filters = ref({
 
 // Funciones de filtrado
 const applyFilters = () => {
-    router.get('/projects', filters.value, {
+    // Limpiar filtros vacíos antes de enviar
+    const cleanFilters = Object.fromEntries(
+        Object.entries(filters.value).filter(([_, value]) => {
+            if (typeof value === 'string') {
+                return value.trim() !== ''
+            }
+            return value !== null && value !== undefined
+        })
+    )
+    
+    // Solo incluir filtros que no sean los valores por defecto
+    const finalFilters: any = {}
+    
+    if (cleanFilters.status) finalFilters.status = cleanFilters.status
+    if (cleanFilters.assigned_user_id) finalFilters.assigned_user_id = cleanFilters.assigned_user_id
+    if (cleanFilters.search) finalFilters.search = cleanFilters.search
+    if (cleanFilters.sort_by && cleanFilters.sort_by !== 'created_at') finalFilters.sort_by = cleanFilters.sort_by
+    if (cleanFilters.sort_order && cleanFilters.sort_order !== 'desc') finalFilters.sort_order = cleanFilters.sort_order
+    
+    router.get('/projects', finalFilters, {
         preserveState: true,
         preserveScroll: true,
         replace: true
@@ -56,6 +76,17 @@ const applyFilters = () => {
 }
 
 const clearFilters = () => {
+    filters.value = {
+        status: '',
+        assigned_user_id: '',
+        sort_by: 'created_at',
+        sort_order: 'desc',
+        search: ''
+    }
+    applyFilters()
+}
+
+const resetAllFilters = () => {
     filters.value = {
         status: '',
         assigned_user_id: '',
@@ -104,6 +135,26 @@ const getStatusIcon = (status: string) => {
   }
 }
 
+const getPriorityClass = (priority: string) => {
+  switch (priority) {
+    case 'high':
+      return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
+    case 'medium':
+      return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
+    case 'low':
+      return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+    default:
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
+  }
+}
+
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amount)
+}
+
 const getProjectProgress = (project: Project) => {
   if (!project.sprints || project.sprints.length === 0) return 0
   
@@ -116,6 +167,20 @@ const getProjectProgress = (project: Project) => {
   }, 0)
   
   return totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+}
+
+// Edit project modal state
+const editModalOpen = ref(false)
+const selectedProject = ref<Project | null>(null)
+
+const openEditModal = (project: Project) => {
+  selectedProject.value = project
+  editModalOpen.value = true
+}
+
+const closeEditModal = () => {
+  editModalOpen.value = false
+  selectedProject.value = null
 }
 
 const getProjectStats = (project: Project) => {
@@ -204,15 +269,27 @@ const getBorderColor = (project: Project) => {
       <div class="p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-medium text-gray-900 dark:text-white">Advanced Filters</h3>
-          <Button 
-            v-if="hasActiveFilters" 
-            @click="clearFilters" 
-            variant="outline" 
-            size="sm"
-          >
-            <Icon name="x" class="h-4 w-4 mr-2" />
-            Clear Filters
-          </Button>
+          <div class="flex items-center gap-2">
+            <Button 
+              v-if="hasActiveFilters" 
+              @click="resetAllFilters" 
+              variant="outline" 
+              size="sm"
+              class="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 hover:text-red-700"
+            >
+              <Icon name="refresh-cw" class="h-4 w-4 mr-2" />
+              Reset All Filters
+            </Button>
+            <Button 
+              v-if="hasActiveFilters" 
+              @click="clearFilters" 
+              variant="outline" 
+              size="sm"
+            >
+              <Icon name="x" class="h-4 w-4 mr-2" />
+              Clear Filters
+            </Button>
+          </div>
         </div>
         
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -404,6 +481,60 @@ const getBorderColor = (project: Project) => {
                 </div>
               </div>
 
+              <!-- Advanced Project Info -->
+              <div class="space-y-2">
+                <!-- Priority and Category -->
+                <div class="flex items-center justify-between text-xs">
+                  <div class="flex items-center gap-2">
+                    <Badge 
+                      :class="getPriorityClass(project.priority)" 
+                      class="text-xs px-2 py-1"
+                    >
+                      {{ project.priority }}
+                    </Badge>
+                    <Badge 
+                      class="bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400 text-xs px-2 py-1"
+                    >
+                      {{ project.category }}
+                    </Badge>
+                  </div>
+                  <div class="text-muted-foreground">
+                    {{ project.methodology }}
+                  </div>
+                </div>
+
+                <!-- Technology Stack Preview -->
+                <div v-if="project.technologies && project.technologies.length" class="flex flex-wrap gap-1">
+                  <span 
+                    v-for="tech in project.technologies.slice(0, 3)" 
+                    :key="tech"
+                    class="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded"
+                  >
+                    {{ tech }}
+                  </span>
+                  <span 
+                    v-if="project.technologies.length > 3" 
+                    class="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded"
+                  >
+                    +{{ project.technologies.length - 3 }}
+                  </span>
+                </div>
+
+                <!-- Budget Info -->
+                <div v-if="project.estimated_budget" class="flex items-center justify-between text-xs">
+                  <span class="text-muted-foreground">Budget:</span>
+                  <span class="font-medium">
+                    ${{ formatCurrency(project.used_budget || 0) }} / ${{ formatCurrency(project.estimated_budget) }}
+                  </span>
+                </div>
+
+                <!-- Current Sprint -->
+                <div v-if="project.current_sprint" class="flex items-center justify-between text-xs">
+                  <span class="text-muted-foreground">Current Sprint:</span>
+                  <span class="font-medium">{{ project.current_sprint }}</span>
+                </div>
+              </div>
+
               <!-- Team Members -->
               <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-2">
@@ -431,9 +562,9 @@ const getBorderColor = (project: Project) => {
                   </Button>
                   <Button 
                     v-if="props.permissions === 'admin'"
-                    variant="outline" 
+                    class="bg-green-500 text-white hover:bg-green-600 border-green-500"
                     size="sm"
-                    @click="router.get(`/projects/${project.id}/edit`)"
+                    @click="openEditModal(project)"
                   >
                     Edit
                   </Button>
@@ -473,5 +604,11 @@ const getBorderColor = (project: Project) => {
         </template>
       </div>
     </div>
+
+    <!-- Edit Project Modal -->
+    <EditProjectModal 
+      v-model:open="editModalOpen"
+      :project="selectedProject"
+    />
   </AppLayout>
 </template>

@@ -33,6 +33,21 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        // Evitar redirigir a endpoints API como URL pretendida tras el login
+        $intended = $request->session()->pull('url.intended');
+        if ($intended) {
+            $path = parse_url($intended, PHP_URL_PATH) ?? '';
+            if (function_exists('str_starts_with') ? str_starts_with($path, '/api/') : substr($path, 0, 5) === '/api/') {
+                return redirect()->route('dashboard');
+            }
+            // Si la intended es la página de login u otra no deseada, también forzar dashboard
+            if ($path === '/login') {
+                return redirect()->route('dashboard');
+            }
+            // Restaurar intended para que redirect()->intended funcione si no es API
+            $request->session()->put('url.intended', $intended);
+        }
+
         return redirect()->intended(route('dashboard', absolute: false));
     }
 

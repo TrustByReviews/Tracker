@@ -69,7 +69,7 @@ const submit = () => {
 
 <template>
   <div>
-    <Button @click="open = true" variant="outline" size="sm">
+    <Button @click="open = true" class="bg-green-500 text-white hover:bg-green-600 border-green-500" size="sm">
       <Icon name="edit" class="h-4 w-4 mr-2" />
       Update Sprint
     </Button>

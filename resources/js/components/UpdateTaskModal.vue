@@ -178,7 +178,7 @@ const openModal = () => {
 
 <template>
     <div @keydown="handleKeydown">
-        <Button @click="openModal" class="border-blue-500 text-white bg-blue-500 hover:bg-blue-600 transition-colors">
+        <Button @click="openModal" class="border-green-500 text-white bg-green-500 hover:bg-green-600 transition-colors">
             Edit Task
         </Button>
         

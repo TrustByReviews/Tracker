@@ -18,15 +18,97 @@ class Project extends Model
     protected $fillable = [
         'name',
         'description',
+        'objectives',
+        'priority',
+        'category',
+        'development_type',
+        'planned_start_date',
+        'planned_end_date',
+        'actual_start_date',
+        'actual_end_date',
+        'methodology',
+        'technologies',
+        'programming_languages',
+        'frameworks',
+        'database_type',
+        'architecture',
+        'external_integrations',
+        'project_owner',
+        'product_owner',
+        'stakeholders',
+        'milestones',
+        'estimated_velocity',
+        'current_sprint',
+        'estimated_budget',
+        'used_budget',
+        'assigned_resources',
+        'progress_percentage',
+        'identified_risks',
+        'open_issues',
+        'documentation_url',
+        'repository_url',
+        'task_board_url',
         'status',
         'created_by',
+        // Campos de finalización
+        'achievements',
+        'difficulties',
+        'lessons_learned',
+        'final_documentation',
+        'termination_reason',
+        'custom_reason',
+        'final_attachments',
+        'is_finished',
+        'finished_at',
+        'finished_by',
     ];
 
     protected $casts = [
         'name' => 'string',
         'description' => 'string',
+        'objectives' => 'string',
+        'priority' => 'string',
+        'category' => 'string',
+        'development_type' => 'string',
+        'planned_start_date' => 'date',
+        'planned_end_date' => 'date',
+        'actual_start_date' => 'date',
+        'actual_end_date' => 'date',
+        'methodology' => 'string',
+        'technologies' => 'array',
+        'programming_languages' => 'array',
+        'frameworks' => 'array',
+        'database_type' => 'string',
+        'architecture' => 'string',
+        'external_integrations' => 'array',
+        'project_owner' => 'string',
+        'product_owner' => 'string',
+        'stakeholders' => 'array',
+        'milestones' => 'array',
+        'estimated_velocity' => 'integer',
+        'current_sprint' => 'string',
+        'estimated_budget' => 'decimal:2',
+        'used_budget' => 'decimal:2',
+        'assigned_resources' => 'array',
+        'progress_percentage' => 'decimal:2',
+        'identified_risks' => 'array',
+        'open_issues' => 'integer',
+        'documentation_url' => 'string',
+        'repository_url' => 'string',
+        'task_board_url' => 'string',
         'status' => 'string',
         'created_by' => 'string',
+        // Campos de finalización
+        'achievements' => 'string',
+        'difficulties' => 'string',
+        'lessons_learned' => 'string',
+        'final_documentation' => 'string',
+        'termination_reason' => 'string',
+        'custom_reason' => 'string',
+        'final_attachments' => 'array',
+        'is_finished' => 'boolean',
+        'finished_at' => 'datetime',
+        'finished_by' => 'string',
     ];
 
 
@@ -39,6 +121,11 @@ class Project extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function finishedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'finished_by');
     }
 
     public function sprints(): HasMany

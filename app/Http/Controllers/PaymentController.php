@@ -14,26 +14,60 @@ use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
+/**
+ * Payment Controller Class
+ * 
+ * This controller handles all payment-related operations including report generation,
+ * payment management, and export functionality. It provides endpoints for both
+ * regular users and administrators to manage payment reports.
+ * 
+ * Features:
+ * - Payment dashboard for users and administrators
+ * - Report generation with various filters
+ * - Excel and PDF export functionality
+ * - Email notifications for payment reports
+ * - Payment approval and status management
+ * - Project and user-type specific reports
+ * 
+ * @package App\Http\Controllers
+ * @author System
+ * @version 1.0
+ */
 class PaymentController extends Controller
 {
+    /**
+     * Payment service instance
+     * 
+     * @var PaymentService
+     */
     protected $paymentService;
 
+    /**
+     * Constructor
+     * 
+     * @param PaymentService $paymentService Service for payment operations
+     */
     public function __construct(PaymentService $paymentService)
     {
         $this->paymentService = $paymentService;
     }
 
     /**
-     * Dashboard de pagos para usuarios normales (próximo pago)
+     * Payment dashboard for regular users
+     * 
+     * Displays the next payment information, user statistics, and payment history
+     * for the authenticated user.
+     * 
+     * @return \Inertia\Response
      */
     public function dashboard()
     {
         $user = Auth::user();
         
-        // Obtener el próximo pago (semana anterior)
+        // Get next payment (previous week)
         $nextPayment = $this->paymentService->getNextPaymentForUser($user);
         
-        // Obtener estadísticas del usuario
+        // Get user statistics
         $userStats = [
             'total_earned' => $user->paymentReports()->sum('total_payment'),
             'total_hours' => $user->paymentReports()->sum('total_hours'),
@@ -41,7 +75,7 @@ class PaymentController extends Controller
             'hourly_rate' => $user->hour_value,
         ];
 
-        // Obtener historial de pagos (últimos 5)
+        // Get payment history (last 5)
         $paymentHistory = $user->paymentReports()
             ->orderBy('week_start_date', 'desc')
             ->limit(5)
@@ -55,7 +89,13 @@ class PaymentController extends Controller
     }
 
     /**
-     * Dashboard unificado de pagos (para usuarios normales y admins)
+     * Unified payment dashboard for administrators
+     * 
+     * Provides comprehensive payment statistics, recent reports, and pending
+     * reports for administrative oversight.
+     * 
+     * @param Request $request The HTTP request
+     * @return \Inertia\Response
      */
     public function adminDashboard(Request $request)
     {
@@ -64,22 +104,22 @@ class PaymentController extends Controller
         $startDate = $request->get('start_date', Carbon::now()->subDays(30)->format('Y-m-d'));
         $endDate = $request->get('end_date', Carbon::now()->format('Y-m-d'));
 
-        // Obtener estadísticas generales
+        // Get general statistics
         $statistics = $this->paymentService->getPaymentStatistics($startDate, $endDate);
 
-        // Obtener reportes recientes
+        // Get recent reports
         $recentReports = PaymentReport::with('user')
             ->orderBy('created_at', 'desc')
             ->limit(10)
             ->get();
 
-        // Obtener reportes pendientes
+        // Get pending reports
         $pendingReports = PaymentReport::with('user')
             ->where('status', 'pending')
             ->orderBy('created_at', 'desc')
             ->get();
 
-        // Obtener datos para reportes de pago (incluyendo QAs)
+        // Get payment report data (including QAs)
         $developers = User::with(['tasks', 'projects'])
             ->whereHas('roles', function ($query) {
                 $query->whereIn('name', ['developer', 'qa']);
@@ -91,12 +131,12 @@ class PaymentController extends Controller
                     return ($task->actual_hours ?? 0) * $developer->hour_value;
                 });
 
-                // Calcular ganancias de QA
+                // Calculate QA earnings
                 $qaTaskEarnings = 0;
                 $qaBugEarnings = 0;
                 
                 if ($developer->roles->contains('name', 'qa')) {
-                    // Tareas testeadas por QA
+                    // Tasks tested by QA
                     $qaTestingTasks = \App\Models\Task::where('qa_assigned_to', $developer->id)
                         ->whereIn('qa_status', ['testing_finished', 'approved', 'rejected'])
                         ->whereNotNull('qa_testing_finished_at')
@@ -107,7 +147,7 @@ class PaymentController extends Controller
                         return $testingHours * $developer->hour_value;
                     });
 
-                    // Bugs testeados por QA
+                    // Bugs tested by QA
                     $qaTestingBugs = \App\Models\Bug::where('qa_assigned_to', $developer->id)
                         ->whereIn('qa_status', ['testing_finished', 'approved', 'rejected'])
                         ->whereNotNull('qa_testing_finished_at')
@@ -251,15 +291,26 @@ class PaymentController extends Controller
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'format' => 'required|in:pdf,email,excel,view',
+            'project_id' => 'nullable|exists:projects,id',
+            'report_type' => 'nullable|in:developers,project,role,week',
         ]);
 
         // Usar PaymentService para obtener datos completos incluyendo QA
         $startDate = $request->start_date ? Carbon::parse($request->start_date) : Carbon::now()->startOfMonth();
         $endDate = $request->end_date ? Carbon::parse($request->end_date) : Carbon::now()->endOfMonth();
 
-        $developers = User::whereIn('id', $request->developer_ids)->get()->map(function ($developer) use ($startDate, $endDate) {
+        // Filtrar desarrolladores por proyecto si se especifica
+        $developerQuery = User::whereIn('id', $request->developer_ids);
+        
+        if ($request->project_id) {
+            $developerQuery->whereHas('projects', function ($query) use ($request) {
+                $query->where('projects.id', $request->project_id);
+            });
+        }
+
+        $developers = $developerQuery->get()->map(function ($developer) use ($startDate, $endDate, $request) {
             // Usar PaymentService para obtener datos completos
-            $report = $this->paymentService->generateReportForDateRange($developer, $startDate, $endDate);
+            $report = $this->paymentService->generateReportForDateRange($developer, $startDate, $endDate, $request->project_id);
             
             // Obtener todas las tareas y bugs (completados, en progreso y QA)
             $allTasks = collect();
@@ -344,6 +395,38 @@ class PaymentController extends Controller
                         'earnings' => $bug['payment'],
                         'completed_at' => $bug['testing_finished_at'],
                         'type' => 'QA Bug Testing',
+                    ];
+                }));
+            }
+            
+            // Rework Tasks
+            if (isset($report->task_details['rework']['tasks'])) {
+                $allTasks = $allTasks->merge(collect($report->task_details['rework']['tasks'])->map(function ($task) {
+                    return [
+                        'name' => $task['name'] . ' (Rework)',
+                        'project' => $task['project'],
+                        'hours' => $task['hours'],
+                        'earnings' => $task['payment'],
+                        'completed_at' => $task['rework_date'],
+                        'type' => 'Rework Task - ' . $task['rework_type'],
+                        'rework_reason' => $task['rework_reason'],
+                        'original_completion' => $task['original_completion'],
+                    ];
+                }));
+            }
+            
+            // Rework Bugs
+            if (isset($report->task_details['rework']['bugs'])) {
+                $allTasks = $allTasks->merge(collect($report->task_details['rework']['bugs'])->map(function ($bug) {
+                    return [
+                        'name' => $bug['name'] . ' (Rework)',
+                        'project' => $bug['project'],
+                        'hours' => $bug['hours'],
+                        'earnings' => $bug['payment'],
+                        'completed_at' => $bug['rework_date'],
+                        'type' => 'Rework Bug - ' . $bug['rework_type'],
+                        'rework_reason' => $bug['rework_reason'],
+                        'original_completion' => $bug['original_completion'],
                     ];
                 }));
             }
@@ -898,6 +981,87 @@ class PaymentController extends Controller
 
 
     /**
+     * Get rework data for a specific project
+     */
+    public function getReworkData(Request $request)
+    {
+        $this->authorize('generatePaymentReports');
+
+        $request->validate([
+            'project_id' => 'required|exists:projects,id',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+        ]);
+
+        $startDate = $request->start_date ? Carbon::parse($request->start_date) : Carbon::now()->subMonths(6)->startOfDay();
+        $endDate = $request->end_date ? Carbon::parse($request->end_date) : Carbon::now()->endOfDay();
+
+        $project = Project::findOrFail($request->project_id);
+        $projectUsers = $project->users;
+
+        $reworkItems = [];
+        $totalTasks = 0;
+        $totalBugs = 0;
+        $totalHours = 0;
+        $totalCost = 0;
+
+        foreach ($projectUsers as $user) {
+            $report = $this->paymentService->generateReportForDateRange($user, $startDate, $endDate, $project->id);
+            
+            // Get rework tasks
+            if (isset($report->task_details['rework']['tasks'])) {
+                foreach ($report->task_details['rework']['tasks'] as $task) {
+                    $reworkItems[] = [
+                        'id' => $task['id'],
+                        'developer_name' => $user->name,
+                        'name' => $task['name'],
+                        'type' => 'Task',
+                        'rework_type' => $task['rework_type'],
+                        'hours' => $task['hours'],
+                        'cost' => $task['payment'],
+                        'rework_reason' => $task['rework_reason'],
+                    ];
+                    $totalTasks++;
+                    $totalHours += $task['hours'];
+                    $totalCost += $task['payment'];
+                }
+            }
+
+            // Get rework bugs
+            if (isset($report->task_details['rework']['bugs'])) {
+                foreach ($report->task_details['rework']['bugs'] as $bug) {
+                    $reworkItems[] = [
+                        'id' => $bug['id'],
+                        'developer_name' => $user->name,
+                        'name' => $bug['name'],
+                        'type' => 'Bug',
+                        'rework_type' => $bug['rework_type'],
+                        'hours' => $bug['hours'],
+                        'cost' => $bug['payment'],
+                        'rework_reason' => $bug['rework_reason'],
+                    ];
+                    $totalBugs++;
+                    $totalHours += $bug['hours'];
+                    $totalCost += $bug['payment'];
+                }
+            }
+        }
+
+        $stats = [
+            'total_tasks' => $totalTasks,
+            'total_bugs' => $totalBugs,
+            'total_hours' => $totalHours,
+            'total_cost' => $totalCost,
+        ];
+
+        return response()->json([
+            'success' => true,
+            'stats' => $stats,
+            'items' => $reworkItems,
+        ]);
+    }
+
+    /**
      * Generar Excel para reporte detallado
      */
     private function generateExcel($data)
@@ -912,6 +1076,8 @@ class PaymentController extends Controller
         
         foreach ($data['developers'] as $developer) {
             $tasksForExcel = [];
+            $reworkTasksForExcel = [];
+            $reworkBugsForExcel = [];
             
             // Procesar tareas y bugs para el formato esperado por ExcelExportService
             foreach ($developer['tasks'] as $task) {
@@ -925,7 +1091,34 @@ class PaymentController extends Controller
                     'type' => $task['type'] ?? 'Task'
                 ];
                 
-                $tasksForExcel[] = $taskData;
+                // Separar rework de tareas normales
+                if (strpos($task['type'], 'Rework') !== false) {
+                    if (strpos($task['type'], 'Task') !== false) {
+                        $reworkTasksForExcel[] = [
+                            'name' => $task['name'],
+                            'project' => $task['project'],
+                            'hours' => $task['hours'],
+                            'payment' => $task['earnings'],
+                            'rework_type' => str_replace('Rework Task - ', '', $task['type']),
+                            'rework_reason' => $task['rework_reason'] ?? 'No especificado',
+                            'rework_date' => $task['completed_at'],
+                            'original_completion' => $task['original_completion'] ?? null,
+                        ];
+                    } else {
+                        $reworkBugsForExcel[] = [
+                            'name' => $task['name'],
+                            'project' => $task['project'],
+                            'hours' => $task['hours'],
+                            'payment' => $task['earnings'],
+                            'rework_type' => str_replace('Rework Bug - ', '', $task['type']),
+                            'rework_reason' => $task['rework_reason'] ?? 'No especificado',
+                            'rework_date' => $task['completed_at'],
+                            'original_completion' => $task['original_completion'] ?? null,
+                        ];
+                    }
+                } else {
+                    $tasksForExcel[] = $taskData;
+                }
             }
             
             $developersForExcel[] = [
@@ -934,7 +1127,9 @@ class PaymentController extends Controller
                 'role' => $developer['role'] ?? 'Developer',
                 'hour_value' => $developer['hour_value'],
                 'total_earnings' => $developer['total_earnings'],
-                'tasks' => $tasksForExcel
+                'tasks' => $tasksForExcel,
+                'rework_tasks' => $reworkTasksForExcel,
+                'rework_bugs' => $reworkBugsForExcel,
             ];
         }
         
@@ -1050,9 +1245,9 @@ class PaymentController extends Controller
         $startDate = $request->start_date ? Carbon::parse($request->start_date) : Carbon::now()->startOfMonth();
         $endDate = $request->end_date ? Carbon::parse($request->end_date) : Carbon::now()->endOfMonth();
 
-        $developers = User::whereIn('id', $request->developer_ids)->get()->map(function ($developer) use ($startDate, $endDate) {
+        $developers = User::whereIn('id', $request->developer_ids)->get()->map(function ($developer) use ($startDate, $endDate, $request) {
             // Usar PaymentService para obtener datos completos
-            $report = $this->paymentService->generateReportForDateRange($developer, $startDate, $endDate);
+            $report = $this->paymentService->generateReportForDateRange($developer, $startDate, $endDate, $request->project_id);
             
             // Obtener todas las tareas y bugs (completados, en progreso y QA)
             $allTasks = collect();
@@ -1185,9 +1380,9 @@ class PaymentController extends Controller
         $startDate = $request->start_date ? Carbon::parse($request->start_date) : Carbon::now()->startOfMonth();
         $endDate = $request->end_date ? Carbon::parse($request->end_date) : Carbon::now()->endOfMonth();
 
-        $developers = User::whereIn('id', $request->developer_ids)->get()->map(function ($developer) use ($startDate, $endDate) {
+        $developers = User::whereIn('id', $request->developer_ids)->get()->map(function ($developer) use ($startDate, $endDate, $request) {
             // Usar PaymentService para obtener datos completos
-            $report = $this->paymentService->generateReportForDateRange($developer, $startDate, $endDate);
+            $report = $this->paymentService->generateReportForDateRange($developer, $startDate, $endDate, $request->project_id);
             
             // Obtener todas las tareas y bugs (completados, en progreso y QA)
             $allTasks = collect();

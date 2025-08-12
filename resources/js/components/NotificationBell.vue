@@ -84,10 +84,10 @@
 
       <div class="p-4 border-t border-gray-200">
         <Link
-          :href="route('team-leader.notifications')"
+          :href="route('qa.finished-items')"
           class="text-sm text-blue-600 hover:text-blue-800 font-medium"
         >
-          Ver todas las notificaciones
+          Ver todas las tareas por testear
         </Link>
       </div>
     </div>
@@ -124,7 +124,15 @@ const unreadCount = ref(0)
 // Obtener notificaciones
 const fetchNotifications = async () => {
   try {
-    const response = await fetch(route('api.team-leader.notifications'))
+    // Determinar la ruta correcta según el contexto
+    let apiRoute = 'api.team-leader.notifications'
+    
+    // Si estamos en una página de QA, usar la ruta de QA
+    if (window.location.pathname.includes('/qa/')) {
+      apiRoute = 'qa.api.qa.notifications'
+    }
+    
+    const response = await fetch(route(apiRoute))
     const data = await response.json()
     notifications.value = data.notifications || []
     unreadCount.value = data.unread_count || 0
@@ -181,8 +189,17 @@ const handleNotificationClick = async (notification: Notification) => {
     await markAsRead(notification.id)
   }
   
-  // Navegar a la vista unificada
-  router.visit(route('team-leader.review.tasks'))
+  // Navegar según el tipo de notificación y usuario
+  if (notification.type === 'task_ready_for_qa') {
+    // Para QA users, navegar a la vista de tareas finalizadas
+    router.visit(route('qa.finished-items'))
+  } else if (notification.type === 'task_approved' || notification.type === 'task_rejected') {
+    // Para Team Leaders, navegar a la vista de revisión
+    router.visit(route('team-leader.review.tasks'))
+  } else {
+    // Ruta por defecto
+    router.visit(route('qa.finished-items'))
+  }
   
   closeNotifications()
 }

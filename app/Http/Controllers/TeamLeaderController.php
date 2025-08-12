@@ -8,6 +8,7 @@ use App\Models\Task;
 use App\Models\Bug;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
 
@@ -209,14 +210,16 @@ class TeamLeaderController extends Controller
     {
         $user = Auth::user();
         
-        $notifications = $user->notifications()
-            ->where('type', 'App\Notifications\TaskCompletedByQA')
-            ->orWhere('type', 'App\Notifications\BugCompletedByQA')
+        $notifications = DB::table('notifications')
+            ->where('user_id', $user->id)
             ->orderBy('created_at', 'desc')
             ->limit(10)
             ->get();
 
-        $unreadCount = $user->notifications()->whereNull('read_at')->count();
+        $unreadCount = DB::table('notifications')
+            ->where('user_id', $user->id)
+            ->whereNull('read_at')
+            ->count();
 
         return response()->json([
             'notifications' => $notifications,
@@ -227,8 +230,11 @@ class TeamLeaderController extends Controller
     public function markNotificationAsRead($notificationId)
     {
         $user = Auth::user();
-        $notification = $user->notifications()->findOrFail($notificationId);
-        $notification->markAsRead();
+        
+        DB::table('notifications')
+            ->where('id', $notificationId)
+            ->where('user_id', $user->id)
+            ->update(['read_at' => now()]);
 
         return response()->json(['success' => true]);
     }
@@ -236,7 +242,11 @@ class TeamLeaderController extends Controller
     public function markAllNotificationsAsRead()
     {
         $user = Auth::user();
-        $user->unreadNotifications()->update(['read_at' => now()]);
+        
+        DB::table('notifications')
+            ->where('user_id', $user->id)
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
 
         return response()->json(['success' => true]);
     }
@@ -248,8 +258,8 @@ class TeamLeaderController extends Controller
     {
         $user = Auth::user();
         
-        // Verificar que el TL pertenece al proyecto del sprint
-        if (!$sprint->project->users->contains($user->id)) {
+        // Verificar que el TL pertenece al proyecto del sprint (los admins pueden ver todos)
+        if (!$user->hasRole('admin') && !$sprint->project->users->contains($user->id)) {
             abort(403, 'No tienes acceso a este sprint');
         }
 
@@ -282,8 +292,8 @@ class TeamLeaderController extends Controller
     {
         $user = Auth::user();
         
-        // Verificar que el TL pertenece al proyecto del sprint
-        if (!$sprint->project->users->contains($user->id)) {
+        // Verificar que el TL pertenece al proyecto del sprint (los admins pueden ver todos)
+        if (!$user->hasRole('admin') && !$sprint->project->users->contains($user->id)) {
             abort(403, 'No tienes acceso a este sprint');
         }
 
@@ -303,8 +313,8 @@ class TeamLeaderController extends Controller
     {
         $user = Auth::user();
         
-        // Verificar que el TL pertenece al proyecto del sprint
-        if (!$sprint->project->users->contains($user->id)) {
+        // Verificar que el TL pertenece al proyecto del sprint (los admins pueden ver todos)
+        if (!$user->hasRole('admin') && !$sprint->project->users->contains($user->id)) {
             abort(403, 'No tienes acceso a este sprint');
         }
 

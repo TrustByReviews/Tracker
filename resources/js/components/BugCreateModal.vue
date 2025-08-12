@@ -504,66 +504,111 @@ import Dialog from '@/components/ui/dialog/Dialog.vue'
 import DialogContent from '@/components/ui/dialog/DialogContent.vue'
 import DialogTitle from '@/components/ui/dialog/DialogTitle.vue'
 
+/**
+ * BugCreateModal Component
+ * 
+ * This component provides a comprehensive modal interface for creating new bugs.
+ * It includes detailed bug reporting fields, environment information, and file
+ * attachment capabilities for bug documentation.
+ * 
+ * Features:
+ * - Comprehensive bug reporting form
+ * - Environment and browser information capture
+ * - File attachment support with drag & drop
+ * - Step-by-step reproduction instructions
+ * - Severity and importance classification
+ * - Project and sprint assignment
+ * - Developer assignment capabilities
+ * 
+ * @component
+ * @example
+ * <BugCreateModal 
+ *   :projects="availableProjects"
+ *   :sprints="availableSprints"
+ *   :developers="availableDevelopers"
+ *   :currentProject="selectedProject"
+ *   :currentSprint="selectedSprint"
+ *   @close="closeModal"
+ *   @created="handleBugCreated"
+ * />
+ */
+
+/**
+ * Component props for bug creation modal
+ */
 const props = defineProps({
   projects: {
-    type: Array,
+    type: Array,           // Available projects for bug assignment
     default: () => []
   },
   sprints: {
-    type: Array,
+    type: Array,           // Available sprints for bug assignment
     default: () => []
   },
   developers: {
-    type: Array,
+    type: Array,           // Available developers for bug assignment
     default: () => []
   },
   // Context props for auto-selection
   currentProject: {
-    type: Object,
+    type: Object,          // Currently selected project (optional)
     default: null
   },
   currentSprint: {
-    type: Object,
+    type: Object,          // Currently selected sprint (optional)
     default: null
   }
 })
 
+/**
+ * Component events for modal interaction
+ */
 const emit = defineEmits(['close', 'created'])
 
+// Form state management
 const isSubmitting = ref(false)
 const selectedFiles = ref([])
 const dragOver = ref(false)
 
-// Browser and OS selection
+// Browser and OS selection state
 const selectedBrowser = ref('')
 const selectedOS = ref('')
 const showCustomBrowser = ref(false)
 const showCustomOS = ref(false)
 
+/**
+ * Bug creation form with comprehensive fields
+ * Manages all bug reporting data and validation state
+ */
 const form = ref({
-  title: '',
-  description: '',
-  long_description: '',
-  project_id: '',
-  sprint_id: '',
-  user_id: '',
-  importance: '',
-  bug_type: '',
-  environment: '',
-  browser_info: '',
-  os_info: '',
-  steps_to_reproduce: '',
-  expected_behavior: '',
-  actual_behavior: '',
-  tags: '',
-  estimated_hours: '',
-  estimated_minutes: '',
-  reproducibility: 'sometimes',
-  severity: 'medium',
-  related_task_id: ''
+  title: '',                    // Bug title/name
+  description: '',              // Short description
+  long_description: '',         // Detailed description
+  project_id: '',              // Associated project ID
+  sprint_id: '',               // Associated sprint ID
+  user_id: '',                 // Assigned developer ID
+  importance: '',              // Bug importance level
+  bug_type: '',                // Type of bug
+  environment: '',             // Environment where bug occurs
+  browser_info: '',            // Browser information
+  os_info: '',                 // Operating system information
+  steps_to_reproduce: '',      // Reproduction steps
+  expected_behavior: '',       // Expected behavior
+  actual_behavior: '',         // Actual behavior
+  tags: '',                    // Bug tags/labels
+  estimated_hours: '',         // Estimated hours for fix
+  estimated_minutes: '',       // Estimated minutes for fix
+  reproducibility: 'sometimes', // How often bug occurs
+  severity: 'medium',          // Bug severity level
+  related_task_id: ''          // Related task ID (optional)
 })
 
-// Browser and OS handling functions
+/**
+ * Browser selection change handler
+ * Manages custom browser input display and placeholder text
+ * 
+ * @param {string} value - Selected browser value
+ */
 const onBrowserChange = (value) => {
   if (value === 'other') {
     showCustomBrowser.value = true
@@ -574,6 +619,12 @@ const onBrowserChange = (value) => {
   }
 }
 
+/**
+ * Operating system selection change handler
+ * Manages custom OS input display and placeholder text
+ * 
+ * @param {string} value - Selected OS value
+ */
 const onOSChange = (value) => {
   if (value === 'other') {
     showCustomOS.value = true
@@ -584,6 +635,13 @@ const onOSChange = (value) => {
   }
 }
 
+/**
+ * Get browser placeholder text based on selected browser
+ * Provides default version information for common browsers
+ * 
+ * @param {string} browser - Browser identifier
+ * @returns {string} Placeholder text for browser version
+ */
 const getBrowserPlaceholder = (browser) => {
   const placeholders = {
     chrome: 'Chrome 120.0.0.0',
@@ -596,6 +654,13 @@ const getBrowserPlaceholder = (browser) => {
   return placeholders[browser] || 'Enter browser version...'
 }
 
+/**
+ * Get OS placeholder text based on selected operating system
+ * Provides default version information for common operating systems
+ * 
+ * @param {string} os - Operating system identifier
+ * @returns {string} Placeholder text for OS version
+ */
 const getOSPlaceholder = (os) => {
   const placeholders = {
     windows: 'Windows 11',

@@ -1,79 +1,114 @@
 <script setup lang="ts">
+/**
+ * AppSidebar Component
+ * 
+ * This component provides the main navigation sidebar for the application.
+ * It dynamically renders different navigation menus based on user roles and permissions.
+ * 
+ * Features:
+ * - Role-based navigation (Admin, Team Leader, Developer, QA)
+ * - Dynamic menu generation based on user permissions
+ * - Integration with TeamLeaderSidebar for team leader specific navigation
+ * - Responsive design with collapsible functionality
+ * - Permission-based access control
+ * 
+ * @author System
+ * @version 1.0
+ */
+
+/**
+ * Navigation item interface definition
+ * Defines the structure for navigation menu items
+ */
 interface NavItem {
-  title: string;
-  href: string;
-  icon?: string | any;
-  external?: boolean;
+  title: string;      // Display text for the navigation item
+  href: string;       // URL or route for the navigation item
+  icon?: string | any; // Icon component for the navigation item
+  external?: boolean; // Whether the link opens in a new tab
 }
+
+// Import required components and utilities
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
-// import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid, Users, Calendar, CheckSquare, Shield, BarChart3, Key, Activity, Bug, CheckCircle, Bell } from 'lucide-vue-next';
+    import { BookOpen, Folder, LayoutGrid, Users, Calendar, CheckSquare, Shield, BarChart3, Activity, Bug, CheckCircle, Bell, TrendingUp } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 import { usePermissions } from '@/composables/usePermissions';
 import { computed } from 'vue';
 import TeamLeaderSidebar from './TeamLeaderSidebar.vue';
 
-// Debug: Check if component is imported
+// Debug: Check if TeamLeaderSidebar component is properly imported
 console.log('TeamLeaderSidebar component:', TeamLeaderSidebar);
 
+// Initialize permissions composable
 const { hasPermission, canAccessModule, user } = usePermissions();
 
-// Debug: Log user data
+// Debug: Log user data for development purposes
 console.log('AppSidebar - User data:', user.value);
 console.log('AppSidebar - User roles:', user.value?.roles);
 console.log('AppSidebar - Is Team Leader:', user.value?.roles?.some(role => role.value === 'team_leader'));
 
+/**
+ * Computed property that generates navigation items based on user role
+ * 
+ * This function creates different navigation menus for different user types:
+ * - QA users: Projects, Sprints, Tasks, Bugs, Finished Items, Notifications
+ * - Team Leaders: Uses TeamLeaderSidebar component
+ * - Admins: Full access to all modules including permissions management
+ * - Developers: Standard development workflow items
+ * 
+ * @returns {NavItem[]} Array of navigation items for the current user
+ */
 const mainNavItems = computed<NavItem[]>(() => {
     const items: NavItem[] = [];
 
-    // Get user roles to check if user is QA, Admin, or Team Leader
-    const userRolees = user.value?.roles?.map(role => role.value) || [];
-    const isQa = userRolees.includes('qa');
-    const isAdmin = userRolees.includes('admin');
-    const isTeamLeader = userRolees.includes('team_leader');
+    // Extract user roles for role-based navigation logic
+    const userRoles = user.value?.roles?.map(role => role.value) || [];
+    const isQa = userRoles.includes('qa');
+    const isAdmin = userRoles.includes('admin');
+    const isTeamLeader = userRoles.includes('team_leader');
+    const isDeveloper = userRoles.includes('developer');
 
     // QA specific navigation - return early to avoid duplicates
     if (isQa) {
-        // Projects (read-only for QA)
+        // Projects (read-only access for QA)
         items.push({
             title: 'Projects',
             href: '/projects',
             icon: Folder,
         });
         
-        // Sprints (read-only for QA)
+        // Sprints (read-only access for QA)
         items.push({
             title: 'Sprints',
             href: '/sprints',
             icon: Calendar,
         });
         
-        // Tasks (QA can edit tasks)
+        // Tasks (QA can edit and review tasks)
         items.push({
             title: 'Tasks',
             href: '/tasks',
             icon: CheckSquare,
         });
         
-        // Bugs (QA can edit bugs)
+        // Bugs (QA can edit and review bugs)
         items.push({
             title: 'Bugs',
             href: '/bugs',
             icon: Bug,
         });
         
-        // Finished Items (QA can approve/reject)
+        // Finished Items (QA can approve/reject completed work)
         items.push({
             title: 'Finished Items',
             href: '/qa/finished-items',
             icon: CheckCircle,
         });
         
-        // Notifications
+        // Notifications (QA specific notifications)
         items.push({
             title: 'Notifications',
             href: '/qa/notifications',
@@ -83,7 +118,7 @@ const mainNavItems = computed<NavItem[]>(() => {
         return items;
     }
 
-    // Team Leader specific navigation - return early to avoid duplicates
+    // Team Leader specific navigation - return empty array as we'll use TeamLeaderSidebar component
     if (isTeamLeader) {
         // Return empty array as we'll use TeamLeaderSidebar component
         return [];
@@ -91,53 +126,55 @@ const mainNavItems = computed<NavItem[]>(() => {
 
     // Admin specific navigation - give access to everything
     if (isAdmin) {
-        // Simultaneous Tasks Permissions (for admins)
-        items.push({
-            title: 'Permissions Tasks',
-            href: '/admin/simultaneous-tasks',
-            icon: Key,
-        });
-
-        // Projects
+        // Projects management
         items.push({
             title: 'Project',
             href: '/projects',
             icon: Folder,
         });
 
-        // Users
+        // User management
         items.push({
             title: 'User',
             href: '/users',
             icon: Users,
         });
 
-        // Sprints
+        // Sprint management
         items.push({
             title: 'Sprints',
             href: '/sprints',
             icon: Calendar,
         });
 
-        // Tasks
+        // Task management
         items.push({
             title: 'Tasks',
             href: '/tasks',
             icon: CheckSquare,
         });
 
-        // Bugs
+        // Bug management
         items.push({
             title: 'Bugs',
             href: '/bugs',
             icon: Bug,
         });
 
-        // Payments (for all users) - Main section
+        // Payments and reports (only for users with payment permissions)
+        if (canAccessModule('payments')) {
+            items.push({
+                title: 'Payments & Reports',
+                href: '/payments',
+                icon: BarChart3,
+            });
+        }
+
+        // Analytics Dashboard
         items.push({
-            title: 'Payments & Reports',
-            href: '/payments',
-            icon: BarChart3,
+            title: 'Analytics',
+            href: '/analytics/projects',
+            icon: TrendingUp,
         });
 
         // Developer Activity Dashboard
@@ -147,7 +184,7 @@ const mainNavItems = computed<NavItem[]>(() => {
             icon: Activity,
         });
 
-        // Permissions (only for users who can manage permissions)
+        // Permissions management (only for users who can manage permissions)
         items.push({
             title: 'Permissions',
             href: '/permissions',
@@ -157,86 +194,48 @@ const mainNavItems = computed<NavItem[]>(() => {
         return items;
     }
 
-    // For non-admin, non-qa users, check permissions
-    // Simultaneous Tasks Permissions (for admins)
-    if (hasPermission('admin.permissions')) {
-        items.push({
-            title: 'Permissions Tasks',
-            href: '/admin/simultaneous-tasks',
-            icon: Key,
-        });
+    // Developer default navigation (fallback when no explicit permissions are assigned)
+    if (isDeveloper) {
+        items.push({ title: 'Projects', href: '/projects', icon: Folder });
+        items.push({ title: 'Sprints', href: '/sprints', icon: Calendar });
+        items.push({ title: 'Tasks', href: '/tasks', icon: CheckSquare });
+        items.push({ title: 'Bugs', href: '/bugs', icon: Bug });
+        // Optional: Payments for visibility if module exists
+        // items.push({ title: 'Payments & Reports', href: '/payments', icon: BarChart3 });
     }
 
-    // Projects
-    if (canAccessModule('projects')) {
-        items.push({
-            title: 'Project',
-            href: '/projects',
-            icon: Folder,
-        });
+
+
+    if (canAccessModule('projects') && !items.some(i => i.href === '/projects')) {
+        items.push({ title: 'Projects', href: '/projects', icon: Folder });
     }
 
-    // Users
-    if (hasPermission('users.view')) {
-        items.push({
-            title: 'User',
-            href: '/users',
-            icon: Users,
-        });
+    if (canAccessModule('users') && !items.some(i => i.href === '/users')) {
+        items.push({ title: 'Users', href: '/users', icon: Users });
     }
 
-    // Sprints
-    if (canAccessModule('sprints')) {
-        items.push({
-            title: 'Sprints',
-            href: '/sprints',
-            icon: Calendar,
-        });
+    if (canAccessModule('sprints') && !items.some(i => i.href === '/sprints')) {
+        items.push({ title: 'Sprints', href: '/sprints', icon: Calendar });
     }
 
-    // Tasks
-    if (canAccessModule('tasks')) {
-        items.push({
-            title: 'Tasks',
-            href: '/tasks',
-            icon: CheckSquare,
-        });
+    if (canAccessModule('tasks') && !items.some(i => i.href === '/tasks')) {
+        items.push({ title: 'Tasks', href: '/tasks', icon: CheckSquare });
     }
 
-    // Bugs
-    if (canAccessModule('bugs')) {
-        items.push({
-            title: 'Bugs',
-            href: '/bugs',
-            icon: Bug,
-        });
+    if (canAccessModule('bugs') && !items.some(i => i.href === '/bugs')) {
+        items.push({ title: 'Bugs', href: '/bugs', icon: Bug });
     }
 
-    // Payments (for all users) - Main section
-    if (hasPermission('payments.view')) {
-        items.push({
-            title: 'Payments & Reports',
-            href: '/payments',
-            icon: BarChart3,
-        });
+    if (canAccessModule('payments') && !items.some(i => i.href === '/payments')) {
+        items.push({ title: 'Payments & Reports', href: '/payments', icon: BarChart3 });
     }
 
-    // Developer Activity Dashboard
-    if (hasPermission('developer-activity.view')) {
-        items.push({
-            title: 'Developer Activity',
-            href: '/developer-activity',
-            icon: Activity,
-        });
+    if (canAccessModule('developer-activity') && !items.some(i => i.href === '/developer-activity')) {
+        items.push({ title: 'Developer Activity', href: '/developer-activity', icon: Activity });
     }
 
-    // Permissions (only for users who can manage permissions)
-    if (hasPermission('permissions.manage')) {
-        items.push({
-            title: 'Permissions',
-            href: '/permissions',
-            icon: Shield,
-        });
+    if (canAccessModule('permissions') && !items.some(i => i.href === '/permissions')) {
+        items.push({ title: 'Permissions', href: '/permissions', icon: Shield });
     }
 
     return items;
@@ -244,18 +243,6 @@ const mainNavItems = computed<NavItem[]>(() => {
 
 const footerNavItems: NavItem[] = [
     // Removed external links for cleaner admin interface
-    // {
-    //     title: 'Github Repo',
-    //     href: 'https://github.com/laravel/vue-starter-kit',
-    //     icon: Folder,
-    //     external: true,
-    // },
-    // {
-    //     title: 'Documentation',
-    //     href: 'https://laravel.com/docs/starter-kits',
-    //     icon: BookOpen,
-    //     external: true,
-    // },
 ];
 </script>
 

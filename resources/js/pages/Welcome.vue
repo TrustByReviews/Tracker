@@ -1,9 +1,34 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
 
+/**
+ * Welcome Component
+ * 
+ * This is the landing page component that serves as the main entry point for the application.
+ * It provides an attractive and informative introduction to the project management system,
+ * highlighting key features and encouraging user registration/login.
+ * 
+ * Features:
+ * - Modern gradient design with glassmorphism effects
+ * - Feature showcase with icons and descriptions
+ * - Call-to-action buttons for login/registration
+ * - Responsive design for all devices
+ * - Smooth animations and hover effects
+ * 
+ * @component
+ * @example
+ * <Welcome 
+ *   :canLogin="true"
+ *   :canRegister="true"
+ * />
+ */
+
+/**
+ * Component props for welcome page functionality
+ */
 defineProps<{
-    canLogin?: boolean;
-    canRegister?: boolean;
+    canLogin?: boolean;      // Whether login functionality is available
+    canRegister?: boolean;   // Whether registration functionality is available
 }>();
 </script>
 
@@ -36,15 +61,15 @@ defineProps<{
         <div class="relative z-10 px-6 py-20">
             <div class="max-w-7xl mx-auto text-center">
                 <h1 class="text-5xl md:text-7xl font-bold text-white mb-6">
-                    Project Management
+                    Advanced Project Management
                     <span class="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                        Made Simple
+                        & Time Tracking
                     </span>
                 </h1>
                 
-                <p class="text-xl md:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto">
-                    Streamline your development workflow with powerful project tracking, 
-                    task management, and team collaboration tools.
+                <p class="text-xl md:text-2xl text-gray-300 mb-8 max-w-4xl mx-auto">
+                    Complete development workflow solution with role-based dashboards, automated payment tracking, 
+                    QA testing workflows, and comprehensive reporting. Built for modern development teams.
                 </p>
 
                 <div class="flex flex-col sm:flex-row gap-4 justify-center">
@@ -58,7 +83,7 @@ defineProps<{
                     
                     <a href="#features" 
                        class="inline-flex items-center px-8 py-4 border-2 border-white text-white font-semibold rounded-lg hover:bg-white hover:text-gray-900 transition-all">
-                        Learn More
+                        Explore Features
                     </a>
                 </div>
             </div>
@@ -69,90 +94,148 @@ defineProps<{
             <div class="max-w-7xl mx-auto">
                 <div class="text-center mb-16">
                     <h2 class="text-4xl md:text-5xl font-bold text-white mb-4">
-                        Everything You Need
+                        Complete Development Workflow
                     </h2>
-                    <p class="text-xl text-gray-300 max-w-2xl mx-auto">
-                        Powerful features designed to boost your team's productivity and project success.
+                    <p class="text-xl text-gray-300 max-w-3xl mx-auto">
+                        From project planning to payment processing, everything you need to manage development teams efficiently.
                     </p>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    <!-- Feature 1 -->
+                    <!-- Feature 1: Role-Based Dashboards -->
                     <div class="bg-white/10 backdrop-blur-sm rounded-xl p-8 border border-white/20 hover:bg-white/20 transition-all">
                         <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center mb-6">
                             <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                             </svg>
                         </div>
-                        <h3 class="text-xl font-semibold text-white mb-4">Project Management</h3>
+                        <h3 class="text-xl font-semibold text-white mb-4">Role-Based Dashboards</h3>
                         <p class="text-gray-300">
-                            Organize projects with sprints, track progress, and manage team assignments efficiently.
+                            Customized dashboards for Admins, Team Leaders, Developers, and QA testers with role-specific features and permissions.
                         </p>
                     </div>
 
-                    <!-- Feature 2 -->
+                    <!-- Feature 2: Advanced Time Tracking -->
                     <div class="bg-white/10 backdrop-blur-sm rounded-xl p-8 border border-white/20 hover:bg-white/20 transition-all">
                         <div class="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center mb-6">
                             <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>
                         </div>
-                        <h3 class="text-xl font-semibold text-white mb-4">Time Tracking</h3>
+                        <h3 class="text-xl font-semibold text-white mb-4">Advanced Time Tracking</h3>
                         <p class="text-gray-300">
-                            Monitor task progress, track actual vs estimated hours, and calculate earnings automatically.
+                            Real-time work tracking with start/pause/resume functionality, automatic time calculations, and efficiency metrics.
                         </p>
                     </div>
 
-                    <!-- Feature 3 -->
+                    <!-- Feature 3: Automated Payment System -->
                     <div class="bg-white/10 backdrop-blur-sm rounded-xl p-8 border border-white/20 hover:bg-white/20 transition-all">
                         <div class="w-12 h-12 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center mb-6">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-4">Automated Payment System</h3>
+                        <p class="text-gray-300">
+                            Weekly payment reports, automatic calculations based on hourly rates, Excel/PDF exports, and email notifications.
+                        </p>
+                    </div>
+
+                    <!-- Feature 4: QA Testing Workflow -->
+                    <div class="bg-white/10 backdrop-blur-sm rounded-xl p-8 border border-white/20 hover:bg-white/20 transition-all">
+                        <div class="w-12 h-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg flex items-center justify-center mb-6">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-4">QA Testing Workflow</h3>
+                        <p class="text-gray-300">
+                            Complete QA testing pipeline with task/bug approval workflows, testing time tracking, and automated notifications.
+                        </p>
+                    </div>
+
+                    <!-- Feature 5: Real-time Notifications -->
+                    <div class="bg-white/10 backdrop-blur-sm rounded-xl p-8 border border-white/20 hover:bg-white/20 transition-all">
+                        <div class="w-12 h-12 bg-gradient-to-r from-pink-500 to-pink-600 rounded-lg flex items-center justify-center mb-6">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5zM4.19 4.19A2 2 0 006 3h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-4">Real-time Notifications</h3>
+                        <p class="text-gray-300">
+                            Instant notifications for task assignments, QA approvals, payment reports, and system updates.
+                        </p>
+                    </div>
+
+                    <!-- Feature 6: Comprehensive Reporting -->
+                    <div class="bg-white/10 backdrop-blur-sm rounded-xl p-8 border border-white/20 hover:bg-white/20 transition-all">
+                        <div class="w-12 h-12 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center mb-6">
                             <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                             </svg>
                         </div>
-                        <h3 class="text-xl font-semibold text-white mb-4">Analytics & Reports</h3>
+                        <h3 class="text-xl font-semibold text-white mb-4">Comprehensive Reporting</h3>
                         <p class="text-gray-300">
-                            Generate detailed payment reports, track team performance, and export data in multiple formats.
+                            Detailed analytics, performance metrics, project summaries, and exportable reports in multiple formats.
                         </p>
                     </div>
+                </div>
+            </div>
+        </div>
 
-                    <!-- Feature 4 -->
-                    <div class="bg-white/10 backdrop-blur-sm rounded-xl p-8 border border-white/20 hover:bg-white/20 transition-all">
-                        <div class="w-12 h-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg flex items-center justify-center mb-6">
-                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
-                            </svg>
+        <!-- New Features Section -->
+        <div class="relative z-10 px-6 py-20">
+            <div class="max-w-7xl mx-auto">
+                <div class="text-center mb-16">
+                    <h2 class="text-4xl md:text-5xl font-bold text-white mb-4">
+                        Latest Enhancements
+                    </h2>
+                    <p class="text-xl text-gray-300 max-w-3xl mx-auto">
+                        Recent updates and improvements to make your development workflow even more efficient.
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Enhancement 1: Bug Management -->
+                    <div class="bg-white/10 backdrop-blur-sm rounded-xl p-8 border border-white/20">
+                        <div class="flex items-center mb-6">
+                            <div class="w-12 h-12 bg-gradient-to-r from-red-500 to-red-600 rounded-lg flex items-center justify-center mr-4">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-semibold text-white">Enhanced Bug Management</h3>
+                                <p class="text-gray-400 text-sm">Complete bug lifecycle tracking</p>
+                            </div>
                         </div>
-                        <h3 class="text-xl font-semibold text-white mb-4">Team Collaboration</h3>
-                        <p class="text-gray-300">
-                            Assign tasks, manage team roles, and keep everyone aligned with project goals.
-                        </p>
+                        <ul class="text-gray-300 space-y-2">
+                            <li class="flex items-center"><span class="w-2 h-2 bg-green-400 rounded-full mr-3"></span>Bug creation with detailed reporting</li>
+                            <li class="flex items-center"><span class="w-2 h-2 bg-green-400 rounded-full mr-3"></span>Environment and browser tracking</li>
+                            <li class="flex items-center"><span class="w-2 h-2 bg-green-400 rounded-full mr-3"></span>QA testing workflow integration</li>
+                            <li class="flex items-center"><span class="w-2 h-2 bg-green-400 rounded-full mr-3"></span>Automatic time tracking for bug fixes</li>
+                        </ul>
                     </div>
 
-                    <!-- Feature 5 -->
-                    <div class="bg-white/10 backdrop-blur-sm rounded-xl p-8 border border-white/20 hover:bg-white/20 transition-all">
-                        <div class="w-12 h-12 bg-gradient-to-r from-pink-500 to-pink-600 rounded-lg flex items-center justify-center mb-6">
-                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                            </svg>
+                    <!-- Enhancement 2: Advanced Permissions -->
+                    <div class="bg-white/10 backdrop-blur-sm rounded-xl p-8 border border-white/20">
+                        <div class="flex items-center mb-6">
+                            <div class="w-12 h-12 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center mr-4">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-semibold text-white">Advanced Permissions</h3>
+                                <p class="text-gray-400 text-sm">Granular access control system</p>
+                            </div>
                         </div>
-                        <h3 class="text-xl font-semibold text-white mb-4">Real-time Updates</h3>
-                        <p class="text-gray-300">
-                            Get instant notifications and real-time updates on project progress and task status.
-                        </p>
-                    </div>
-
-                    <!-- Feature 6 -->
-                    <div class="bg-white/10 backdrop-blur-sm rounded-xl p-8 border border-white/20 hover:bg-white/20 transition-all">
-                        <div class="w-12 h-12 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center mb-6">
-                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-                            </svg>
-                        </div>
-                        <h3 class="text-xl font-semibold text-white mb-4">Secure & Reliable</h3>
-                        <p class="text-gray-300">
-                            Enterprise-grade security with role-based access control and data protection.
-                        </p>
+                        <ul class="text-gray-300 space-y-2">
+                            <li class="flex items-center"><span class="w-2 h-2 bg-green-400 rounded-full mr-3"></span>Role-based access control</li>
+                            <li class="flex items-center"><span class="w-2 h-2 bg-green-400 rounded-full mr-3"></span>Project-specific permissions</li>
+                            <li class="flex items-center"><span class="w-2 h-2 bg-green-400 rounded-full mr-3"></span>Simultaneous task limits</li>
+                            <li class="flex items-center"><span class="w-2 h-2 bg-green-400 rounded-full mr-3"></span>Admin override capabilities</li>
+                        </ul>
                     </div>
                 </div>
             </div>
@@ -162,10 +245,10 @@ defineProps<{
         <div class="relative z-10 px-6 py-20">
             <div class="max-w-4xl mx-auto text-center">
                 <h2 class="text-4xl md:text-5xl font-bold text-white mb-6">
-                    Ready to Transform Your Workflow?
+                    Ready to Transform Your Development Workflow?
                 </h2>
                 <p class="text-xl text-gray-300 mb-8">
-                    Join thousands of teams who have already improved their project management with Tracker.
+                    Join development teams who have already improved their project management, time tracking, and payment processing with Tracker.
                 </p>
                 <Link v-if="canLogin" :href="route('login')"
                       class="inline-flex items-center px-10 py-5 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg text-lg hover:from-blue-700 hover:to-purple-700 transition-all transform hover:scale-105">
@@ -191,7 +274,7 @@ defineProps<{
                     </div>
                     
                     <div class="text-gray-400 text-sm">
-                        © {{ new Date().getFullYear() }} Tracker. All rights reserved.
+                        © {{ new Date().getFullYear() }} Tracker. Advanced Project Management & Time Tracking System.
                     </div>
                 </div>
             </div>

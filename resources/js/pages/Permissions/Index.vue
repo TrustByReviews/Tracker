@@ -33,7 +33,7 @@
                                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
                                     ]"
                                 >
-                                    Roleeeeeeeeeee Permissions
+                                    Role Permissions
                                 </button>
                                 <button
                                     @click="activeTab = 'expired'"
@@ -72,7 +72,7 @@
                                                 <div class="font-medium">{{ user.name }}</div>
                                                 <div class="text-sm text-gray-500 dark:text-gray-400">{{ user.email }}</div>
                                                 <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                                    Roleeeeeeeeeees: {{ user.roles.map(r => r.name).join(', ') }}
+                                                    Roles: {{ user.roles.map(r => r.name).join(', ') }}
                                                 </div>
                                             </div>
                                         </div>
@@ -98,18 +98,16 @@
                                                 <h4 class="font-medium mb-2">Direct Permissions</h4>
                                                 <div class="space-y-2">
                                                     <div
-                                                        v-for="permission in userDirectPermissions"
+                                                        v-for="permission in userPermissions.direct_permissions"
                                                         :key="permission.id"
-                                                        class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                                                        class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
                                                     >
                                                         <div>
                                                             <div class="font-medium">{{ permission.display_name }}</div>
-                                                            <div class="text-sm text-gray-500 dark:text-gray-400">
-                                                                {{ permission.description }}
-                                                            </div>
-                                                            <div class="text-xs text-gray-400 dark:text-gray-500">
-                                                                Type: {{ permission.pivot?.type }}
-                                                                <span v-if="permission.pivot?.expires_at">
+                                                            <div class="text-sm text-gray-500">{{ permission.module }}</div>
+                                                            <div v-if="permission.pivot" class="text-xs text-gray-400">
+                                                                Type: {{ permission.pivot.type }}
+                                                                <span v-if="permission.pivot.expires_at">
                                                                     | Expires: {{ formatDate(permission.pivot.expires_at) }}
                                                                 </span>
                                                             </div>
@@ -121,107 +119,94 @@
                                                             Revoke
                                                         </button>
                                                     </div>
-                                                    <div v-if="userDirectPermissions.length === 0" class="text-gray-500 dark:text-gray-400 text-center py-4">
-                                                        No direct permissions
-                                                    </div>
                                                 </div>
                                             </div>
 
-                                            <!-- Roleeeeeeeeeee Permissions -->
+                                            <!-- Role Permissions -->
                                             <div>
-                                                <h4 class="font-medium mb-2">Permissions by Roleeeeeeeeeees</h4>
+                                                <h4 class="font-medium mb-2">Role Permissions</h4>
                                                 <div class="space-y-2">
                                                     <div
-                                                        v-for="permission in userRoleeeeeeeeeeeeeePermissions"
-                                                        :key="permission.id"
-                                                        class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg"
+                                                        v-for="permission in userPermissions.role_permissions"
+                                                        :key="`${permission.id}-${permission.role_name}`"
+                                                        class="p-3 bg-blue-50 dark:bg-blue-900 rounded-lg"
                                                     >
                                                         <div class="font-medium">{{ permission.display_name }}</div>
-                                                        <div class="text-sm text-gray-500 dark:text-gray-400">
-                                                            {{ permission.description }}
-                                                        </div>
+                                                        <div class="text-sm text-gray-500">{{ permission.module }}</div>
                                                         <div class="text-xs text-blue-600 dark:text-blue-400">
                                                             Via role: {{ permission.role_name }}
                                                         </div>
                                                     </div>
-                                                    <div v-if="userRoleeeeeeeeeeeeeePermissions.length === 0" class="text-gray-500 dark:text-gray-400 text-center py-4">
-                                                        No permissions by roles
-                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                        <div v-else class="text-center py-12 text-gray-500 dark:text-gray-400">
+                                        <div v-else class="text-center text-gray-500 py-8">
                                             Select a user to view their permissions
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Roleeeeeeeeeees Tab -->
+                            <!-- Roles Tab -->
                             <div v-if="activeTab === 'roles'" class="space-y-6">
                                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                    <!-- Roleeeeeeeeeees List -->
+                                    <!-- Roles List -->
                                     <div class="lg:col-span-1">
-                                        <h3 class="text-lg font-medium mb-4">Roleeeeeeeeeees</h3>
-                                        <div class="space-y-2">
+                                        <h3 class="text-lg font-medium mb-4">Roles</h3>
+                                        <div class="space-y-2 max-h-96 overflow-y-auto">
                                             <div
                                                 v-for="role in roles"
                                                 :key="role.id"
-                                                @click="selectRoleeeeeeeeeeeeee(role)"
+                                                @click="selectRole(role)"
                                                 :class="[
                                                     'p-3 rounded-lg cursor-pointer transition-colors',
-                                                    selectedRoleeeeeeeeeeeeee?.id === role.id
+                                                    selectedRole?.id === role.id
                                                         ? 'bg-indigo-100 dark:bg-indigo-900 border border-indigo-300 dark:border-indigo-700'
                                                         : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'
                                                 ]"
                                             >
                                                 <div class="font-medium">{{ role.name }}</div>
                                                 <div class="text-sm text-gray-500 dark:text-gray-400">
-                                                    {{ role.permissions.length }} permissions
+                                                    {{ role.permissions?.length || 0 }} permissions
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <!-- Roleeeeeeeeeee Permissions -->
+                                    <!-- Role Permissions -->
                                     <div class="lg:col-span-2">
-                                        <div v-if="selectedRoleeeeeeeeeeeeee" class="space-y-4">
+                                        <div v-if="selectedRole" class="space-y-4">
                                             <div class="flex justify-between items-center">
                                                 <h3 class="text-lg font-medium">
-                                                    Permissions for Roleeeeeeeeeee: {{ selectedRoleeeeeeeeeeeeee.name }}
+                                                    Permissions for {{ selectedRole.name }} role
                                                 </h3>
                                                 <button
-                                                    @click="showRoleeeeeeeeeeeeeeModal = true"
+                                                    @click="showRoleModal = true"
                                                     class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium"
                                                 >
-                                                    Edit Permissions
+                                                    Update Permissions
                                                 </button>
                                             </div>
 
                                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <div
-                                                    v-for="permission in selectedRoleeeeeeeeeeeeee.permissions"
+                                                    v-for="permission in rolePermissions"
                                                     :key="permission.id"
                                                     class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
                                                 >
                                                     <div class="font-medium">{{ permission.display_name }}</div>
-                                                    <div class="text-sm text-gray-500 dark:text-gray-400">
-                                                        {{ permission.description }}
-                                                    </div>
-                                                    <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                                        Module: {{ permission.module }}
-                                                    </div>
+                                                    <div class="text-sm text-gray-500">{{ permission.module }}</div>
                                                 </div>
                                             </div>
                                         </div>
-                                        <div v-else class="text-center py-12 text-gray-500 dark:text-gray-400">
+                                        <div v-else class="text-center text-gray-500 py-8">
                                             Select a role to view its permissions
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Expired Tab -->
+                            <!-- Expired Permissions Tab -->
                             <div v-if="activeTab === 'expired'" class="space-y-6">
                                 <div class="flex justify-between items-center">
                                     <h3 class="text-lg font-medium">Expired Permissions</h3>
@@ -229,7 +214,7 @@
                                         @click="cleanupExpiredPermissions"
                                         class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium"
                                     >
-                                        Clear Expired
+                                        Cleanup All Expired
                                     </button>
                                 </div>
 
@@ -237,29 +222,26 @@
                                     <div
                                         v-for="permission in expiredPermissions"
                                         :key="permission.id"
-                                        class="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg"
+                                        class="flex items-center justify-between p-4 bg-red-50 dark:bg-red-900 rounded-lg"
                                     >
-                                        <div class="flex justify-between items-start">
-                                            <div>
-                                                <div class="font-medium">{{ permission.user.name }}</div>
-                                                <div class="text-sm text-gray-500 dark:text-gray-400">
-                                                    Permission: {{ permission.permission.display_name }}
-                                                </div>
-                                                <div class="text-xs text-red-600 dark:text-red-400">
-                                                    Expired: {{ formatDate(permission.expires_at) }}
-                                                </div>
+                                        <div>
+                                            <div class="font-medium">{{ permission.user?.name }}</div>
+                                            <div class="text-sm text-gray-500">{{ permission.permission?.display_name }}</div>
+                                            <div class="text-xs text-red-600 dark:text-red-400">
+                                                Expired: {{ formatDate(permission.expires_at) }}
                                             </div>
-                                            <button
-                                                @click="deleteExpiredPermission(permission.id)"
-                                                class="text-red-600 hover:text-red-800 text-sm"
-                                            >
-                                                Delete
-                                            </button>
                                         </div>
+                                        <button
+                                            @click="deleteExpiredPermission(permission.id)"
+                                            class="text-red-600 hover:text-red-800 text-sm"
+                                        >
+                                            Delete
+                                        </button>
                                     </div>
-                                    <div v-if="expiredPermissions.length === 0" class="text-center py-12 text-gray-500 dark:text-gray-400">
-                                        No expired permissions
-                                    </div>
+                                </div>
+
+                                <div v-if="expiredPermissions.length === 0" class="text-center text-gray-500 py-8">
+                                    No expired permissions found
                                 </div>
                             </div>
                         </div>
@@ -269,170 +251,130 @@
         </div>
 
         <!-- Grant Permission Modal -->
-        <div v-if="showGrantModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-                <div class="mt-3">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Grant Permission</h3>
-                    <form @submit.prevent="grantPermission">
-                        <div class="space-y-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Permission</label>
-                                <select v-model="grantForm.permission_name" class="w-full rounded-md border-gray-300 text-gray-900 bg-white focus:border-indigo-500 focus:ring-indigo-500">
-                                    <option value="" class="text-gray-500">Select permission</option>
-                                    <option v-for="permission in permissions" :key="permission.id" :value="permission.name" class="text-gray-900 bg-white">
-                                        {{ permission.display_name }} ({{ permission.module }})
-                                    </option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                                <select v-model="grantForm.type" class="w-full rounded-md border-gray-300 text-gray-900 bg-white focus:border-indigo-500 focus:ring-indigo-500">
-                                    <option value="temporary" class="text-gray-900 bg-white">Temporary</option>
-                                    <option value="permanent" class="text-gray-900 bg-white">Permanent</option>
-                                </select>
-                            </div>
-
-                            <div v-if="grantForm.type === 'temporary'">
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Expiration Date</label>
-                                <input
-                                    v-model="grantForm.expires_at"
-                                    type="datetime-local"
-                                    class="w-full rounded-md border-gray-300 text-gray-900 bg-white focus:border-indigo-500 focus:ring-indigo-500"
-                                />
-                            </div>
-
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Reason (optional)</label>
-                                <textarea
-                                    v-model="grantForm.reason"
-                                    rows="3"
-                                    class="w-full rounded-md border-gray-300 text-gray-900 bg-white focus:border-indigo-500 focus:ring-indigo-500"
-                                    placeholder="Reason for granting the permission..."
-                                ></textarea>
-                            </div>
+        <div v-if="showGrantModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+                <h3 class="text-lg font-medium mb-4">Grant Permission</h3>
+                <form @submit.prevent="grantPermission">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Permission</label>
+                            <select v-model="grantForm.permission_name" class="w-full border rounded-md px-3 py-2">
+                                <option value="">Select permission...</option>
+                                <option v-for="permission in permissions" :key="permission.id" :value="permission.name">
+                                    {{ permission.display_name }} ({{ permission.module }})
+                                </option>
+                            </select>
                         </div>
-
-                        <div class="flex justify-end space-x-3 mt-6">
-                            <button
-                                type="button"
-                                @click="showGrantModal = false"
-                                class="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            >
-                                Grant
-                            </button>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Type</label>
+                            <select v-model="grantForm.type" class="w-full border rounded-md px-3 py-2">
+                                <option value="temporary">Temporary</option>
+                                <option value="permanent">Permanent</option>
+                            </select>
                         </div>
-                    </form>
-                </div>
+                        <div v-if="grantForm.type === 'temporary'">
+                            <label class="block text-sm font-medium mb-1">Expires At</label>
+                            <input
+                                v-model="grantForm.expires_at"
+                                type="datetime-local"
+                                class="w-full border rounded-md px-3 py-2"
+                            />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Reason</label>
+                            <textarea
+                                v-model="grantForm.reason"
+                                class="w-full border rounded-md px-3 py-2"
+                                rows="3"
+                            ></textarea>
+                        </div>
+                    </div>
+                    <div class="flex justify-end space-x-3 mt-6">
+                        <button
+                            type="button"
+                            @click="showGrantModal = false"
+                            class="px-4 py-2 text-gray-600 hover:text-gray-800"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md"
+                        >
+                            Grant Permission
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
 
-        <!-- Roleeeeeeeeeee Permissions Modal -->
-        <div v-if="showRoleeeeeeeeeeeeeeModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-                <div class="mt-3">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Edit Permissions for Roleeeeeeeeeee: {{ selectedRoleeeeeeeeeeeeee?.name }}</h3>
-                    <form @submit.prevent="updateRoleeeeeeeeeeeeeePermissions">
-                        <div class="space-y-4 max-h-96 overflow-y-auto">
-                            <div
-                                v-for="permission in permissions"
-                                :key="permission.id"
-                                class="flex items-center p-2 hover:bg-gray-50 rounded-md"
-                            >
-                                <input
-                                    :id="permission.id"
-                                    v-model="rolePermissionsForm.permission_ids"
-                                    :value="permission.id"
-                                    type="checkbox"
-                                    class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                                />
-                                <label :for="permission.id" class="ml-2 text-sm text-gray-900 cursor-pointer flex-1">
-                                    <div class="font-medium">{{ permission.display_name }}</div>
-                                    <div class="text-gray-600">{{ permission.description }}</div>
+        <!-- Update Role Permissions Modal -->
+        <div v-if="showRoleModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+                <h3 class="text-lg font-medium mb-4">Update Role Permissions</h3>
+                <form @submit.prevent="updateRolePermissions">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Permissions</label>
+                            <div class="max-h-64 overflow-y-auto space-y-2">
+                                <label
+                                    v-for="permission in permissions"
+                                    :key="permission.id"
+                                    class="flex items-center"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        :value="permission.id"
+                                        v-model="roleForm.permission_ids"
+                                        class="mr-2"
+                                    />
+                                    <span class="text-sm">
+                                        {{ permission.display_name }} ({{ permission.module }})
+                                    </span>
                                 </label>
                             </div>
                         </div>
-
-                        <div class="flex justify-end space-x-3 mt-6">
-                            <button
-                                type="button"
-                                @click="showRoleeeeeeeeeeeeeeModal = false"
-                                class="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            >
-                                Save
-                            </button>
-                        </div>
-                    </form>
-                </div>
+                    </div>
+                    <div class="flex justify-end space-x-3 mt-6">
+                        <button
+                            type="button"
+                            @click="showRoleModal = false"
+                            class="px-4 py-2 text-gray-600 hover:text-gray-800"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md"
+                        >
+                            Update Permissions
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </AppLayout>
 </template>
 
-<script setup lang="ts">
+<script setup>
 import { ref, onMounted, computed } from 'vue';
-import { router } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/app/AppSidebarLayout.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
 
+const props = defineProps({
+    permissions: Array,
+    users: Array,
+    roles: Array,
+});
 
-interface Permission {
-    id: string;
-    name: string;
-    display_name: string;
-    description: string;
-    module: string;
-    pivot?: {
-        type: string;
-        expires_at: string;
-        reason: string;
-    };
-    role_name?: string;
-}
-
-interface User {
-    id: string;
-    name: string;
-    email: string;
-    roles: Array<{ id: string; name: string }>;
-    directPermissions?: Permission[];
-    rolePermissions?: Permission[];
-}
-
-interface Roleeeeeeeeeeeeee {
-    id: string;
-    name: string;
-    permissions: Permission[];
-}
-
-interface Props {
-    permissions: Permission[];
-    users: User[];
-    roles: Roleeeeeeeeeeeeee[];
-}
-
-const props = defineProps<Props>();
-
-// Reactive data
 const activeTab = ref('users');
-const selectedUser = ref<User | null>(null);
-const selectedRoleeeeeeeeeeeeee = ref<Roleeeeeeeeeeeeee | null>(null);
+const selectedUser = ref(null);
+const selectedRole = ref(null);
+const userPermissions = ref({ direct_permissions: [], role_permissions: [] });
+const rolePermissions = ref([]);
+const expiredPermissions = ref([]);
 const showGrantModal = ref(false);
-const showRoleeeeeeeeeeeeeeModal = ref(false);
-const expiredPermissions = ref<any[]>([]);
+const showRoleModal = ref(false);
 
-// Forms
 const grantForm = ref({
     permission_name: '',
     type: 'temporary',
@@ -440,111 +382,91 @@ const grantForm = ref({
     expires_at: '',
 });
 
-const rolePermissionsForm = ref({
-    permission_ids: [] as string[],
+const roleForm = ref({
+    permission_ids: [],
 });
 
-// Computed
-const userDirectPermissions = computed(() => {
-    if (!selectedUser.value) return [];
-    return selectedUser.value.directPermissions || [];
+onMounted(async () => {
+    await loadExpiredPermissions();
 });
 
-const userRoleeeeeeeeeeeeeePermissions = computed(() => {
-    if (!selectedUser.value) return [];
-    return selectedUser.value.rolePermissions || [];
-});
-
-// Methods
-const selectUser = (user: User) => {
+const selectUser = async (user) => {
     selectedUser.value = user;
-    loadUserPermissions(user.id);
-};
-
-const selectRoleeeeeeeeeeeeee = (role: Roleeeeeeeeeeeeee) => {
-    selectedRoleeeeeeeeeeeeee.value = role;
-    rolePermissionsForm.value.permission_ids = role.permissions.map(p => p.id);
-};
-
-const loadUserPermissions = async (userId: string) => {
     try {
-        const response = await fetch(`/permissions/user/${userId}`);
+        const response = await fetch(`/permissions/user/${user.id}`);
         const data = await response.json();
-        if (selectedUser.value) {
-            selectedUser.value.directPermissions = data.direct_permissions;
-            selectedUser.value.rolePermissions = data.role_permissions;
-        }
+        userPermissions.value = data;
     } catch (error) {
         console.error('Error loading user permissions:', error);
     }
 };
 
-const grantPermission = async () => {
-    if (!selectedUser.value) return;
+const selectRole = async (role) => {
+    selectedRole.value = role;
+    try {
+        const response = await fetch(`/permissions/role/${role.id}`);
+        const data = await response.json();
+        rolePermissions.value = data.permissions;
+    } catch (error) {
+        console.error('Error loading role permissions:', error);
+    }
+};
 
+const grantPermission = async () => {
     try {
         const response = await fetch(`/permissions/user/${selectedUser.value.id}/grant`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
             },
             body: JSON.stringify(grantForm.value),
         });
 
         if (response.ok) {
             showGrantModal.value = false;
-            grantForm.value = {
-                permission_name: '',
-                type: 'temporary',
-                reason: '',
-                expires_at: '',
-            };
-            loadUserPermissions(selectedUser.value.id);
+            await selectUser(selectedUser.value);
+            grantForm.value = { permission_name: '', type: 'temporary', reason: '', expires_at: '' };
         }
     } catch (error) {
         console.error('Error granting permission:', error);
     }
 };
 
-const revokePermission = async (permissionName: string) => {
-    if (!selectedUser.value) return;
-
+const revokePermission = async (permissionName) => {
     try {
         const response = await fetch(`/permissions/user/${selectedUser.value.id}/revoke`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
             },
             body: JSON.stringify({ permission_name: permissionName }),
         });
 
         if (response.ok) {
-            loadUserPermissions(selectedUser.value.id);
+            await selectUser(selectedUser.value);
         }
     } catch (error) {
         console.error('Error revoking permission:', error);
     }
 };
 
-const updateRoleeeeeeeeeeeeeePermissions = async () => {
-    if (!selectedRoleeeeeeeeeeeeee.value) return;
-
+const updateRolePermissions = async () => {
     try {
-        const response = await fetch(`/permissions/role/${selectedRoleeeeeeeeeeeeee.value.id}`, {
+        const response = await fetch(`/permissions/role/${selectedRole.value.id}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
             },
-            body: JSON.stringify(rolePermissionsForm.value),
+            body: JSON.stringify(roleForm.value),
         });
 
         if (response.ok) {
-            showRoleeeeeeeeeeeeeeModal.value = false;
-            // Reload the page to get updated role data
-            router.reload();
+            showRoleModal.value = false;
+            await selectRole(selectedRole.value);
+            roleForm.value = { permission_ids: [] };
         }
     } catch (error) {
         console.error('Error updating role permissions:', error);
@@ -566,70 +488,42 @@ const cleanupExpiredPermissions = async () => {
         const response = await fetch('/permissions/expired', {
             method: 'DELETE',
             headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
             },
         });
 
         if (response.ok) {
-            loadExpiredPermissions();
+            await loadExpiredPermissions();
         }
     } catch (error) {
         console.error('Error cleaning up expired permissions:', error);
     }
 };
 
-const deleteExpiredPermission = async (permissionId: string) => {
+const deleteExpiredPermission = async (permissionId) => {
     try {
         const response = await fetch(`/permissions/expired/${permissionId}`, {
             method: 'DELETE',
             headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
             },
         });
 
         if (response.ok) {
-            loadExpiredPermissions();
+            await loadExpiredPermissions();
         }
     } catch (error) {
         console.error('Error deleting expired permission:', error);
     }
 };
 
-const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
+const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
 };
-
-// Lifecycle
-onMounted(() => {
-    loadExpiredPermissions();
-});
 </script>
-
-<style scoped>
-/* Specific styles to improve contrast in dropdowns */
-select option {
-    background-color: white;
-    color: #111827; /* text-gray-900 */
-    padding: 8px 12px;
-}
-
-select option:hover {
-    background-color: #f3f4f6; /* bg-gray-100 */
-}
-
-select option:checked {
-    background-color: #3b82f6; /* bg-blue-500 */
-    color: white;
-}
-
-/* Improvementr la legibilidad de los checkboxes */
-input[type="checkbox"]:checked {
-    background-color: #3b82f6;
-    border-color: #3b82f6;
-}
-
-/* Estilos para el hover en las opciones de permisos */
-.hover\:bg-gray-50:hover {
-    background-color: #f9fafb;
-}
-</style> 

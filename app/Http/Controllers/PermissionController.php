@@ -181,4 +181,4 @@ class PermissionController extends Controller
             'message' => "Cleaned up {$deletedCount} expired permissions",
         ]);
     }
-} 
+}

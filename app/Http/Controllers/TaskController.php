@@ -49,14 +49,14 @@ class TaskController extends Controller
 
         if ($permissions === 'admin') {
             // Admin ve todo
-            $tasksQuery = Task::with(['user', 'sprint', 'project']);
+            $tasksQuery = Task::with(['user', 'sprint', 'project', 'qaReviewedBy', 'teamLeaderReviewedBy']);
             $projects = Project::orderBy('name')->get();
             $sprints = Sprint::with('project')->orderBy('start_date', 'desc')->get();
         } elseif ($permissions === 'team_leader') {
             // Team leader ve tareas de sus proyectos
             $tasksQuery = Task::whereHas('sprint.project.users', function ($query) use ($authUser) {
                 $query->where('users.id', $authUser->id);
-            })->with(['user', 'sprint', 'project']);
+            })->with(['user', 'sprint', 'project', 'qaReviewedBy', 'teamLeaderReviewedBy']);
             $projects = $authUser->projects()->orderBy('name')->get();
             $sprints = Sprint::whereHas('project.users', function ($query) use ($authUser) {
                 $query->where('users.id', $authUser->id);
@@ -67,7 +67,7 @@ class TaskController extends Controller
                 $query->whereHas('users', function ($q) use ($authUser) {
                     $q->where('users.id', $authUser->id);
                 });
-            })->with(['user', 'sprint', 'project']);
+            })->with(['user', 'sprint', 'project', 'qaReviewedBy', 'teamLeaderReviewedBy']);
             $projects = $authUser->projects()->orderBy('name')->get();
             $sprints = Sprint::whereHas('project.users', function ($query) use ($authUser) {
                 $query->where('users.id', $authUser->id);
@@ -194,7 +194,13 @@ class TaskController extends Controller
             $permissions = $role->first()->name;
         }
 
-        $task = Task::with(['user', 'sprint', 'project'])->findOrFail($id);
+        $task = Task::with([
+            'user', 
+            'sprint', 
+            'project',
+            'qaReviewedBy',
+            'teamLeaderReviewedBy'
+        ])->findOrFail($id);
         
         // Verificar permisos
         if ($permissions === 'developer') {

@@ -22,6 +22,7 @@ class TestDataSeeder extends Seeder
         $adminRole = Role::firstOrCreate(['name' => 'admin']);
         $teamLeaderRole = Role::firstOrCreate(['name' => 'team_leader']);
         $developerRole = Role::firstOrCreate(['name' => 'developer']);
+        $qaRole = Role::firstOrCreate(['name' => 'qa']);
 
         // Crear usuarios de prueba
         $users = [
@@ -89,6 +90,20 @@ class TestDataSeeder extends Seeder
                 'email' => 'developer5@example.com',
                 'password' => 'password',
                 'role' => 'developer'
+            ],
+
+            // QA
+            [
+                'name' => 'Carlos Rodríguez - QA',
+                'email' => 'carlos.rodriguez270@test.com',
+                'password' => 'password',
+                'role' => 'qa'
+            ],
+            [
+                'name' => 'QA Tester',
+                'email' => 'qa1@test.com',
+                'password' => 'password',
+                'role' => 'qa'
             ]
         ];
 
@@ -115,6 +130,9 @@ class TestDataSeeder extends Seeder
                     break;
                 case 'developer':
                     $user->roles()->sync([$developerRole->id]);
+                    break;
+                case 'qa':
+                    $user->roles()->sync([$qaRole->id]);
                     break;
             }
 
@@ -171,7 +189,9 @@ class TestDataSeeder extends Seeder
         $createdProjects[0]->users()->sync([
             $createdUsers['team_leader'][0]->id,
             $createdUsers['developer'][0]->id,
-            $createdUsers['developer'][1]->id
+            $createdUsers['developer'][1]->id,
+            $createdUsers['qa'][0]->id, // Carlos Rodríguez - QA
+            $createdUsers['qa'][1]->id  // QA Tester
         ]);
 
         $createdProjects[1]->users()->sync([
@@ -442,8 +462,12 @@ class TestDataSeeder extends Seeder
         $this->command->info('   developer4@example.com / password');
         $this->command->info('   developer5@example.com / password');
         $this->command->info('');
+        $this->command->info('👨‍💻 QA:');
+        $this->command->info('   carlos.rodriguez270@test.com / password');
+        $this->command->info('   qa1@test.com / password');
+        $this->command->info('');
         $this->command->info('📊 DATOS CREADOS:');
-        $this->command->info('   - 9 usuarios (2 admin, 3 team leaders, 5 developers)');
+        $this->command->info('   - 9 usuarios (2 admin, 3 team leaders, 5 developers, 2 QA)');
         $this->command->info('   - 4 proyectos');
         $this->command->info('   - 8 sprints (2 por proyecto)');
         $this->command->info('   - 10 tareas con diferentes estados');

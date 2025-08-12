@@ -31,7 +31,65 @@ interface Sprint {
     project?: {
         id: string,
         name: string
-    }
+    },
+    // Fase 1: Campos esenciales
+    description?: string,
+    sprint_type?: string,
+    planned_start_date?: string,
+    planned_end_date?: string,
+    actual_start_date?: string,
+    actual_end_date?: string,
+    duration_days?: number,
+    sprint_objective?: string,
+    user_stories_included?: string[],
+    assigned_tasks?: string[],
+    acceptance_criteria?: string,
+    
+    // Fase 2: Campos de seguimiento avanzado
+    planned_velocity?: number,
+    actual_velocity?: number,
+    velocity_deviation?: number,
+    progress_percentage?: number,
+    blockers?: string[],
+    risks?: string[],
+    blocker_resolution_notes?: string,
+    detailed_acceptance_criteria?: string[],
+    definition_of_done?: string[],
+    quality_gates?: string[],
+    bugs_found?: number,
+    bugs_resolved?: number,
+    bug_resolution_rate?: number,
+    code_reviews_completed?: number,
+    code_reviews_pending?: number,
+    daily_scrums_held?: number,
+    daily_scrums_missed?: number,
+    daily_scrum_attendance_rate?: number,
+    
+    // Fase 3: Campos de retrospectiva y mejoras
+    isCompleted?: boolean,
+    hasRetrospective?: boolean,
+    achievements?: string[],
+    problems?: string[],
+    actions_to_take?: string[],
+    retrospective_notes?: string,
+    lessons_learned?: string[],
+    improvement_areas?: string[],
+    team_feedback?: string[],
+    stakeholder_feedback?: string[],
+    team_satisfaction_score?: number,
+    stakeholder_satisfaction_score?: number,
+    process_improvements?: string[],
+    tool_improvements?: string[],
+    communication_improvements?: string[],
+    technical_debt_added?: string[],
+    technical_debt_resolved?: string[],
+    knowledge_shared?: string[],
+    skills_developed?: string[],
+    mentoring_sessions?: string[],
+    sprint_goals_achieved?: string[],
+    sprint_goals_partially_achieved?: string[],
+    sprint_goals_not_achieved?: string[],
+    sprint_ceremony_effectiveness?: string[]
 }
 
 interface Project {
@@ -86,7 +144,7 @@ const clearFilters = () => {
     applyFilters()
 }
 
-// Calculate sprint statistics
+// Calculate sprint statistics with new fields
 const getSprintStats = (sprint: Sprint) => {
     const totalTasks = sprint.tasks?.length || 0
     const completedTasks = sprint.tasks?.filter(task => task.status === 'done').length || 0
@@ -100,13 +158,28 @@ const getSprintStats = (sprint: Sprint) => {
     // Calculate priority based on pending tasks vs remaining days
     const priorityScore = daysToEnd > 0 ? pendingTasks / daysToEnd : pendingTasks
     
+    // New metrics from Phase 2
+    const velocityDeviation = sprint.velocity_deviation || 0
+    const bugResolutionRate = sprint.bug_resolution_rate || 0
+    const attendanceRate = sprint.daily_scrum_attendance_rate || 0
+    const codeReviewCompletionRate = sprint.code_reviews_completed && sprint.code_reviews_pending 
+        ? Math.round((sprint.code_reviews_completed / (sprint.code_reviews_completed + sprint.code_reviews_pending)) * 100)
+        : 0
+    
     return {
         totalTasks,
         completedTasks,
         pendingTasks,
         completionRate,
         daysToEnd,
-        priorityScore
+        priorityScore,
+        velocityDeviation,
+        bugResolutionRate,
+        attendanceRate,
+        codeReviewCompletionRate,
+        progressPercentage: sprint.progress_percentage || 0,
+        blockersCount: sprint.blockers?.length || 0,
+        risksCount: sprint.risks?.length || 0
     }
 }
 
@@ -141,6 +214,16 @@ const getPriorityIcon = (priorityScore: number) => {
     return 'check-circle'
 }
 
+// Get sprint type badge
+const getSprintTypeBadge = (sprintType: string) => {
+    const types = {
+        'regular': { label: 'Regular', class: 'bg-blue-100 text-blue-800' },
+        'release': { label: 'Release', class: 'bg-green-100 text-green-800' },
+        'hotfix': { label: 'Hotfix', class: 'bg-red-100 text-red-800' }
+    }
+    return types[sprintType as keyof typeof types] || { label: 'Unknown', class: 'bg-gray-100 text-gray-800' }
+}
+
 // Filter sprints por estado
 const filteredSprints = computed(() => {
     let filtered = props.sprints
@@ -153,18 +236,33 @@ const filteredSprints = computed(() => {
     return filtered
 })
 
-// Get general statistics
+// Get enhanced general statistics
 const getGeneralStats = () => {
     const totalSprints = props.sprints.length
     const activeSprints = props.sprints.filter(sprint => getSprintStatus(sprint) === 'active').length
     const completedSprints = props.sprints.filter(sprint => getSprintStatus(sprint) === 'completed').length
     const upcomingSprints = props.sprints.filter(sprint => getSprintStatus(sprint) === 'upcoming').length
     
+    // New metrics
+    const totalBugs = props.sprints.reduce((sum, sprint) => sum + (sprint.bugs_found || 0), 0)
+    const resolvedBugs = props.sprints.reduce((sum, sprint) => sum + (sprint.bugs_resolved || 0), 0)
+    const totalBlockers = props.sprints.reduce((sum, sprint) => sum + (sprint.blockers?.length || 0), 0)
+    const totalRisks = props.sprints.reduce((sum, sprint) => sum + (sprint.risks?.length || 0), 0)
+    
+    const avgVelocityDeviation = props.sprints.length > 0 
+        ? props.sprints.reduce((sum, sprint) => sum + (sprint.velocity_deviation || 0), 0) / props.sprints.length
+        : 0
+    
     return {
         total: totalSprints,
         active: activeSprints,
         completed: completedSprints,
-        upcoming: upcomingSprints
+        upcoming: upcomingSprints,
+        totalBugs,
+        resolvedBugs,
+        totalBlockers,
+        totalRisks,
+        avgVelocityDeviation: Math.round(avgVelocityDeviation * 100) / 100
     }
 }
 
@@ -181,7 +279,10 @@ const sortOptions = [
     { value: 'pending_tasks', label: 'Most pending tasks' },
     { value: 'completion_rate', label: 'Highest completion rate' },
     { value: 'days_to_end', label: 'Closest to closing' },
-    { value: 'priority_score', label: 'Highest priority' }
+    { value: 'priority_score', label: 'Highest priority' },
+    { value: 'velocity_deviation', label: 'Velocity deviation' },
+    { value: 'bug_resolution_rate', label: 'Bug resolution rate' },
+    { value: 'progress_percentage', label: 'Progress percentage' }
 ]
 
 // Opciones de filtro por tipo
@@ -205,54 +306,74 @@ watch(filters, () => {
       <div class="flex items-center justify-between">
         <div>
           <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">Sprints</h1>
-          <p class="text-sm text-gray-600 dark:text-gray-400">Manage and track all project sprints</p>
+          <p class="text-sm text-gray-600 dark:text-gray-400">Manage and track all project sprints with advanced metrics</p>
         </div>
         <CreateSprintModal 
           v-if="permissions === 'admin' && projects.length > 0" 
-          :project="projects[0]!" 
+          :projects="projects" 
         />
       </div>
     </template>
 
-    <!-- Sprint Stats -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <!-- Enhanced Sprint Stats -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4 sm:gap-6 mb-8">
       <Card>
         <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle class="text-sm font-medium">Total Sprints</CardTitle>
+          <CardTitle class="text-xs sm:text-sm font-medium">Total Sprints</CardTitle>
           <Icon name="list" class="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div class="text-2xl font-bold">{{ getGeneralStats().total }}</div>
+          <div class="text-xl sm:text-2xl font-bold">{{ getGeneralStats().total }}</div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle class="text-sm font-medium">Active</CardTitle>
+          <CardTitle class="text-xs sm:text-sm font-medium">Active</CardTitle>
           <Icon name="play" class="h-4 w-4 text-green-600" />
         </CardHeader>
         <CardContent>
-          <div class="text-2xl font-bold text-green-600">{{ getGeneralStats().active }}</div>
+          <div class="text-xl sm:text-2xl font-bold text-green-600">{{ getGeneralStats().active }}</div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle class="text-sm font-medium">Upcoming</CardTitle>
+          <CardTitle class="text-xs sm:text-sm font-medium">Upcoming</CardTitle>
           <Icon name="clock" class="h-4 w-4 text-blue-600" />
         </CardHeader>
         <CardContent>
-          <div class="text-2xl font-bold text-blue-600">{{ getGeneralStats().upcoming }}</div>
+          <div class="text-xl sm:text-2xl font-bold text-blue-600">{{ getGeneralStats().upcoming }}</div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle class="text-sm font-medium">Completed</CardTitle>
+          <CardTitle class="text-xs sm:text-sm font-medium">Completed</CardTitle>
           <Icon name="check" class="h-4 w-4 text-gray-600" />
         </CardHeader>
         <CardContent>
-          <div class="text-2xl font-bold text-gray-600">{{ getGeneralStats().completed }}</div>
+          <div class="text-xl sm:text-2xl font-bold text-gray-600">{{ getGeneralStats().completed }}</div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle class="text-xs sm:text-sm font-medium">Bugs Resolved</CardTitle>
+          <Icon name="bug" class="h-4 w-4 text-purple-600" />
+        </CardHeader>
+        <CardContent>
+          <div class="text-xl sm:text-2xl font-bold text-purple-600">{{ getGeneralStats().resolvedBugs }}/{{ getGeneralStats().totalBugs }}</div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle class="text-xs sm:text-sm font-medium">Avg Velocity Dev.</CardTitle>
+          <Icon name="trending-down" class="h-4 w-4 text-orange-600" />
+        </CardHeader>
+        <CardContent>
+          <div class="text-xl sm:text-2xl font-bold text-orange-600">{{ getGeneralStats().avgVelocityDeviation }}%</div>
         </CardContent>
       </Card>
     </div>
@@ -266,7 +387,7 @@ watch(filters, () => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
           <!-- Filtro por Project -->
           <div>
             <label class="block text-sm font-medium mb-2">Project</label>
@@ -370,7 +491,7 @@ watch(filters, () => {
       </CardContent>
     </Card>
 
-    <!-- Sprints with Detailed Information -->
+    <!-- Sprints with Enhanced Information -->
     <div v-if="filteredSprints.length > 0" class="space-y-8">
       <!-- Active Sprints -->
       <div v-if="getSprintsByStatus('active').length > 0">
@@ -441,7 +562,7 @@ watch(filters, () => {
         </Button>
         <CreateSprintModal 
           v-if="permissions === 'admin' && projects.length > 0" 
-          :project="projects[0]!" 
+          :projects="projects" 
         />
       </div>
     </div>

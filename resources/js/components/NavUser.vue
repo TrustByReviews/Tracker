@@ -22,7 +22,7 @@ console.log('NavUser - User data:', user);
 console.log('NavUser - Sidebar state:', state.value);
 console.log('NavUser - Is mobile:', isMobile.value);
 
-// Rolees are loaded correctly from the middleware
+// Roles are loaded correctly from the middleware
 </script>
 
 <template>

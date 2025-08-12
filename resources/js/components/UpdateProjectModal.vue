@@ -56,25 +56,26 @@ const getRoleeeeeeeeeeeeeName = (developer: Developer) => {
 
 <template>
   <div>
-    <Button @click="open = true" variant="outline" size="sm">
+    <Button @click="open = true" class="border-black bg-black text-white hover:bg-gray-400 hover:border-white hover:text-black" size="sm">
       <Icon name="edit" class="h-4 w-4 mr-2" />
       Update Project
     </Button>
 
     <Dialog :open="open" @update:open="open = $event">
-      <DialogContent class="sm:max-w-md">
+      <DialogContent class="sm:max-w-md bg-white rounded-lg shadow-lg">
         <DialogHeader>
-          <DialogTitle>Update Project</DialogTitle>
+          <DialogTitle class="text-gray-800">Update Project</DialogTitle>
         </DialogHeader>
 
         <form @submit.prevent="submit" class="space-y-4">
           <!-- Name -->
           <div class="space-y-2">
-            <Label for="name">Name</Label>
+            <Label for="name" class="text-gray-700">Name</Label>
                         <Input
               id="name"
               v-model="form.name"
               placeholder="Enter project name"
+              class="w-full border-gray-300 text-black bg-white"
               :class="conditionalClass('', form.errors.name, 'border-red-500')"
             />
             <p v-if="form.errors.name" class="text-sm text-red-600">{{ form.errors.name }}</p>
@@ -82,11 +83,12 @@ const getRoleeeeeeeeeeeeeName = (developer: Developer) => {
 
           <!-- Description -->
           <div class="space-y-2">
-            <Label for="description">Description</Label>
+            <Label for="description" class="text-gray-700">Description</Label>
                         <Input
               id="description"
               v-model="form.description"
               placeholder="Enter project description"
+              class="w-full border-gray-300 text-black bg-white"
               :class="conditionalClass('', form.errors.description, 'border-red-500')"
             />
             <p v-if="form.errors.description" class="text-sm text-red-600">{{ form.errors.description }}</p>
@@ -94,9 +96,9 @@ const getRoleeeeeeeeeeeeeName = (developer: Developer) => {
 
           <!-- Status -->
           <div class="space-y-2">
-            <Label for="status">Status</Label>
+            <Label for="status" class="text-gray-700">Status</Label>
             <Select v-model="form.status">
-              <SelectTrigger :class="conditionalClass('', form.errors.status, 'border-red-500')">
+              <SelectTrigger class="w-full border-gray-300 text-black bg-white" :class="conditionalClass('', form.errors.status, 'border-red-500')">
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
@@ -111,8 +113,8 @@ const getRoleeeeeeeeeeeeeName = (developer: Developer) => {
 
           <!-- Developers -->
           <div class="space-y-2">
-            <Label>Team Members</Label>
-            <div class="space-y-2 max-h-40 overflow-y-auto border rounded-md p-2">
+            <Label class="text-gray-700">Team Members</Label>
+            <div class="space-y-2 max-h-40 overflow-y-auto border border-gray-300 rounded-md p-2 bg-white">
               <div
                 v-for="developer in developers"
                 :key="developer.id"
@@ -126,9 +128,9 @@ const getRoleeeeeeeeeeeeeName = (developer: Developer) => {
                   class="rounded border-gray-300"
                 />
                 <label :for="`dev-${developer.id}`" class="flex-1 text-sm">
-                  <div class="font-medium">{{ developer.name }}</div>
-                  <div class="text-gray-500 text-xs">{{ developer.email }}</div>
-                  <div class="text-gray-400 text-xs">{{ getRoleeeeeeeeeeeeeName(developer) }}</div>
+                  <div class="font-medium text-gray-800">{{ developer.name }}</div>
+                  <div class="text-gray-600 text-xs">{{ developer.email }}</div>
+                  <div class="text-gray-500 text-xs">{{ getRoleeeeeeeeeeeeeName(developer) }}</div>
                 </label>
               </div>
             </div>
@@ -139,7 +141,7 @@ const getRoleeeeeeeeeeeeeName = (developer: Developer) => {
             <Button type="button" variant="outline" @click="open = false">
               Cancel
             </Button>
-            <Button type="submit" :disabled="form.processing">
+            <Button type="submit" :disabled="form.processing" class="bg-blue-500 text-white hover:bg-blue-600">
               <span v-if="form.processing">Updating...</span>
               <span v-else>Update Project</span>
             </Button>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { cn } from '@/lib/utils';
-import { useEventListener, useMediumQuery, useVModel } from '@vueuse/core';
+import { useEventListener, useMediaQuery, useVModel } from '@vueuse/core';
 import { TooltipProvider } from 'reka-ui';
 import { computed, ref, type HTMLAttributes, type Ref } from 'vue';
 import {
@@ -28,7 +28,7 @@ const emits = defineEmits<{
     'update:open': [open: boolean];
 }>();
 
-const isMobile = useMediumQuery('(max-width: 768px)');
+const isMobile = useMediaQuery('(max-width: 768px)');
 const openMobile = ref(false);
 
 const open = useVModel(props, 'open', emits, {

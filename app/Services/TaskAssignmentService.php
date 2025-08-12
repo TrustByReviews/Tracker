@@ -9,20 +9,44 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 
+/**
+ * Task Assignment Service Class
+ * 
+ * This service handles all task assignment operations including team leader assignments,
+ * developer self-assignments, and validation of assignment rules and permissions.
+ * 
+ * Features:
+ * - Team leader task assignments to developers
+ * - Developer self-assignment capabilities
+ * - Activity limit validation (max 3 concurrent activities)
+ * - Project permission validation
+ * - Assignment history tracking
+ * - Available tasks and developers queries
+ * 
+ * @package App\Services
+ * @author System
+ * @version 1.0
+ */
 class TaskAssignmentService
 {
     /**
-     * Verificar el número de actividades activas de un usuario
+     * Get the count of active activities for a user
+     * 
+     * Counts both active tasks and bugs assigned to a user.
+     * Used to enforce the maximum 3 concurrent activities rule.
+     * 
+     * @param string $userId The user ID to check
+     * @return int Number of active activities (tasks + bugs)
      */
     private function getActiveActivitiesCount(string $userId): int
     {
-        // Contar tareas activas
+        // Count active tasks
         $activeTasks = DB::table('tasks')
             ->where('user_id', $userId)
             ->whereIn('status', ['to do', 'in progress'])
             ->count();
             
-        // Contar bugs activos
+        // Count active bugs
         $activeBugs = DB::table('bugs')
             ->where('user_id', $userId)
             ->whereIn('status', ['new', 'assigned', 'in progress'])
@@ -32,35 +56,45 @@ class TaskAssignmentService
     }
     
     /**
-     * Asignar tarea a un desarrollador por un team leader
+     * Assign a task to a developer by a team leader
+     * 
+     * This method handles task assignments from team leaders to developers.
+     * It includes comprehensive validation of permissions, project membership,
+     * and activity limits before allowing the assignment.
+     * 
+     * @param Task $task The task to be assigned
+     * @param User $developer The developer to assign the task to
+     * @param User $teamLeader The team leader making the assignment
+     * @return bool True if assignment was successful
+     * @throws \Exception If assignment validation fails
      */
     public function assignTaskByTeamLeader(Task $task, User $developer, User $teamLeader): bool
     {
         try {
             DB::beginTransaction();
             
-            // Verificar que el team leader tiene permisos sobre el proyecto
+            // Verify team leader has permissions for the project
             if (!$this->canTeamLeaderAssignToProject($teamLeader, $task->project)) {
-                throw new \Exception('Team leader no tiene permisos para asignar tareas en este proyecto');
+                throw new \Exception('Team leader does not have permissions to assign tasks in this project');
             }
             
-            // Verificar que el desarrollador está asignado al proyecto
+            // Verify developer is assigned to the project
             if (!$task->project->users()->where('users.id', $developer->id)->exists()) {
-                throw new \Exception('El desarrollador no está asignado a este proyecto');
+                throw new \Exception('The developer is not assigned to this project');
             }
             
-            // Verificar límite de actividades activas (máximo 3)
+            // Verify activity limit (maximum 3 concurrent activities)
             $activeActivities = $this->getActiveActivitiesCount($developer->id);
             if ($activeActivities >= 3) {
-                throw new \Exception('El desarrollador ya tiene el máximo de 3 actividades activas (tareas o bugs). Debe completar o pausar alguna actividad antes de asignar una nueva.');
+                throw new \Exception('The developer already has the maximum of 3 active activities (tasks or bugs). They must complete or pause some activity before assigning a new one.');
             }
             
-            // Verificar que la tarea no está ya asignada
+            // Verify task is not already assigned
             if ($task->user_id) {
-                throw new \Exception('La tarea ya está asignada a otro desarrollador');
+                throw new \Exception('The task is already assigned to another developer');
             }
             
-            // Asignar la tarea
+            // Assign the task
             $task->update([
                 'user_id' => $developer->id,
                 'assigned_by' => $teamLeader->id,
@@ -68,7 +102,7 @@ class TaskAssignmentService
                 'status' => 'to do'
             ]);
             
-            Log::info('Tarea asignada por team leader', [
+            Log::info('Task assigned by team leader', [
                 'task_id' => $task->id,
                 'task_name' => $task->name,
                 'developer_id' => $developer->id,
@@ -82,7 +116,7 @@ class TaskAssignmentService
             
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Error al asignar tarea por team leader', [
+            Log::error('Error assigning task by team leader', [
                 'error' => $e->getMessage(),
                 'task_id' => $task->id,
                 'developer_id' => $developer->id,
@@ -93,43 +127,53 @@ class TaskAssignmentService
     }
     
     /**
-     * Auto-asignar tarea por un desarrollador
+     * Self-assign a task by a developer
+     * 
+     * Allows developers to assign tasks to themselves under specific conditions:
+     * - Task must be unassigned or have high priority
+     * - Developer must be assigned to the project
+     * - Developer must not exceed activity limits
+     * 
+     * @param Task $task The task to be self-assigned
+     * @param User $developer The developer self-assigning the task
+     * @return bool True if self-assignment was successful
+     * @throws \Exception If self-assignment validation fails
      */
     public function selfAssignTask(Task $task, User $developer): bool
     {
         try {
             DB::beginTransaction();
             
-            // Verificar que el desarrollador está asignado al proyecto
+            // Verify developer is assigned to the project
             if (!$task->project->users()->where('users.id', $developer->id)->exists()) {
-                throw new \Exception('No tienes acceso a este proyecto');
+                throw new \Exception('You are not assigned to this project');
             }
             
-            // Verificar límite de actividades activas (máximo 3)
+            // Verify activity limit (maximum 3 concurrent activities)
             $activeActivities = $this->getActiveActivitiesCount($developer->id);
             if ($activeActivities >= 3) {
-                throw new \Exception('Ya tienes el máximo de 3 actividades activas (tareas o bugs). Debes completar o pausar alguna actividad antes de asignarte una nueva.');
+                throw new \Exception('You already have the maximum of 3 active activities (tasks or bugs). You must complete or pause some activity before assigning a new one.');
             }
             
-            // Verificar que la tarea no está ya asignada
+            // Verify task is not already assigned
             if ($task->user_id) {
-                throw new \Exception('La tarea ya está asignada a otro desarrollador');
+                throw new \Exception('The task is already assigned to another developer');
             }
             
-            // Verificar que la tarea está disponible (no asignada y con prioridad alta o sin asignar)
+            // Verify task is available for self-assignment (unassigned or high priority)
             if ($task->user_id && $task->priority !== 'high') {
-                throw new \Exception('Solo puedes auto-asignarte tareas de alta prioridad o tareas no asignadas');
+                throw new \Exception('You can only self-assign unassigned tasks or high priority tasks');
             }
             
-            // Auto-asignar la tarea
+            // Self-assign the task
             $task->update([
                 'user_id' => $developer->id,
-                'assigned_by' => $developer->id, // Se auto-asigna
+                'assigned_by' => $developer->id,
                 'assigned_at' => now(),
                 'status' => 'to do'
             ]);
             
-            Log::info('Tarea auto-asignada por desarrollador', [
+            Log::info('Task self-assigned by developer', [
                 'task_id' => $task->id,
                 'task_name' => $task->name,
                 'developer_id' => $developer->id,
@@ -141,7 +185,7 @@ class TaskAssignmentService
             
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Error al auto-asignar tarea', [
+            Log::error('Error self-assigning task', [
                 'error' => $e->getMessage(),
                 'task_id' => $task->id,
                 'developer_id' => $developer->id
@@ -151,11 +195,18 @@ class TaskAssignmentService
     }
     
     /**
-     * Obtener tareas disponibles para auto-asignación
+     * Get available tasks for a developer to self-assign
+     * 
+     * Returns tasks that a developer can assign to themselves.
+     * Includes unassigned tasks and high priority tasks from projects
+     * the developer is assigned to.
+     * 
+     * @param User $developer The developer to get available tasks for
+     * @return \Illuminate\Database\Eloquent\Collection Collection of available tasks
      */
     public function getAvailableTasksForDeveloper(User $developer): \Illuminate\Database\Eloquent\Collection
     {
-        return Task::whereHas('sprint.project.users', function ($query) use ($developer) {
+        return Task::whereHas('project.users', function ($query) use ($developer) {
             $query->where('users.id', $developer->id);
         })
         ->where(function ($query) {
@@ -163,53 +214,77 @@ class TaskAssignmentService
                   ->orWhere('priority', 'high');
         })
         ->where('status', 'to do')
-        ->with(['sprint', 'project'])
+        ->with(['project', 'sprint'])
         ->orderBy('priority', 'desc')
         ->orderBy('created_at', 'asc')
         ->get();
     }
     
     /**
-     * Obtener tareas asignadas a un desarrollador
+     * Get tasks currently assigned to a developer
+     * 
+     * Returns all tasks (active and completed) that are assigned to a specific developer.
+     * 
+     * @param User $developer The developer to get tasks for
+     * @return \Illuminate\Database\Eloquent\Collection Collection of assigned tasks
      */
     public function getAssignedTasksForDeveloper(User $developer): \Illuminate\Database\Eloquent\Collection
     {
         return Task::where('user_id', $developer->id)
-            ->with(['sprint', 'project', 'assignedBy'])
+            ->with(['project', 'sprint'])
+            ->orderBy('status')
             ->orderBy('priority', 'desc')
-            ->orderBy('created_at', 'asc')
             ->get();
     }
     
     /**
-     * Verificar si un team leader puede asignar tareas en un proyecto
+     * Check if a team leader can assign tasks to a specific project
+     * 
+     * Validates that a team leader has the necessary permissions
+     * to assign tasks within a project.
+     * 
+     * @param User $teamLeader The team leader to check permissions for
+     * @param Project $project The project to check permissions in
+     * @return bool True if team leader can assign tasks in the project
      */
     private function canTeamLeaderAssignToProject(User $teamLeader, Project $project): bool
     {
-        // Verificar que el usuario es team leader
-        if (!$teamLeader->roles()->where('name', 'team_leader')->exists()) {
-            return false;
-        }
-        
-        // Verificar que el team leader está asignado al proyecto
-        return $project->users()->where('users.id', $teamLeader->id)->exists();
+        return $project->users()
+            ->where('users.id', $teamLeader->id)
+            ->whereHas('roles', function ($query) {
+                $query->where('name', 'team_leader');
+            })
+            ->exists();
     }
     
     /**
-     * Obtener desarrolladores disponibles para un proyecto
+     * Get available developers for a project
+     * 
+     * Returns all developers assigned to a project who are available
+     * for new task assignments (not at activity limit).
+     * 
+     * @param Project $project The project to get developers for
+     * @return \Illuminate\Database\Eloquent\Collection Collection of available developers
      */
     public function getAvailableDevelopersForProject(Project $project): \Illuminate\Database\Eloquent\Collection
     {
         return $project->users()
             ->whereHas('roles', function ($query) {
-                $query->where('name', 'developer');
+                $query->whereIn('name', ['developer', 'qa']);
             })
-            ->orderBy('name')
-            ->get();
+            ->get()
+            ->filter(function ($developer) {
+                return $this->getActiveActivitiesCount($developer->id) < 3;
+            });
     }
     
     /**
-     * Obtener team leaders de un proyecto
+     * Get team leaders for a project
+     * 
+     * Returns all team leaders assigned to a specific project.
+     * 
+     * @param Project $project The project to get team leaders for
+     * @return \Illuminate\Database\Eloquent\Collection Collection of team leaders
      */
     public function getTeamLeadersForProject(Project $project): \Illuminate\Database\Eloquent\Collection
     {
@@ -217,7 +292,6 @@ class TaskAssignmentService
             ->whereHas('roles', function ($query) {
                 $query->where('name', 'team_leader');
             })
-            ->orderBy('name')
             ->get();
     }
 } 

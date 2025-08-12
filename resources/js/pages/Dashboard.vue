@@ -12,6 +12,36 @@ import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
 import { router } from '@inertiajs/vue3';
 
+/**
+ * Dashboard Component
+ * 
+ * This is the main dashboard page that provides role-specific views and functionality
+ * for different user types (Admin, Team Leader, Developer, QA). It dynamically renders
+ * different content based on user permissions and role.
+ * 
+ * Features:
+ * - Role-based dashboard views
+ * - Real-time statistics and metrics
+ * - Task and project management
+ * - Performance tracking
+ * - Quick action buttons
+ * - Responsive design for all screen sizes
+ * 
+ * @component
+ * @example
+ * <Dashboard 
+ *   :user="currentUser"
+ *   :isAdmin="userIsAdmin"
+ *   :isQa="userIsQa"
+ *   :isTeamLeader="userIsTeamLeader"
+ *   :assignedProjects="userProjects"
+ *   :tasksInProgress="userTasks"
+ * />
+ */
+
+/**
+ * Breadcrumb navigation items for the dashboard
+ */
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Dashboard',
@@ -19,43 +49,56 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-// Props from the controller
+/**
+ * Component props interface for dashboard data
+ */
 interface Props {
-    user: any;
-    isAdmin: boolean;
-    isQa?: boolean;
-    isTeamLeader?: boolean;
-    // Developer props
-    assignedProjects?: any[];
-    tasksInProgress?: any[];
-    completedTasks?: any[];
-    highPriorityUnassignedTasks?: any[];
-    stats?: any;
-    // Admin props
-    projects?: any[];
-    developers?: any[];
-    systemStats?: any;
-    tasksRequiringAttention?: any[];
-    activeProjectsSummary?: any[];
-    developerMetrics?: any[];
-    // QA props
-    tasksReadyForTesting?: any[];
-    bugsReadyForTesting?: any[];
-    tasksInTesting?: any[];
-    bugsInTesting?: any[];
-    existingTasks?: any[];
-    existingBugs?: any[];
-    // Team Leader props
-    pendingTasks?: any[];
-    qaApprovedTasks?: any[];
-    qaApprovedBugs?: any[];
-    // Bugs props
-    bugs?: any[];
-    bugStats?: any;
+    user: any;                    // Current authenticated user
+    isAdmin: boolean;             // Whether user has admin privileges
+    isQa?: boolean;               // Whether user has QA role
+    isTeamLeader?: boolean;       // Whether user has team leader role
+    
+    // Developer-specific props
+    assignedProjects?: any[];     // Projects assigned to the developer
+    tasksInProgress?: any[];      // Tasks currently in progress
+    completedTasks?: any[];       // Recently completed tasks
+    highPriorityUnassignedTasks?: any[]; // High priority tasks available for assignment
+    stats?: any;                  // Developer performance statistics
+    
+    // Admin-specific props
+    projects?: any[];             // All projects in the system
+    developers?: any[];           // All developers in the system
+    systemStats?: any;            // System-wide statistics
+    tasksRequiringAttention?: any[]; // Tasks that need admin attention
+    activeProjectsSummary?: any[]; // Summary of active projects
+    developerMetrics?: any[];     // Performance metrics for all developers
+    
+    // QA-specific props
+    tasksReadyForTesting?: any[]; // Tasks ready for QA testing
+    bugsReadyForTesting?: any[];  // Bugs ready for QA testing
+    tasksInTesting?: any[];       // Tasks currently being tested
+    bugsInTesting?: any[];        // Bugs currently being tested
+    existingTasks?: any[];        // All tasks in the system
+    existingBugs?: any[];         // All bugs in the system
+    
+    // Team Leader-specific props
+    pendingTasks?: any[];         // Tasks pending team leader approval
+    qaApprovedTasks?: any[];      // Tasks approved by QA
+    qaApprovedBugs?: any[];       // Bugs approved by QA
+    
+    // Bug-related props
+    bugs?: any[];                 // Bugs assigned to the user
+    bugStats?: any;               // Bug-related statistics
 }
 
 const props = defineProps<Props>();
 
+/**
+ * Assign a task to the current user
+ * Updates the task status to 'in_progress' and assigns it to the user
+ * 
+ * @param {any} task - The task to be assigned
+ */
 const assignTask = (task: any) => {
     router.put(`/tasks/${task.id}`, {
         user_id: props.user.id,
@@ -63,6 +106,13 @@ const assignTask = (task: any) => {
     });
 };
 
+/**
+ * Format time in seconds to HH:MM:SS format
+ * Converts total seconds to a readable time format
+ * 
+ * @param {number} seconds - Total seconds to format
+ * @returns {string} Formatted time string (HH:MM:SS)
+ */
 const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -71,6 +121,13 @@ const formatTime = (seconds: number) => {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
 
+/**
+ * Calculate time excess for a task
+ * Compares actual time spent vs estimated time and returns the excess
+ * 
+ * @param {any} task - The task to calculate time excess for
+ * @returns {string} Formatted excess time or 'N/A' if no estimate
+ */
 const getTimeExcess = (task: any) => {
     if (!task.estimated_hours) return 'N/A';
     
@@ -86,6 +143,13 @@ const getTimeExcess = (task: any) => {
     return `${excessHours}h ${excessMinutes}m`;
 };
 
+/**
+ * Format date string to localized format
+ * Converts date string to Spanish locale format
+ * 
+ * @param {string} dateString - Date string to format
+ * @returns {string} Formatted date string
+ */
 const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-ES', {
         year: 'numeric',
@@ -94,6 +158,12 @@ const formatDate = (dateString: string) => {
     });
 };
 
+/**
+ * Navigate to task details page
+ * Redirects user to the detailed view of a specific task
+ * 
+ * @param {string} taskId - ID of the task to view
+ */
 const viewTaskDetails = (taskId: string) => {
     router.visit(`/tasks/${taskId}`);
 };

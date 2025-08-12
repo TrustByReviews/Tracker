@@ -23,7 +23,7 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: '/team-leader/dashboard',
     },
     {
-        title: 'Mis Projects',
+        title: 'My Projects',
         href: '/team-leader/projects',
     },
 ];
@@ -36,7 +36,7 @@ interface Props {
 const props = defineProps<Props>();
 
 const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-ES', {
+    return new Date(dateString).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric'
@@ -62,8 +62,8 @@ const viewBugs = (projectId: string) => {
 const getProjectStatus = (project: any) => {
     if (project.status === 'active') return { label: 'Active', color: 'bg-green-100 text-green-800' };
     if (project.status === 'completed') return { label: 'Completed', color: 'bg-blue-100 text-blue-800' };
-    if (project.status === 'on_hold') return { label: 'En Pausa', color: 'bg-yellow-100 text-yellow-800' };
-    return { label: 'Desconocido', color: 'bg-gray-100 text-gray-800' };
+    if (project.status === 'on_hold') return { label: 'On Hold', color: 'bg-yellow-100 text-yellow-800' };
+    return { label: 'Unknown', color: 'bg-gray-100 text-gray-800' };
 };
 
 const getActiveSprintsCount = (project: any) => {
@@ -84,15 +84,15 @@ const getTotalBugsCount = (project: any) => {
 </script>
 
 <template>
-    <Head title="Mis Projects - Team Leader" />
+    <Head title="My Projects - Team Leader" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 p-4">
             <!-- Header -->
             <div class="flex items-center justify-between">
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Mis Projects</h1>
-                    <p class="text-gray-600 dark:text-gray-400">Gestiona los proyectos donde eres Team Leader</p>
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">My Projects</h1>
+                    <p class="text-gray-600 dark:text-gray-400">Manage your projects where you are Team Leader</p>
                 </div>
                 <div class="flex space-x-2">
                     <Button variant="outline" size="sm">
@@ -111,40 +111,40 @@ const getTotalBugsCount = (project: any) => {
                     </CardHeader>
                     <CardContent>
                         <div class="text-2xl font-bold">{{ projects.length }}</div>
-                        <p class="text-xs text-muted-foreground">Projects asignados</p>
+                        <p class="text-xs text-muted-foreground">Assigned projects</p>
                     </CardContent>
                 </Card>
 
                 <Card>
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Projects Actives</CardTitle>
+                        <CardTitle class="text-sm font-medium">Active Projects</CardTitle>
                         <Folder class="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div class="text-2xl font-bold">{{ projects.filter(p => p.status === 'active').length }}</div>
-                        <p class="text-xs text-muted-foreground">En desarrollo</p>
+                        <p class="text-xs text-muted-foreground">In development</p>
                     </CardContent>
                 </Card>
 
                 <Card>
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Sprints Actives</CardTitle>
+                        <CardTitle class="text-sm font-medium">Active Sprints</CardTitle>
                         <Calendar class="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div class="text-2xl font-bold">{{ projects.reduce((total, p) => total + getActiveSprintsCount(p), 0) }}</div>
-                        <p class="text-xs text-muted-foreground">Sprints en curso</p>
+                        <p class="text-xs text-muted-foreground">Ongoing sprints</p>
                     </CardContent>
                 </Card>
 
                 <Card>
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Tasks Completadas</CardTitle>
+                        <CardTitle class="text-sm font-medium">Completed Tasks</CardTitle>
                         <CheckSquare class="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div class="text-2xl font-bold">{{ projects.reduce((total, p) => total + getCompletedTasksCount(p), 0) }}</div>
-                        <p class="text-xs text-muted-foreground">Tasks finalizadas</p>
+                        <p class="text-xs text-muted-foreground">Finished tasks</p>
                     </CardContent>
                 </Card>
             </div>
@@ -169,7 +169,7 @@ const getTotalBugsCount = (project: any) => {
                         <div class="grid grid-cols-2 gap-4 mb-4">
                             <div class="text-center">
                                 <div class="text-2xl font-bold text-blue-600">{{ getActiveSprintsCount(project) }}</div>
-                                <div class="text-xs text-gray-500">Sprints Actives</div>
+                                <div class="text-xs text-gray-500">Active Sprints</div>
                             </div>
                             <div class="text-center">
                                 <div class="text-2xl font-bold text-green-600">{{ getCompletedTasksCount(project) }}/{{ getTotalTasksCount(project) }}</div>
@@ -197,7 +197,7 @@ const getTotalBugsCount = (project: any) => {
                         <div class="grid grid-cols-2 gap-2">
                             <Button @click="viewProject(project.id)" size="sm" variant="outline" class="w-full">
                                 <Folder class="h-4 w-4 mr-1" />
-                                Ver Project
+                                View Project
                             </Button>
                             <Button @click="viewSprints(project.id)" size="sm" variant="outline" class="w-full">
                                 <Calendar class="h-4 w-4 mr-1" />
@@ -209,7 +209,7 @@ const getTotalBugsCount = (project: any) => {
                         <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                             <div class="flex justify-between text-xs text-gray-500">
                                 <span>Bugs: {{ getTotalBugsCount(project) }}</span>
-                                <span v-if="project.created_at">Creado: {{ formatDate(project.created_at) }}</span>
+                                <span v-if="project.created_at">Created: {{ formatDate(project.created_at) }}</span>
                             </div>
                         </div>
                     </CardContent>
@@ -219,8 +219,8 @@ const getTotalBugsCount = (project: any) => {
             <!-- Empty State -->
             <div v-if="projects.length === 0" class="text-center py-12">
                 <Folder class="mx-auto h-16 w-16 text-gray-400" />
-                <h3 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">No tienes proyectos asignados</h3>
-                <p class="mt-2 text-gray-500 dark:text-gray-400">Contacta con un administrador para ser asignado a proyectos.</p>
+                <h3 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">You don't have any assigned projects</h3>
+                <p class="mt-2 text-gray-500 dark:text-gray-400">Contact an administrator to be assigned to projects.</p>
             </div>
         </div>
     </AppLayout>

@@ -10,6 +10,7 @@ use App\Models\Notification;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -32,25 +33,25 @@ class QaController extends Controller
         $projects = $user->projects()->with(['users', 'sprints.tasks'])->get();
         
         // Tareas listas para testing
-        $tasksReadyForTesting = Task::whereHas('project', function ($query) use ($user) {
+        $tasksReadyForTesting = Task::whereHas('sprint.project', function ($query) use ($user) {
             $query->whereHas('users', function ($q) use ($user) {
                 $q->where('users.id', $user->id);
             });
         })
         ->where('qa_status', 'ready_for_test')
-        ->with(['project', 'user', 'sprint'])
+        ->with(['sprint.project', 'user', 'sprint'])
         ->orderBy('priority', 'desc')
         ->orderBy('created_at', 'asc')
         ->get();
 
         // Bugs listos para testing
-        $bugsReadyForTesting = Bug::whereHas('project', function ($query) use ($user) {
+        $bugsReadyForTesting = Bug::whereHas('sprint.project', function ($query) use ($user) {
             $query->whereHas('users', function ($q) use ($user) {
                 $q->where('users.id', $user->id);
             });
         })
         ->where('qa_status', 'ready_for_test')
-        ->with(['project', 'user', 'sprint'])
+        ->with(['sprint.project', 'user', 'sprint'])
         ->orderBy('importance', 'desc')
         ->orderBy('created_at', 'asc')
         ->get();
@@ -58,13 +59,13 @@ class QaController extends Controller
         // Tareas en testing por el QA actual
         $tasksInTesting = Task::where('qa_assigned_to', $user->id)
             ->where('qa_status', 'testing')
-            ->with(['project', 'user', 'sprint'])
+            ->with(['sprint.project', 'user', 'sprint'])
             ->get();
 
         // Bugs en testing por el QA actual
         $bugsInTesting = Bug::where('qa_assigned_to', $user->id)
             ->where('qa_status', 'testing')
-            ->with(['project', 'user', 'sprint'])
+            ->with(['sprint.project', 'user', 'sprint'])
             ->get();
 
         // Estadísticas
@@ -355,7 +356,26 @@ class QaController extends Controller
     }
 
     /**
-     * Obtener notificaciones
+     * Obtener notificaciones (API endpoint)
+     */
+    public function getNotifications(): \Illuminate\Http\JsonResponse
+    {
+        $user = Auth::user();
+        
+        $notifications = \Illuminate\Support\Facades\DB::table('notifications')
+            ->where('user_id', $user->id)
+            ->orderBy('created_at', 'desc')
+            ->limit(20)
+            ->get();
+
+        return response()->json([
+            'notifications' => $notifications,
+            'unread_count' => $this->notificationService->getUnreadCount($user),
+        ]);
+    }
+
+    /**
+     * Obtener notificaciones (vista)
      */
     public function notifications(): \Illuminate\Http\JsonResponse
     {
@@ -439,14 +459,15 @@ class QaController extends Controller
         $user = Auth::user();
         
         // Tareas finalizadas por desarrolladores que necesitan aprobación de QA
-        $finishedTasks = Task::whereHas('project', function ($query) use ($user) {
+        $finishedTasks = Task::whereHas('sprint.project', function ($query) use ($user) {
             $query->whereHas('users', function ($q) use ($user) {
                 $q->where('users.id', $user->id);
             });
         })
         ->where('status', 'done')
         ->whereIn('qa_status', ['ready_for_test', 'testing', 'testing_paused', 'testing_finished', 'approved', 'rejected'])
-        ->with(['project', 'user', 'sprint'])
+        ->with(['sprint.project', 'user', 'sprint'])
+        ->orderByRaw("CASE WHEN qa_status = 'ready_for_test' THEN 0 ELSE 1 END")
         ->orderBy('priority', 'desc')
         ->orderBy('created_at', 'asc')
         ->paginate(10);
@@ -459,7 +480,7 @@ class QaController extends Controller
         })
         ->where('status', 'resolved')
         ->whereIn('qa_status', ['ready_for_test', 'testing', 'testing_paused', 'testing_finished', 'approved', 'rejected'])
-        ->with(['project', 'user', 'sprint'])
+        ->with(['sprint.project', 'user', 'sprint'])
         ->orderBy('importance', 'desc')
         ->orderBy('created_at', 'asc')
         ->paginate(10);
@@ -488,7 +509,7 @@ class QaController extends Controller
         $user = Auth::user();
         
         // Verificar que el QA esté asignado al proyecto
-        if (!$task->project->users->contains($user->id)) {
+        if (!$task->sprint->project->users->contains($user->id)) {
             return response()->json(['error' => 'No tienes permisos para testear esta tarea'], 403);
         }
 
@@ -512,7 +533,7 @@ class QaController extends Controller
 
         return response()->json([
             'message' => 'Testing iniciado',
-            'task' => $task->load(['project', 'user', 'sprint'])
+            'task' => $task->load(['sprint.project', 'user', 'sprint'])
         ]);
     }
 

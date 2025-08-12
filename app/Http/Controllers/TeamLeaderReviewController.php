@@ -34,7 +34,8 @@ class TeamLeaderReviewController extends Controller
             $query->where('users.id', $authUser->id);
         })
         ->where('qa_status', 'approved')
-        ->whereNull('team_leader_reviewed_by')
+        ->where('team_leader_final_approval', false)
+        ->where('team_leader_requested_changes', false)
         ->with(['user', 'sprint', 'project', 'qaReviewedBy'])
         ->orderBy('qa_reviewed_at', 'desc')
         ->get();
@@ -69,7 +70,8 @@ class TeamLeaderReviewController extends Controller
             $query->where('users.id', $authUser->id);
         })
         ->where('qa_status', 'approved')
-        ->whereNull('team_leader_reviewed_by')
+        ->where('team_leader_final_approval', false)
+        ->where('team_leader_requested_changes', false)
         ->with(['user', 'sprint', 'project', 'qaReviewedBy'])
         ->orderBy('qa_reviewed_at', 'desc')
         ->get();

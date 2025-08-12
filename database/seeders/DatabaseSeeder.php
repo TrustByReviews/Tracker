@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             RoleSeeder::class,
+            ClientRoleSeeder::class,
             AdminUserSeeder::class,
             TestDataSeeder::class, // Agregar el seeder de datos de prueba
         ]);

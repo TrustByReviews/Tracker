@@ -61,6 +61,32 @@
         {{ task.description }}
       </p>
 
+      <!-- QA Rejection Reason (if rejected by QA) -->
+      <div v-if="task.qa_status === 'rejected' && task.qa_rejection_reason" class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-md">
+        <div class="flex items-start">
+          <svg class="w-4 h-4 text-red-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+          </svg>
+          <div>
+            <p class="text-sm font-medium text-red-800 dark:text-red-300 mb-1">Rechazada por QA</p>
+            <p class="text-sm text-red-700 dark:text-red-400">{{ task.qa_rejection_reason }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Team Leader Changes Requested (if TL requested changes) -->
+      <div v-if="task.team_leader_requested_changes && task.team_leader_change_notes" class="mb-4 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-md">
+        <div class="flex items-start">
+          <svg class="w-4 h-4 text-orange-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+          </svg>
+          <div>
+            <p class="text-sm font-medium text-orange-800 dark:text-orange-300 mb-1">Cambios solicitados por Team Leader</p>
+            <p class="text-sm text-orange-700 dark:text-orange-400">{{ task.team_leader_change_notes }}</p>
+          </div>
+        </div>
+      </div>
+
       <!-- Attachments -->
       <div v-if="task.attachments && task.attachments.length > 0" class="mb-4">
         <div class="flex items-center text-xs text-gray-500 mb-2">

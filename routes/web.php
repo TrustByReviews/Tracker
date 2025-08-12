@@ -77,6 +77,11 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
     });
 
+    Route::middleware('permission:projects.edit')->group(function () {
+        Route::post('projects/{project}/finish', [ProjectController::class, 'finish'])->name('projects.finish');
+        Route::put('projects/{project}/users', [ProjectController::class, 'updateUsers'])->name('projects.users.update');
+    });
+
     // Sprints routes with permissions
     Route::middleware(['auth'])->group(function () {
         Route::get('sprints', [SprintController::class, 'index'])->name('sprints.index');
@@ -89,10 +94,20 @@ Route::middleware(['auth'])->group(function () {
     
     Route::middleware('permission:sprints.edit')->group(function () {
         Route::put('projects/{project}/sprints/{sprint}', [SprintController::class, 'update'])->name('sprints.update');
+        Route::put('sprints/{sprint}', [SprintController::class, 'update'])->name('sprints.update.general');
     });
     
     Route::middleware('permission:sprints.delete')->group(function () {
         Route::delete('projects/{project}/sprints/{sprint}', [SprintController::class, 'destroy'])->name('sprints.destroy');
+    });
+
+    // Sprint completion and retrospective routes
+    Route::middleware(['auth'])->group(function () {
+        Route::post('sprints/{sprint}/finish', [SprintController::class, 'finishSprint'])->name('sprints.finish');
+        Route::post('sprints/{sprint}/retrospective', [SprintController::class, 'addRetrospective'])->name('sprints.retrospective');
+        Route::post('sprints/{sprint}/finish-with-retrospective', [SprintController::class, 'finishSprintWithRetrospective'])->name('sprints.finish-with-retrospective');
+        Route::get('sprints/{sprint}/retrospective-summary', [SprintController::class, 'getRetrospectiveSummary'])->name('sprints.retrospective-summary');
+        Route::get('sprints/{sprint}/finish-status', [SprintController::class, 'getFinishStatus'])->name('sprints.finish-status');
     });
 
     // Tasks routes with permissions
@@ -177,6 +192,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('notifications', [QaController::class, 'notifications'])->name('notifications');
         Route::post('notifications/{notification}/read', [QaController::class, 'markNotificationAsRead'])->name('notifications.read');
         Route::post('notifications/read-all', [QaController::class, 'markAllNotificationsAsRead'])->name('notifications.read-all');
+        
+        // API endpoints para notificaciones
+        Route::get('api/qa/notifications', [QaController::class, 'getNotifications'])->name('api.qa.notifications');
     });
 
     // Admin routes with permissions
@@ -217,14 +235,31 @@ Route::middleware(['auth'])->group(function () {
 
 
     // Reports routes with permissions
-    Route::middleware('permission:reports.view')->group(function () {
-        Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
-        Route::get('/reports/current-week', [ReportController::class, 'currentWeek'])->name('reports.current-week');
-        Route::get('/reports/{id}', [ReportController::class, 'show'])->name('reports.show');
-    });
+Route::middleware('permission:reports.view')->group(function () {
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::get('/reports/current-week', [ReportController::class, 'currentWeek'])->name('reports.current-week');
+    Route::get('/reports/{id}', [ReportController::class, 'show'])->name('reports.show');
+});
+
+// API routes for reports
+Route::middleware('permission:reports.view')->group(function () {
+    // Route moved to payments group below
+});
+
+// API routes accessible from payments page
+Route::get('/api/projects', [ProjectController::class, 'getProjectsForReports'])->name('api.projects');
+Route::get('/api/projects/users', [ProjectController::class, 'getUsersByProject'])->name('api.projects.users');
+Route::get('/api/payments/rework', [PaymentController::class, 'getReworkData'])->name('api.payments.rework');
     
     Route::middleware('permission:reports.create')->group(function () {
         Route::post('/reports/generate', [ReportController::class, 'generate'])->name('reports.generate');
+    });
+
+    // Analytics routes - accessible by admin users
+    Route::middleware(['auth'])->group(function () {
+        Route::get('/analytics/projects', [ReportController::class, 'projectAnalytics'])->name('analytics.projects');
+        Route::get('/analytics/team', [ReportController::class, 'teamAnalytics'])->name('analytics.team');
+        Route::get('/analytics/budget', [ReportController::class, 'budgetAnalytics'])->name('analytics.budget');
     });
 
     // Payment routes (unified)
@@ -296,6 +331,7 @@ Route::post('/payment-reports/generate', function () {
         Route::put('users/{user}', [UserController::class, 'update'])->name('users.update');
     });
 
+
     // Permissions routes with permissions
     Route::prefix('permissions')->name('permissions.')->middleware('permission:permissions.manage')->group(function () {
         Route::get('/', [App\Http\Controllers\PermissionController::class, 'index'])->name('index');
@@ -316,15 +352,7 @@ Route::post('/payment-reports/generate', function () {
         Route::delete('/expired', [App\Http\Controllers\PermissionController::class, 'cleanupExpiredPermissions'])->name('cleanup');
     });
 
-    // Simultaneous Tasks Permissions routes (Admin only)
-    Route::prefix('admin/simultaneous-tasks')->name('admin.simultaneous-tasks.')->middleware('permission:admin.permissions')->group(function () {
-        Route::get('/', [PermissionController::class, 'index'])->name('index');
-        Route::post('/grant', [PermissionController::class, 'grantPermission'])->name('grant');
-        Route::post('/revoke', [PermissionController::class, 'revokePermission'])->name('revoke');
-        Route::post('/grant-team', [PermissionController::class, 'grantPermissionToTeam'])->name('grant-team');
-        Route::post('/revoke-team', [PermissionController::class, 'revokePermissionFromTeam'])->name('revoke-team');
-        Route::get('/user/{userId}/history', [PermissionController::class, 'getUserPermissionHistory'])->name('user-history');
-    });
+
 
     // Bugs routes with permissions
     Route::middleware(['auth'])->group(function () {

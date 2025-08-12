@@ -9,30 +9,60 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 
+/**
+ * Task Time Tracking Service Class
+ * 
+ * This service handles all time tracking operations for tasks including start, pause,
+ * resume, and finish work sessions. It manages the complete workflow of time tracking
+ * with validation, logging, and automatic pause functionality.
+ * 
+ * Features:
+ * - Start, pause, resume, and finish work sessions
+ * - Automatic task pausing for inactivity
+ * - Simultaneous task limit validation (max 3)
+ * - Comprehensive time logging and tracking
+ * - Alert system for long work sessions
+ * - Auto-pause functionality for task management
+ * 
+ * @package App\Services
+ * @author System
+ * @version 1.0
+ */
 class TaskTimeTrackingService
 {
     /**
-     * Verificar límite de tareas simultáneas para un usuario
+     * Check if a user can work on additional tasks (simultaneous task limit)
+     * 
+     * Validates whether a user can start working on a new task based on
+     * their current active task count and permissions.
+     * 
+     * @param User $user The user to check limits for
+     * @return bool True if user can work on additional tasks, false otherwise
      */
     public function checkSimultaneousTasksLimit(User $user): bool
     {
-        // Verificar si el usuario tiene permiso para tareas simultáneas sin límite
+        // Check if user has permission for unlimited simultaneous tasks
         if ($user->hasPermission('unlimited_simultaneous_tasks')) {
-            return true; // Sin límite
+            return true; // No limit
         }
         
-        // Contar tareas activas del usuario
+        // Count user's active tasks
         $activeTasksCount = Task::where('user_id', $user->id)
             ->where('is_working', true)
             ->where('status', 'in progress')
             ->count();
         
-        // Límite de 3 tareas simultáneas
+        // Limit of 3 simultaneous tasks
         return $activeTasksCount < 3;
     }
     
     /**
-     * Obtener el número de tareas activas de un usuario
+     * Get the number of active tasks for a user
+     * 
+     * Returns the count of tasks currently being worked on by a user.
+     * 
+     * @param User $user The user to get active task count for
+     * @return int Number of active tasks
      */
     public function getActiveTasksCount(User $user): int
     {
@@ -43,57 +73,78 @@ class TaskTimeTrackingService
     }
     
     /**
-     * Iniciar trabajo en una tarea
+     * Start working on a task
+     * 
+     * Initiates a work session on a specific task. This method includes
+     * comprehensive validation and creates the necessary time logs.
+     * 
+     * @param Task $task The task to start working on
+     * @param User $user The user starting the work
+     * @return bool True if work was started successfully
+     * @throws \Exception If validation fails
      */
     public function startWork(Task $task, User $user): bool
     {
         try {
             DB::beginTransaction();
             
-            // Verificar que la tarea está asignada al usuario
+            // Verify task is assigned to the user
             if ($task->user_id !== $user->id) {
-                throw new \Exception('No tienes permisos para trabajar en esta tarea');
+                throw new \Exception('You do not have permission to work on this task');
             }
             
-            // Verificar que la tarea no está ya en progreso
+            // Verify task is not already in progress
             if ($task->is_working) {
-                throw new \Exception('Ya estás trabajando en esta tarea');
+                throw new \Exception('You are already working on this task');
             }
             
-            // Verificar que la tarea no está completada
-            if ($task->status === 'done') {
-                throw new \Exception('No puedes trabajar en una tarea completada');
+            // Verify task is not completed (unless it's rework)
+            if ($task->status === 'done' && !$task->has_been_returned) {
+                throw new \Exception('You cannot work on a completed task');
             }
             
-            // Verificar límite de tareas simultáneas
+            // Verify simultaneous task limit
             if (!$this->checkSimultaneousTasksLimit($user)) {
                 $activeCount = $this->getActiveTasksCount($user);
-                throw new \Exception("Ya tienes {$activeCount} tareas activas. El límite es 3 tareas simultáneas. Contacta a tu administrador si necesitas trabajar en más tareas.");
+                throw new \Exception("You already have {$activeCount} active tasks. The limit is 3 simultaneous tasks. Contact your administrator if you need to work on more tasks.");
             }
             
-            // Crear log de inicio
+            // Determine if this is rework
+            $isRework = $task->has_been_returned;
+            $action = $isRework ? 'start_retwork' : 'start';
+            $notes = $isRework ? 'Re-trabajo iniciado' : 'Work started';
+            
+            // Create start log
             $timeLog = TaskTimeLog::create([
                 'task_id' => $task->id,
                 'user_id' => $user->id,
                 'started_at' => now(),
-                'action' => 'start',
-                'notes' => 'Inicio de trabajo'
+                'action' => $action,
+                'notes' => $notes
             ]);
             
-            // Actualizar tarea
-            $task->update([
+            // Update task
+            $updateData = [
                 'status' => 'in progress',
                 'work_started_at' => now(),
                 'is_working' => true,
-                'actual_start' => $task->actual_start ?? now()->format('Y-m-d'),
                 'auto_paused' => false,
                 'auto_paused_at' => null,
                 'auto_pause_reason' => null,
                 'alert_count' => 0,
                 'last_alert_at' => null
-            ]);
+            ];
             
-            Log::info('Trabajo iniciado en tarea', [
+            // If this is rework, set retwork_started_at
+            if ($isRework) {
+                $updateData['retwork_started_at'] = now();
+            } else {
+                $updateData['actual_start'] = $task->actual_start ?? now()->format('Y-m-d');
+            }
+            
+            $task->update($updateData);
+            
+            Log::info('Work started on task', [
                 'task_id' => $task->id,
                 'task_name' => $task->name,
                 'user_id' => $user->id,
@@ -116,24 +167,32 @@ class TaskTimeTrackingService
     }
     
     /**
-     * Pausar trabajo en una tarea
+     * Pause work on a task
+     * 
+     * Temporarily stops work on a task while maintaining the session.
+     * Calculates and logs the time spent before pausing.
+     * 
+     * @param Task $task The task to pause work on
+     * @param User $user The user pausing the work
+     * @return bool True if work was paused successfully
+     * @throws \Exception If validation fails
      */
     public function pauseWork(Task $task, User $user): bool
     {
         try {
             DB::beginTransaction();
             
-            // Verificar que la tarea está asignada al usuario
+            // Verify task is assigned to the user
             if ($task->user_id !== $user->id) {
-                throw new \Exception('No tienes permisos para pausar esta tarea');
+                throw new \Exception('You do not have permission to pause this task');
             }
             
-            // Verificar que la tarea está en progreso
+            // Verify task is in progress
             if (!$task->is_working) {
-                throw new \Exception('No hay trabajo activo en esta tarea');
+                throw new \Exception('There is no active work on this task');
             }
             
-            // Obtener el log activo
+            // Get the active log
             $activeLog = TaskTimeLog::where('task_id', $task->id)
                 ->where('user_id', $user->id)
                 ->whereNotNull('started_at')
@@ -143,19 +202,19 @@ class TaskTimeTrackingService
                 ->first();
             
             if (!$activeLog) {
-                throw new \Exception('No se encontró sesión activa de trabajo');
+                throw new \Exception('No active work session found');
             }
             
-            // Calcular tiempo transcurrido con mayor precisión
+            // Calculate elapsed time with higher precision
             $startTime = \Carbon\Carbon::parse($activeLog->started_at);
             $endTime = \Carbon\Carbon::now();
             
-            // Calcular duración usando valor absoluto y redondear a entero para evitar problemas de zona horaria
+            // Calculate duration using absolute value and round to integer to avoid timezone issues
             $duration = (int) round($endTime->diffInSeconds($startTime, true));
             
-            // Log para debug si hay problemas de tiempo
+            // Log for debug if there are time issues
             if ($endTime->lt($startTime)) {
-                Log::warning('Tiempo de fin anterior al tiempo de inicio, usando valor absoluto', [
+                Log::warning('End time is before start time, using absolute value', [
                     'task_id' => $task->id,
                     'started_at' => $activeLog->started_at,
                     'startTime' => $startTime->toDateTimeString(),
@@ -165,8 +224,8 @@ class TaskTimeTrackingService
                 ]);
             }
             
-            // Log para debug
-            Log::info('Calculando duración de pausa', [
+            // Debug log
+            Log::info('Calculating pause duration', [
                 'task_id' => $task->id,
                 'started_at' => $activeLog->started_at,
                 'startTime' => $startTime->toDateTimeString(),
@@ -176,14 +235,14 @@ class TaskTimeTrackingService
                 'diff_in_seconds' => $endTime->diffInSeconds($startTime, false)
             ]);
             
-            // Actualizar log
+            // Update log
             $activeLog->update([
                 'paused_at' => now(),
                 'duration_seconds' => $duration,
                 'action' => 'pause'
             ]);
             
-            // Actualizar tarea
+            // Update task
             $task->update([
                 'is_working' => false,
                 'total_time_seconds' => $task->total_time_seconds + $duration
@@ -341,14 +400,31 @@ class TaskTimeTrackingService
                 'action' => 'finish'
             ]);
             
+            // Determinar el siguiente paso en el flujo de re-trabajo
+            $nextStep = $this->determineNextStepInRetworkFlow($task);
+            
+            // Determinar si es re-trabajo
+            $isRework = $task->has_been_returned && $task->retwork_started_at;
+            
             // Actualizar tarea
-            $task->update([
-                'status' => 'done',
+            $updateData = [
+                'status' => $nextStep['status'],
                 'is_working' => false,
                 'total_time_seconds' => $task->total_time_seconds + $duration,
                 'actual_finish' => now()->format('Y-m-d'),
-                'approval_status' => 'pending' // Pendiente de revisión por team leader
-            ]);
+                'approval_status' => $nextStep['approval_status'],
+                'qa_status' => $nextStep['qa_status'] ?? $task->qa_status,
+                'team_leader_requested_changes' => $nextStep['team_leader_requested_changes'] ?? false
+            ];
+            
+            // Si es re-trabajo, actualizar tiempo de re-trabajo
+            if ($isRework) {
+                $retworkTime = $task->retwork_time_seconds + $duration;
+                $updateData['retwork_time_seconds'] = $retworkTime;
+                $updateData['retwork_started_at'] = null; // Reset rework start time
+            }
+            
+            $task->update($updateData);
             
             Log::info('Trabajo finalizado en tarea', [
                 'task_id' => $task->id,
@@ -510,5 +586,39 @@ class TaskTimeTrackingService
             ->where('status', 'in progress')
             ->with(['sprint', 'project'])
             ->get();
+    }
+
+    /**
+     * Determinar el siguiente paso en el flujo de re-trabajo
+     */
+    private function determineNextStepInRetworkFlow(Task $task): array
+    {
+        // Si la tarea fue rechazada por QA, va de vuelta a QA
+        if ($task->qa_status === 'rejected') {
+            return [
+                'status' => 'done',
+                'approval_status' => 'pending',
+                'qa_status' => 'ready_for_test',
+                'team_leader_requested_changes' => false
+            ];
+        }
+        
+        // Si la tarea tiene cambios solicitados por TL, va de vuelta a QA para re-testing
+        if ($task->team_leader_requested_changes) {
+            return [
+                'status' => 'done',
+                'approval_status' => 'pending',
+                'qa_status' => 'ready_for_test', // QA debe re-testear los cambios
+                'team_leader_requested_changes' => false
+            ];
+        }
+        
+        // Flujo normal: va a QA primero
+        return [
+            'status' => 'done',
+            'approval_status' => 'pending',
+            'qa_status' => 'ready_for_test',
+            'team_leader_requested_changes' => false
+        ];
     }
 } 

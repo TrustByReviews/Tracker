@@ -204,6 +204,173 @@
       </Card>
     </div>
 
+    <!-- Recently Added Section -->
+    <div v-if="recentlyAddedItems.length > 0" class="mb-8">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-xl font-semibold text-gray-900 dark:text-white">🆕 Recién Agregadas</h2>
+          <p class="text-sm text-gray-600 dark:text-gray-400">Últimas tareas finalizadas para testing</p>
+        </div>
+        <Badge variant="secondary" class="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+          {{ recentlyAddedItems.length }} nueva{{ recentlyAddedItems.length > 1 ? 's' : '' }}
+        </Badge>
+      </div>
+      
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div
+          v-for="item in recentlyAddedItems"
+          :key="`recent-${item.type}-${item.id}`"
+          class="bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 border border-orange-200 dark:border-orange-700 rounded-lg p-4 hover:shadow-md transition-shadow"
+        >
+          <div class="flex items-start justify-between">
+            <div class="flex-1">
+              <div class="flex items-center gap-3 mb-2">
+                <!-- Icon based on type -->
+                <div class="flex-shrink-0">
+                  <div v-if="item.type === 'task'" class="w-8 h-8 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
+                    <Icon name="check-square" class="h-4 w-4 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div v-else class="w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
+                    <Icon name="bug" class="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                  </div>
+                </div>
+                
+                <!-- Title and badges -->
+                <div class="flex-1 min-w-0">
+                  <h3 class="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                    {{ item.name || item.title }}
+                  </h3>
+                  <div class="flex items-center gap-2 mt-1">
+                    <Badge variant="outline" class="text-xs">
+                      {{ item.type === 'task' ? 'Task' : 'Bug' }}
+                    </Badge>
+                    <Badge 
+                      :class="getStatusBadgeClass(item.qa_status)"
+                      class="text-xs"
+                    >
+                      {{ getStatusText(item.qa_status) }}
+                    </Badge>
+                    <Badge 
+                      :class="getPriorityBadgeClass(item.priority || item.importance)"
+                      class="text-xs"
+                    >
+                      {{ getPriorityText(item.priority || item.importance) }}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Description -->
+              <p class="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                {{ item.description || item.title || 'Sin descripción' }}
+              </p>
+              
+              <!-- Project and developer info -->
+              <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                <div>
+                  <span class="font-medium">Project:</span> 
+                  {{ item.sprint?.project?.name || item.project?.name || 'N/A' }}
+                </div>
+                <div>
+                  <span class="font-medium">Developer:</span> 
+                  {{ item.user?.name || 'Unassigned' }}
+                </div>
+              </div>
+              
+              <!-- Finished date -->
+              <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <span class="font-medium">Finished:</span> 
+                {{ formatDate(item.finished_at || item.updated_at) }}
+              </div>
+            </div>
+            
+            <!-- Action buttons -->
+            <div class="flex flex-col gap-2 ml-4">
+              <Button
+                @click="viewDetails(item)"
+                variant="outline"
+                size="sm"
+                class="text-xs"
+              >
+                <Icon name="eye" class="h-3 w-3 mr-1" />
+                View Details
+              </Button>
+              
+              <!-- Testing Buttons -->
+              <div v-if="item.qa_status === 'ready_for_test'" class="flex flex-col gap-1">
+                <Button
+                  @click="startTesting(item)"
+                  variant="default"
+                  size="sm"
+                  class="bg-blue-600 hover:bg-blue-700 text-xs"
+                >
+                  <Icon name="play" class="h-3 w-3 mr-1" />
+                  Start Testing
+                </Button>
+              </div>
+              
+              <div v-if="item.qa_status === 'testing'" class="flex flex-col gap-1">
+                <Button
+                  @click="pauseTesting(item)"
+                  variant="outline"
+                  size="sm"
+                  class="border-yellow-500 text-yellow-600 hover:bg-yellow-50 hover:text-yellow-700 dark:hover:bg-yellow-900/20 text-xs"
+                >
+                  <Icon name="pause" class="h-3 w-3 mr-1" />
+                  Pause Testing
+                </Button>
+                
+                <Button
+                  @click="finishTesting(item)"
+                  variant="default"
+                  size="sm"
+                  class="bg-green-600 hover:bg-green-700 text-xs"
+                >
+                  <Icon name="check" class="h-3 w-3 mr-1" />
+                  Finish Testing
+                </Button>
+              </div>
+              
+              <div v-if="item.qa_status === 'testing_paused'" class="flex flex-col gap-1">
+                <Button
+                  @click="resumeTesting(item)"
+                  variant="outline"
+                  size="sm"
+                  class="border-blue-500 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/20 text-xs"
+                >
+                  <Icon name="play" class="h-3 w-3 mr-1" />
+                  Resume Testing
+                </Button>
+              </div>
+              
+              <!-- Approval/Rejection Buttons -->
+              <div v-if="item.qa_status === 'testing_finished'" class="flex flex-col gap-1">
+                <Button
+                  @click="showApproveModal(item)"
+                  variant="default"
+                  size="sm"
+                  class="bg-green-600 hover:bg-green-700 text-xs"
+                >
+                  <Icon name="check" class="h-3 w-3 mr-1" />
+                  Approve
+                </Button>
+                
+                <Button
+                  @click="showRejectModal(item)"
+                  variant="destructive"
+                  size="sm"
+                  class="text-xs"
+                >
+                  <Icon name="x" class="h-3 w-3 mr-1" />
+                  Reject
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Tabs to organize -->
     <div class="mb-6">
       <div class="border-b border-gray-200">
@@ -569,6 +736,7 @@ import { router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import Icon from '@/components/Icon.vue'
@@ -781,6 +949,30 @@ const filteredItems = computed(() => {
   }
 })
 
+// Recently Added Items - Show items from the last 24 hours
+const recentlyAddedItems = computed(() => {
+  const now = new Date()
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+  
+  const allItems = [
+    ...props.finishedTasks.data.map(task => ({ ...task, type: 'task' as const })),
+    ...props.finishedBugs.data.map(bug => ({ ...bug, type: 'bug' as const }))
+  ]
+  
+  return allItems
+    .filter(item => {
+      const finishedAt = item.finished_at || item.updated_at
+      const itemDate = new Date(finishedAt)
+      return itemDate >= twentyFourHoursAgo && item.qa_status === 'ready_for_test'
+    })
+    .sort((a, b) => {
+      const aDate = new Date(a.finished_at || a.updated_at)
+      const bDate = new Date(b.finished_at || b.updated_at)
+      return bDate.getTime() - aDate.getTime() // Most recent first
+    })
+    .slice(0, 6) // Show max 6 items
+})
+
 const displayItems = computed(() => {
   if (activeTab.value === 'tasks') {
     return filteredTasks.value.map(task => ({ ...task, type: 'task' }))
@@ -864,6 +1056,25 @@ const getPriorityBadgeClass = (priority: string) => {
   }
 }
 
+const getStatusText = (status: string) => {
+  switch (status) {
+    case 'ready_for_test':
+      return 'Ready for Testing'
+    case 'testing':
+      return 'In Testing'
+    case 'testing_paused':
+      return 'Paused'
+    case 'testing_finished':
+      return 'Finished'
+    case 'approved':
+      return 'Approved'
+    case 'rejected':
+      return 'Rejected'
+    default:
+      return status
+  }
+}
+
 const getStatusLabel = (status: string) => {
   switch (status) {
     case 'ready_for_test':
@@ -880,6 +1091,21 @@ const getStatusLabel = (status: string) => {
       return 'Rejected'
     default:
       return status
+  }
+}
+
+const getPriorityText = (priority: string) => {
+  switch (priority) {
+    case 'high':
+      return 'High'
+    case 'medium':
+      return 'Medium'
+    case 'low':
+      return 'Low'
+    case 'critical':
+      return 'Critical'
+    default:
+      return priority
   }
 }
 

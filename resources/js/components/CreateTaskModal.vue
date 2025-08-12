@@ -11,66 +11,108 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import InputError from './InputError.vue';
 
+/**
+ * CreateTaskModal Component
+ * 
+ * This component provides a comprehensive modal interface for creating new tasks.
+ * It includes form validation, file upload functionality, and dynamic field management
+ * based on task type and project context.
+ * 
+ * Features:
+ * - Task creation with detailed form fields
+ * - File attachment support with drag & drop
+ * - Dynamic field validation
+ * - Priority and category selection
+ * - Story points and complexity level assignment
+ * - Developer assignment capabilities
+ * 
+ * @component
+ * @example
+ * <CreateTaskModal 
+ *   :sprint="currentSprint"
+ *   :project="currentProject"
+ *   :developers="availableDevelopers"
+ * />
+ */
+
+/**
+ * Sprint interface for task creation context
+ */
 interface Sprint {
-    id: string,
-    goal: string,
-    name: string,
-    start_date: string,
-    end_date: string,
+    id: string,           // Unique sprint identifier
+    goal: string,         // Sprint goal description
+    name: string,         // Sprint name
+    start_date: string,   // Sprint start date
+    end_date: string,     // Sprint end date
 }
 
+/**
+ * Project interface for task creation context
+ */
 interface Project {
-    id: string,
-    name: string,
+    id: string,           // Unique project identifier
+    name: string,         // Project name
 }
 
+/**
+ * User interface for developer assignment
+ */
 interface User {
-    id: string,
-    name: string,
-    email: string,
-    roles?: Array<{
-        name: string,
-        value: string
+    id: string,           // Unique user identifier
+    name: string,         // User display name
+    email: string,        // User email address
+    roles?: Array<{       // User roles (optional)
+        name: string,     // Role name
+        value: string     // Role value
     }>
 }
 
+/**
+ * Component props for task creation modal
+ */
 const props = defineProps<{
-    sprint?: Sprint
-    project?: Project
-    project_id?: string
-    developers?: User[]
+    sprint?: Sprint       // Current sprint context (optional)
+    project?: Project     // Current project context (optional)
+    project_id?: string   // Project ID for task assignment (optional)
+    developers?: User[]   // Available developers for assignment (optional)
 }>()
 
+// Modal state management
 const open = ref(false);
 const uploadedFiles = ref<File[]>([]);
 const dragOver = ref(false);
 
-// Task form state only
-
+/**
+ * Task creation form using Inertia.js useForm
+ * Manages all form fields and validation state
+ */
 const form = useForm({
     // Common fields
-    name: '',
-    description: '',
-    long_description: '',
-    priority: 'medium',
-    sprint_id: '',
-    project_id: '',
-    estimated_hours: 1,
-    estimated_minutes: 0,
-    assigned_user_id: '',
-    attachments: [] as any[],
-    tags: '',
+    name: 'Implementar sistema de autenticación JWT',                    // Task name/title
+    description: 'Desarrollar sistema completo de autenticación usando JWT tokens para la aplicación web',             // Short description
+    long_description: 'Se requiere implementar un sistema robusto de autenticación que incluya login, registro, recuperación de contraseña y validación de tokens JWT. El sistema debe ser seguro, escalable y fácil de mantener. Incluir documentación técnica y casos de prueba.',        // Detailed description
+    priority: 'high',          // Task priority level
+    sprint_id: '',              // Associated sprint ID
+    project_id: '',             // Associated project ID
+    estimated_hours: 8,         // Estimated hours for completion
+    estimated_minutes: 30,       // Estimated minutes for completion
+    assigned_user_id: '',       // Assigned developer ID (se mantiene vacío)
+    attachments: [] as any[],   // File attachments
+    tags: 'autenticacion,jwt,seguridad,backend',                   // Task tags/labels
     
     // Task-specific fields
-    category: 'full stack',
-    story_points: 1,
-    acceptance_criteria: '',
-    technical_notes: '',
-    complexity_level: 'medium',
-    task_type: 'feature',
+    category: 'backend',     // Task category/type
+    story_points: 8,           // Agile story points
+    acceptance_criteria: '1. Usuario puede registrarse con email y contraseña\n2. Usuario puede iniciar sesión y recibir token JWT\n3. Token JWT se valida en cada request\n4. Usuario puede recuperar contraseña\n5. Sistema maneja tokens expirados\n6. Documentación técnica completa',    // Acceptance criteria
+    technical_notes: 'Usar bcrypt para hash de contraseñas. Implementar refresh tokens. Considerar rate limiting para endpoints de autenticación. Usar middleware de validación de JWT. Implementar blacklist de tokens para logout.',        // Technical implementation notes
+    complexity_level: 'high', // Task complexity level
+    task_type: 'feature',       // Type of task
 });
 
-// Priority options
+/**
+ * Priority options for task assignment
+ * Each option includes value, display label, and color styling
+ */
 const priorityOptions = [
     { value: 'low', label: 'Low', color: 'text-green-600' },
     { value: 'medium', label: 'Medium', color: 'text-yellow-600' },
@@ -78,7 +120,10 @@ const priorityOptions = [
     { value: 'critical', label: 'Critical', color: 'text-red-600' },
 ];
 
-// Category options
+/**
+ * Category options for task classification
+ * Defines different types of development work
+ */
 const categoryOptions = [
     { value: 'frontend', label: 'Frontend' },
     { value: 'backend', label: 'Backend' },
@@ -94,10 +139,16 @@ const categoryOptions = [
     { value: 'performance', label: 'Performance' },
 ];
 
-// Story points options
+/**
+ * Story points options for Agile estimation
+ * Uses Fibonacci sequence for story point values
+ */
 const storyPointsOptions = [1, 2, 3, 5, 8, 13, 21];
 
-// Complexity levels
+/**
+ * Complexity levels for task assessment
+ * Helps in resource allocation and timeline estimation
+ */
 const complexityOptions = [
     { value: 'low', label: 'Low' },
     { value: 'medium', label: 'Medium' },
@@ -105,7 +156,10 @@ const complexityOptions = [
     { value: 'expert', label: 'Experto' },
 ];
 
-// Task types
+/**
+ * Task types for task classification
+ * Defines the nature of the development work
+ */
 const taskTypeOptions = [
     { value: 'feature', label: 'Nueva Funcionalidad' },
     { value: 'bugfix', label: 'Corrección de Bug' },
@@ -116,9 +170,9 @@ const taskTypeOptions = [
     { value: 'research', label: 'Investigación' },
 ];
 
-// Bug-related options removed (this modal es solo para tareas)
-
-// File handling functions
+/**
+ * File handling functions for attachment management
+ */
 const handleFileUpload = (event: Event) => {
     const target = event.target as HTMLInputElement;
     if (target.files) {
