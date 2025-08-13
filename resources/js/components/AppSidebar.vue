@@ -70,6 +70,40 @@ const mainNavItems = computed<NavItem[]>(() => {
     const isAdmin = userRoles.includes('admin');
     const isTeamLeader = userRoles.includes('team_leader');
     const isDeveloper = userRoles.includes('developer');
+    const isClient = userRoles.includes('client');
+
+    // Client specific navigation - return early to avoid duplicates
+    if (isClient) {
+        // Proyectos del cliente
+        items.push({
+            title: 'Mis Proyectos',
+            href: '/client/projects',
+            icon: Folder,
+        });
+        
+        // Tareas del cliente
+        items.push({
+            title: 'Mis Tareas',
+            href: '/client/tasks',
+            icon: CheckSquare,
+        });
+        
+        // Sprints del cliente
+        items.push({
+            title: 'Mis Sprints',
+            href: '/client/sprints',
+            icon: Calendar,
+        });
+        
+        // Sugerencias del cliente
+        items.push({
+            title: 'Mis Sugerencias',
+            href: '/client/suggestions',
+            icon: BookOpen,
+        });
+        
+        return items;
+    }
 
     // QA specific navigation - return early to avoid duplicates
     if (isQa) {
@@ -257,7 +291,7 @@ const footerNavItems: NavItem[] = [
         <SidebarHeader>
             <SidebarMenu>
                 <SidebarMenuItem>
-                    <Link href="/dashboard">
+                    <Link :href="user?.roles?.some(role => role.value === 'client') ? '/client/dashboard' : '/dashboard'">
                         <SidebarMenuButton size="lg">
                             <AppLogo />
                         </SidebarMenuButton>

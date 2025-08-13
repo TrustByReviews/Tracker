@@ -22,6 +22,12 @@ Route::get('/', function () {
 
 Route::get('dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
 
+// Incluir rutas de clientes
+require __DIR__.'/client.php';
+
+// Incluir rutas de administración
+require __DIR__.'/admin.php';
+
 Route::middleware(['auth'])->group(function () {
     // Projects routes with permissions
     Route::middleware(['auth'])->group(function () {

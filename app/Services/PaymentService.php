@@ -327,6 +327,8 @@ class PaymentService
 
         $developers = User::whereHas('roles', function ($query) {
             $query->whereIn('name', ['developer', 'qa']);
+        })->whereDoesntHave('roles', function ($query) {
+            $query->where('name', 'client');
         })->get();
 
         $reports = [];
@@ -364,6 +366,8 @@ class PaymentService
     {
         $developers = User::whereHas('roles', function ($query) {
             $query->whereIn('name', ['developer', 'qa']);
+        })->whereDoesntHave('roles', function ($query) {
+            $query->where('name', 'client');
         })->get();
 
         $reports = [];
@@ -551,12 +555,18 @@ class PaymentService
         // If there are pauses, calculate the actual testing time
         if ($task->qa_testing_paused_at) {
             $pausedTime = Carbon::parse($task->qa_testing_paused_at);
-            $activeTime = $pausedTime->diffInSeconds($startTime);
+            $resumeTime = $task->qa_testing_resumed_at ? Carbon::parse($task->qa_testing_resumed_at) : $finishTime;
+            
+            // Calculate time before pause + time after resume
+            $timeBeforePause = $pausedTime->diffInSeconds($startTime);
+            $timeAfterResume = $finishTime->diffInSeconds($resumeTime);
+            $activeTime = $timeBeforePause + $timeAfterResume;
         } else {
             $activeTime = $finishTime->diffInSeconds($startTime);
         }
 
-        return round($activeTime / 3600, 2); // Convert seconds to hours
+        // Ensure we don't return negative values
+        return max(0, round($activeTime / 3600, 2)); // Convert seconds to hours
     }
 
     /**
@@ -596,12 +606,18 @@ class PaymentService
         // If there are pauses, calculate the actual testing time
         if ($bug->qa_testing_paused_at) {
             $pausedTime = Carbon::parse($bug->qa_testing_paused_at);
-            $activeTime = $pausedTime->diffInSeconds($startTime);
+            $resumeTime = $bug->qa_testing_resumed_at ? Carbon::parse($bug->qa_testing_resumed_at) : $finishTime;
+            
+            // Calculate time before pause + time after resume
+            $timeBeforePause = $pausedTime->diffInSeconds($startTime);
+            $timeAfterResume = $finishTime->diffInSeconds($resumeTime);
+            $activeTime = $timeBeforePause + $timeAfterResume;
         } else {
             $activeTime = $finishTime->diffInSeconds($startTime);
         }
 
-        return round($activeTime / 3600, 2); // Convert seconds to hours
+        // Ensure we don't return negative values
+        return max(0, round($activeTime / 3600, 2)); // Convert seconds to hours
     }
 
     /**
@@ -692,14 +708,14 @@ class PaymentService
     {
         // If there's specific rework time tracking, use it
         if ($task->retwork_time_seconds && $task->retwork_time_seconds > 0) {
-            return round($task->retwork_time_seconds / 3600, 2);
+            return max(0, round($task->retwork_time_seconds / 3600, 2));
         }
 
         // Otherwise, calculate based on total time vs original time
         if ($task->total_time_seconds && $task->original_time_seconds) {
             $additionalTime = $task->total_time_seconds - $task->original_time_seconds;
             if ($additionalTime > 0) {
-                return round($additionalTime / 3600, 2);
+                return max(0, round($additionalTime / 3600, 2));
             }
         }
 
@@ -707,7 +723,7 @@ class PaymentService
         if ($task->team_leader_requested_changes || $task->qa_rejection_reason) {
             // Estimate 25% of original time as rework
             $originalHours = $task->original_time_seconds ? round($task->original_time_seconds / 3600, 2) : 0;
-            return round($originalHours * 0.25, 2);
+            return max(0, round($originalHours * 0.25, 2));
         }
 
         return 0;
@@ -743,11 +759,11 @@ class PaymentService
 
         // If there's specific rework time tracking, use it
         if ($bug->total_time_seconds && $bug->total_time_seconds > 0) {
-            return round($bug->total_time_seconds / 3600, 2);
+            return max(0, round($bug->total_time_seconds / 3600, 2));
         }
 
         // Otherwise, use estimated base hours
-        return $baseHours;
+        return max(0, $baseHours);
     }
 
     /**

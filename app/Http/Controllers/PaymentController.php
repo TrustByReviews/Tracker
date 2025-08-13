@@ -119,10 +119,13 @@ class PaymentController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        // Get payment report data (including QAs)
+        // Get payment report data (including QAs, excluding clients)
         $developers = User::with(['tasks', 'projects'])
             ->whereHas('roles', function ($query) {
                 $query->whereIn('name', ['developer', 'qa']);
+            })
+            ->whereDoesntHave('roles', function ($query) {
+                $query->where('name', 'client');
             })
             ->get()
             ->map(function ($developer) {
@@ -485,9 +488,10 @@ class PaymentController extends Controller
 
         $project = \App\Models\Project::with(['users.roles'])->findOrFail($request->project_id);
         
-        // Obtener usuarios asignados al proyecto (developers y QAs)
+        // Obtener usuarios asignados al proyecto (developers y QAs, excluyendo clients)
         $projectUsers = $project->users->filter(function ($user) {
-            return $user->roles->contains('name', 'developer') || $user->roles->contains('name', 'qa');
+            return ($user->roles->contains('name', 'developer') || $user->roles->contains('name', 'qa')) 
+                   && !$user->roles->contains('name', 'client');
         });
 
         $developers = $projectUsers->map(function ($developer) use ($request) {
@@ -653,9 +657,11 @@ class PaymentController extends Controller
             'format' => 'required|in:pdf,email,excel',
         ]);
 
-        // Obtener usuarios del tipo especificado
+        // Obtener usuarios del tipo especificado (excluyendo clients)
         $users = User::whereHas('roles', function ($query) use ($request) {
             $query->where('name', $request->user_type);
+        })->whereDoesntHave('roles', function ($query) {
+            $query->where('name', 'client');
         })->get();
 
         $userReports = $users->map(function ($user) use ($request) {
@@ -997,7 +1003,9 @@ class PaymentController extends Controller
         $endDate = $request->end_date ? Carbon::parse($request->end_date) : Carbon::now()->endOfDay();
 
         $project = Project::findOrFail($request->project_id);
-        $projectUsers = $project->users;
+        $projectUsers = $project->users()->whereDoesntHave('roles', function ($query) {
+            $query->where('name', 'client');
+        })->get();
 
         $reworkItems = [];
         $totalTasks = 0;
@@ -1068,6 +1076,14 @@ class PaymentController extends Controller
     {
         $filename = 'payment_report_' . date('Y-m-d_H-i-s') . '.xlsx';
         
+        // Verificar que hay datos para exportar
+        if (empty($data['developers']) || count($data['developers']) === 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No hay datos para exportar. Verifique que el proyecto tenga tareas asignadas y que el período seleccionado contenga datos.'
+            ], 400);
+        }
+        
         // Crear instancia del servicio de Excel
         $excelService = new ExcelExportService();
         
@@ -1079,54 +1095,64 @@ class PaymentController extends Controller
             $reworkTasksForExcel = [];
             $reworkBugsForExcel = [];
             
-            // Procesar tareas y bugs para el formato esperado por ExcelExportService
-            foreach ($developer['tasks'] as $task) {
-                $taskData = [
-                    'name' => $task['name'],
-                    'project' => $task['project'],
-                    'estimated_hours' => $task['hours'],
-                    'actual_hours' => $task['hours'], // Para compatibilidad
-                    'earnings' => $task['earnings'],
-                    'completed_at' => $task['completed_at'],
-                    'type' => $task['type'] ?? 'Task'
-                ];
-                
-                // Separar rework de tareas normales
-                if (strpos($task['type'], 'Rework') !== false) {
-                    if (strpos($task['type'], 'Task') !== false) {
-                        $reworkTasksForExcel[] = [
-                            'name' => $task['name'],
-                            'project' => $task['project'],
-                            'hours' => $task['hours'],
-                            'payment' => $task['earnings'],
-                            'rework_type' => str_replace('Rework Task - ', '', $task['type']),
-                            'rework_reason' => $task['rework_reason'] ?? 'No especificado',
-                            'rework_date' => $task['completed_at'],
-                            'original_completion' => $task['original_completion'] ?? null,
-                        ];
+            // Verificar que el desarrollador tenga tareas
+            if (!empty($developer['tasks'])) {
+                // Procesar tareas y bugs para el formato esperado por ExcelExportService
+                foreach ($developer['tasks'] as $task) {
+                    // Asegurar que las horas no sean negativas
+                    $hours = max(0, $task['hours'] ?? 0);
+                    $earnings = max(0, $task['earnings'] ?? 0);
+                    
+                    $taskData = [
+                        'name' => $task['name'],
+                        'project' => $task['project'],
+                        'estimated_hours' => $hours,
+                        'actual_hours' => $hours, // Para compatibilidad
+                        'earnings' => $earnings,
+                        'completed_at' => $task['completed_at'],
+                        'type' => $task['type'] ?? 'Task'
+                    ];
+                    
+                    // Separar rework de tareas normales
+                    if (strpos($task['type'], 'Rework') !== false) {
+                        if (strpos($task['type'], 'Task') !== false) {
+                            $reworkTasksForExcel[] = [
+                                'name' => $task['name'],
+                                'project' => $task['project'],
+                                'hours' => $hours,
+                                'payment' => $earnings,
+                                'rework_type' => str_replace('Rework Task - ', '', $task['type']),
+                                'rework_reason' => $task['rework_reason'] ?? 'No especificado',
+                                'rework_date' => $task['completed_at'],
+                                'original_completion' => $task['original_completion'] ?? null,
+                            ];
+                        } else {
+                            $reworkBugsForExcel[] = [
+                                'name' => $task['name'],
+                                'project' => $task['project'],
+                                'hours' => $hours,
+                                'payment' => $earnings,
+                                'rework_type' => str_replace('Rework Bug - ', '', $task['type']),
+                                'rework_reason' => $task['rework_reason'] ?? 'No especificado',
+                                'rework_date' => $task['completed_at'],
+                                'original_completion' => $task['original_completion'] ?? null,
+                            ];
+                        }
                     } else {
-                        $reworkBugsForExcel[] = [
-                            'name' => $task['name'],
-                            'project' => $task['project'],
-                            'hours' => $task['hours'],
-                            'payment' => $task['earnings'],
-                            'rework_type' => str_replace('Rework Bug - ', '', $task['type']),
-                            'rework_reason' => $task['rework_reason'] ?? 'No especificado',
-                            'rework_date' => $task['completed_at'],
-                            'original_completion' => $task['original_completion'] ?? null,
-                        ];
+                        $tasksForExcel[] = $taskData;
                     }
-                } else {
-                    $tasksForExcel[] = $taskData;
                 }
             }
+            
+            // Asegurar que los totales no sean negativos
+            $totalEarnings = max(0, $developer['total_earnings'] ?? 0);
             
             $developersForExcel[] = [
                 'name' => $developer['name'],
                 'email' => $developer['email'],
                 'role' => $developer['role'] ?? 'Developer',
-                'hour_value' => $developer['hour_value'],
-                'total_earnings' => $developer['total_earnings'],
+                'hour_value' => max(0, $developer['hour_value'] ?? 0),
+                'total_earnings' => $totalEarnings,
                 'tasks' => $tasksForExcel,
                 'rework_tasks' => $reworkTasksForExcel,
                 'rework_bugs' => $reworkBugsForExcel,
@@ -1514,12 +1540,16 @@ class PaymentController extends Controller
             $pausedTime = Carbon::parse($task->qa_testing_paused_at);
             $resumeTime = $task->qa_testing_resumed_at ? Carbon::parse($task->qa_testing_resumed_at) : $finishTime;
             
-            $activeTime = $pausedTime->diffInSeconds($startTime) + $finishTime->diffInSeconds($resumeTime);
+            // Calcular tiempo antes de la pausa + tiempo después de reanudar
+            $timeBeforePause = $pausedTime->diffInSeconds($startTime);
+            $timeAfterResume = $finishTime->diffInSeconds($resumeTime);
+            $activeTime = $timeBeforePause + $timeAfterResume;
         } else {
             $activeTime = $finishTime->diffInSeconds($startTime);
         }
 
-        return round($activeTime / 3600, 2); // Convertir segundos a horas
+        // Asegurar que no devolvemos valores negativos
+        return max(0, round($activeTime / 3600, 2)); // Convertir segundos a horas
     }
 
     /**
@@ -1539,12 +1569,16 @@ class PaymentController extends Controller
             $pausedTime = Carbon::parse($bug->qa_testing_paused_at);
             $resumeTime = $bug->qa_testing_resumed_at ? Carbon::parse($bug->qa_testing_resumed_at) : $finishTime;
             
-            $activeTime = $pausedTime->diffInSeconds($startTime) + $finishTime->diffInSeconds($resumeTime);
+            // Calcular tiempo antes de la pausa + tiempo después de reanudar
+            $timeBeforePause = $pausedTime->diffInSeconds($startTime);
+            $timeAfterResume = $finishTime->diffInSeconds($resumeTime);
+            $activeTime = $timeBeforePause + $timeAfterResume;
         } else {
             $activeTime = $finishTime->diffInSeconds($startTime);
         }
 
-        return round($activeTime / 3600, 2); // Convertir segundos a horas
+        // Asegurar que no devolvemos valores negativos
+        return max(0, round($activeTime / 3600, 2)); // Convertir segundos a horas
     }
 
     /**

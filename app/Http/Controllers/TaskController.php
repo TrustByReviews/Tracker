@@ -80,6 +80,29 @@ class TaskController extends Controller
             $sprints = Sprint::whereHas('project.users', function ($query) use ($authUser) {
                 $query->where('users.id', $authUser->id);
             })->with('project')->orderBy('start_date', 'desc')->get();
+        } elseif ($permissions === 'client') {
+            // Cliente ve tareas de sus proyectos asignados (excluyendo bugs)
+            $tasksQuery = Task::whereHas('sprint.project.users', function ($query) use ($authUser) {
+                $query->where('users.id', $authUser->id);
+            })->where('task_type', '!=', 'bug')
+                ->with(['user', 'sprint', 'project', 'qaReviewedBy', 'teamLeaderReviewedBy']);
+            $projects = $authUser->projects()->orderBy('name')->get();
+            $sprints = Sprint::whereHas('project.users', function ($query) use ($authUser) {
+                $query->where('users.id', $authUser->id);
+            })->with('project')->orderBy('start_date', 'desc')->get();
+        }
+
+        // Verificar que tasksQuery no sea null
+        if (!$tasksQuery) {
+            // Si no se pudo inicializar la consulta, redirigir o mostrar error
+            return Inertia::render('Task/Index', [
+                'tasks' => collect(),
+                'permissions' => $permissions,
+                'projects' => collect(),
+                'sprints' => collect(),
+                'developers' => collect(),
+                'filters' => [],
+            ]);
         }
 
         // Aplicar filtros

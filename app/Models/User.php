@@ -139,6 +139,11 @@ class User extends Authenticatable
         return $this->hasMany(Bug::class);
     }
 
+    public function suggestions(): HasMany
+    {
+        return $this->hasMany(Suggestion::class, 'user_id');
+    }
+
     public function paymentReports(): HasMany
     {
         return $this->hasMany(PaymentReport::class);
