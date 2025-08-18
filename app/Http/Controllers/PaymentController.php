@@ -169,6 +169,13 @@ class PaymentController extends Controller
                     'name' => $developer->name,
                     'email' => $developer->email,
                     'role' => $developer->roles->first()->name ?? 'unknown',
+                    'roles' => $developer->roles->map(function($role) {
+                        return [
+                            'id' => $role->id,
+                            'name' => $role->name,
+                            'value' => $role->value
+                        ];
+                    }),
                     'hour_value' => $developer->hour_value,
                     'total_tasks' => $developer->tasks->count(),
                     'completed_tasks' => $completedTasks->count(),
@@ -296,18 +303,26 @@ class PaymentController extends Controller
             'format' => 'required|in:pdf,email,excel,view',
             'project_id' => 'nullable|exists:projects,id',
             'report_type' => 'nullable|in:developers,project,role,week',
+            'role' => 'nullable|string',
         ]);
 
         // Usar PaymentService para obtener datos completos incluyendo QA
         $startDate = $request->start_date ? Carbon::parse($request->start_date) : Carbon::now()->startOfMonth();
         $endDate = $request->end_date ? Carbon::parse($request->end_date) : Carbon::now()->endOfMonth();
 
-        // Filtrar desarrolladores por proyecto si se especifica
+        // Filtrar desarrolladores por proyecto y rol si se especifica
         $developerQuery = User::whereIn('id', $request->developer_ids);
         
         if ($request->project_id) {
             $developerQuery->whereHas('projects', function ($query) use ($request) {
                 $query->where('projects.id', $request->project_id);
+            });
+        }
+
+        // Filtrar por rol si se especifica
+        if ($request->role) {
+            $developerQuery->whereHas('roles', function ($query) use ($request) {
+                $query->where('name', $request->role)->orWhere('value', $request->role);
             });
         }
 
@@ -318,95 +333,204 @@ class PaymentController extends Controller
             // Obtener todas las tareas y bugs (completados, en progreso y QA)
             $allTasks = collect();
             
-            // Tareas completadas
-            if (isset($report->task_details['tasks']['completed'])) {
-                $allTasks = $allTasks->merge(collect($report->task_details['tasks']['completed'])->map(function ($task) {
-                    return [
-                        'name' => $task['name'],
-                        'project' => $task['project'],
-                        'hours' => $task['hours'],
-                        'earnings' => $task['payment'],
-                        'completed_at' => $task['completed_at'],
-                        'type' => 'Task (Completed)',
-                    ];
-                }));
+            // Determinar el rol principal del desarrollador para adaptar el reporte
+            $userRole = $developer->roles->first();
+            $roleName = $userRole ? $userRole->name : 'developer';
+            
+            // Recopilar tareas según el rol del usuario
+            switch ($roleName) {
+                case 'qa':
+                    // Para QAs, enfocarse en tareas de testing y bugs
+                    if (isset($report->task_details['qa']['tasks_tested'])) {
+                        $allTasks = $allTasks->merge(collect($report->task_details['qa']['tasks_tested'])->map(function ($task) {
+                            return [
+                                'name' => $task['name'] . ' (QA Testing)',
+                                'project' => $task['project'],
+                                'hours' => $task['hours'],
+                                'estimated_hours' => $task['estimated_hours'] ?? 0,
+                                'earnings' => $task['payment'],
+                                'completed_at' => $task['testing_finished_at'],
+                                'type' => 'QA Task Testing',
+                            ];
+                        }));
+                    }
+                    
+                    if (isset($report->task_details['qa']['bugs_tested'])) {
+                        $allTasks = $allTasks->merge(collect($report->task_details['qa']['bugs_tested'])->map(function ($bug) {
+                            return [
+                                'name' => $bug['name'] . ' (QA Testing)',
+                                'project' => $bug['project'],
+                                'hours' => $bug['hours'],
+                                'estimated_hours' => $bug['estimated_hours'] ?? 0,
+                                'earnings' => $bug['payment'],
+                                'completed_at' => $bug['testing_finished_at'],
+                                'type' => 'QA Bug Testing',
+                            ];
+                        }));
+                    }
+                    
+                    // También incluir bugs que el QA ha resuelto
+                    if (isset($report->task_details['bugs']['completed'])) {
+                        $allTasks = $allTasks->merge(collect($report->task_details['bugs']['completed'])->map(function ($bug) {
+                            return [
+                                'name' => $bug['name'],
+                                'project' => $bug['project'],
+                                'hours' => $bug['hours'],
+                                'estimated_hours' => $bug['estimated_hours'] ?? 0,
+                                'earnings' => $bug['payment'],
+                                'completed_at' => $bug['completed_at'],
+                                'type' => 'Bug (Resolved)',
+                            ];
+                        }));
+                    }
+                    break;
+                    
+                case 'team_leader':
+                    // Para Team Leaders, incluir tareas de supervisión y gestión
+                    if (isset($report->task_details['tasks']['completed'])) {
+                        $allTasks = $allTasks->merge(collect($report->task_details['tasks']['completed'])->map(function ($task) {
+                            return [
+                                'name' => $task['name'] . ' (Supervised)',
+                                'project' => $task['project'],
+                                'hours' => $task['hours'],
+                                'earnings' => $task['payment'],
+                                'completed_at' => $task['completed_at'],
+                                'type' => 'Task (Supervised)',
+                            ];
+                        }));
+                    }
+                    
+                    if (isset($report->task_details['tasks']['in_progress'])) {
+                        $allTasks = $allTasks->merge(collect($report->task_details['tasks']['in_progress'])->map(function ($task) {
+                            return [
+                                'name' => $task['name'] . ' (Supervised)',
+                                'project' => $task['project'],
+                                'hours' => $task['hours'],
+                                'earnings' => $task['payment'],
+                                'completed_at' => null,
+                                'type' => 'Task (Supervised - In Progress)',
+                            ];
+                        }));
+                    }
+                    break;
+                    
+                case 'admin':
+                    // Para Admins, incluir todo tipo de tareas
+                    if (isset($report->task_details['tasks']['completed'])) {
+                        $allTasks = $allTasks->merge(collect($report->task_details['tasks']['completed'])->map(function ($task) {
+                            return [
+                                'name' => $task['name'],
+                                'project' => $task['project'],
+                                'hours' => $task['hours'],
+                                'earnings' => $task['payment'],
+                                'completed_at' => $task['completed_at'],
+                                'type' => 'Task (Completed)',
+                            ];
+                        }));
+                    }
+                    
+                    if (isset($report->task_details['tasks']['in_progress'])) {
+                        $allTasks = $allTasks->merge(collect($report->task_details['tasks']['in_progress'])->map(function ($task) {
+                            return [
+                                'name' => $task['name'],
+                                'project' => $task['project'],
+                                'hours' => $task['hours'],
+                                'earnings' => $task['payment'],
+                                'completed_at' => null,
+                                'type' => 'Task (In Progress)',
+                            ];
+                        }));
+                    }
+                    
+                    if (isset($report->task_details['bugs']['completed'])) {
+                        $allTasks = $allTasks->merge(collect($report->task_details['bugs']['completed'])->map(function ($bug) {
+                            return [
+                                'name' => $bug['name'],
+                                'project' => $bug['project'],
+                                'hours' => $bug['hours'],
+                                'earnings' => $bug['payment'],
+                                'completed_at' => $bug['completed_at'],
+                                'type' => 'Bug (Resolved)',
+                            ];
+                        }));
+                    }
+                    
+                    if (isset($report->task_details['bugs']['in_progress'])) {
+                        $allTasks = $allTasks->merge(collect($report->task_details['bugs']['in_progress'])->map(function ($bug) {
+                            return [
+                                'name' => $bug['name'],
+                                'project' => $bug['project'],
+                                'hours' => $bug['hours'],
+                                'earnings' => $bug['payment'],
+                                'completed_at' => null,
+                                'type' => 'Bug (In Progress)',
+                            ];
+                        }));
+                    }
+                    break;
+                    
+                default: // developer
+                    // Para Developers, incluir tareas y bugs normales
+                    if (isset($report->task_details['tasks']['completed'])) {
+                        $allTasks = $allTasks->merge(collect($report->task_details['tasks']['completed'])->map(function ($task) {
+                            return [
+                                'name' => $task['name'],
+                                'project' => $task['project'],
+                                'hours' => $task['hours'],
+                                'earnings' => $task['payment'],
+                                'completed_at' => $task['completed_at'],
+                                'type' => 'Task (Completed)',
+                            ];
+                        }));
+                    }
+                    
+                    if (isset($report->task_details['tasks']['in_progress'])) {
+                        $allTasks = $allTasks->merge(collect($report->task_details['tasks']['in_progress'])->map(function ($task) {
+                            return [
+                                'name' => $task['name'],
+                                'project' => $task['project'],
+                                'hours' => $task['hours'],
+                                'earnings' => $task['payment'],
+                                'completed_at' => null,
+                                'type' => 'Task (In Progress)',
+                            ];
+                        }));
+                    }
+                    
+                    if (isset($report->task_details['bugs']['completed'])) {
+                        $allTasks = $allTasks->merge(collect($report->task_details['bugs']['completed'])->map(function ($bug) {
+                            return [
+                                'name' => $bug['name'],
+                                'project' => $bug['project'],
+                                'hours' => $bug['hours'],
+                                'earnings' => $bug['payment'],
+                                'completed_at' => $bug['completed_at'],
+                                'type' => 'Bug (Resolved)',
+                            ];
+                        }));
+                    }
+                    
+                    if (isset($report->task_details['bugs']['in_progress'])) {
+                        $allTasks = $allTasks->merge(collect($report->task_details['bugs']['in_progress'])->map(function ($bug) {
+                            return [
+                                'name' => $bug['name'],
+                                'project' => $bug['project'],
+                                'hours' => $bug['hours'],
+                                'earnings' => $bug['payment'],
+                                'completed_at' => null,
+                                'type' => 'Bug (In Progress)',
+                            ];
+                        }));
+                    }
+                    break;
             }
             
-            // Tareas en progreso
-            if (isset($report->task_details['tasks']['in_progress'])) {
-                $allTasks = $allTasks->merge(collect($report->task_details['tasks']['in_progress'])->map(function ($task) {
-                    return [
-                        'name' => $task['name'],
-                        'project' => $task['project'],
-                        'hours' => $task['hours'],
-                        'earnings' => $task['payment'],
-                        'completed_at' => null,
-                        'type' => 'Task (In Progress)',
-                    ];
-                }));
-            }
-            
-            // Bugs completados
-            if (isset($report->task_details['bugs']['completed'])) {
-                $allTasks = $allTasks->merge(collect($report->task_details['bugs']['completed'])->map(function ($bug) {
-                    return [
-                        'name' => $bug['name'],
-                        'project' => $bug['project'],
-                        'hours' => $bug['hours'],
-                        'earnings' => $bug['payment'],
-                        'completed_at' => $bug['completed_at'],
-                        'type' => 'Bug (Resolved)',
-                    ];
-                }));
-            }
-            
-            // Bugs en progreso
-            if (isset($report->task_details['bugs']['in_progress'])) {
-                $allTasks = $allTasks->merge(collect($report->task_details['bugs']['in_progress'])->map(function ($bug) {
-                    return [
-                        'name' => $bug['name'],
-                        'project' => $bug['project'],
-                        'hours' => $bug['hours'],
-                        'earnings' => $bug['payment'],
-                        'completed_at' => null,
-                        'type' => 'Bug (In Progress)',
-                    ];
-                }));
-            }
-            
-            // QA Testing Tasks
-            if (isset($report->task_details['qa']['tasks_tested'])) {
-                $allTasks = $allTasks->merge(collect($report->task_details['qa']['tasks_tested'])->map(function ($task) {
-                    return [
-                        'name' => $task['name'] . ' (QA Testing)',
-                        'project' => $task['project'],
-                        'hours' => $task['hours'],
-                        'earnings' => $task['payment'],
-                        'completed_at' => $task['testing_finished_at'],
-                        'type' => 'QA Task Testing',
-                    ];
-                }));
-            }
-            
-            // QA Testing Bugs
-            if (isset($report->task_details['qa']['bugs_tested'])) {
-                $allTasks = $allTasks->merge(collect($report->task_details['qa']['bugs_tested'])->map(function ($bug) {
-                    return [
-                        'name' => $bug['name'] . ' (QA Testing)',
-                        'project' => $bug['project'],
-                        'hours' => $bug['hours'],
-                        'earnings' => $bug['payment'],
-                        'completed_at' => $bug['testing_finished_at'],
-                        'type' => 'QA Bug Testing',
-                    ];
-                }));
-            }
-            
-            // Rework Tasks
+            // Rework Tasks (común para todos los roles)
             if (isset($report->task_details['rework']['tasks'])) {
-                $allTasks = $allTasks->merge(collect($report->task_details['rework']['tasks'])->map(function ($task) {
+                $allTasks = $allTasks->merge(collect($report->task_details['rework']['tasks'])->map(function ($task) use ($roleName) {
+                    $reworkLabel = $roleName === 'qa' ? ' (QA Rework)' : ' (Rework)';
                     return [
-                        'name' => $task['name'] . ' (Rework)',
+                        'name' => $task['name'] . $reworkLabel,
                         'project' => $task['project'],
                         'hours' => $task['hours'],
                         'earnings' => $task['payment'],
@@ -418,11 +542,12 @@ class PaymentController extends Controller
                 }));
             }
             
-            // Rework Bugs
+            // Rework Bugs (común para todos los roles)
             if (isset($report->task_details['rework']['bugs'])) {
-                $allTasks = $allTasks->merge(collect($report->task_details['rework']['bugs'])->map(function ($bug) {
+                $allTasks = $allTasks->merge(collect($report->task_details['rework']['bugs'])->map(function ($bug) use ($roleName) {
+                    $reworkLabel = $roleName === 'qa' ? ' (QA Rework)' : ' (Rework)';
                     return [
-                        'name' => $bug['name'] . ' (Rework)',
+                        'name' => $bug['name'] . $reworkLabel,
                         'project' => $bug['project'],
                         'hours' => $bug['hours'],
                         'earnings' => $bug['payment'],
@@ -1072,7 +1197,7 @@ class PaymentController extends Controller
     /**
      * Generar Excel para reporte detallado
      */
-    private function generateExcel($data)
+    public function generateExcel($data)
     {
         $filename = 'payment_report_' . date('Y-m-d_H-i-s') . '.xlsx';
         
@@ -1100,14 +1225,15 @@ class PaymentController extends Controller
                 // Procesar tareas y bugs para el formato esperado por ExcelExportService
                 foreach ($developer['tasks'] as $task) {
                     // Asegurar que las horas no sean negativas
-                    $hours = max(0, $task['hours'] ?? 0);
+                    $actualHours = max(0, $task['actual_hours'] ?? ($task['hours'] ?? 0));
+                    $estimatedHours = max(0, $task['estimated_hours'] ?? 0);
                     $earnings = max(0, $task['earnings'] ?? 0);
                     
                     $taskData = [
                         'name' => $task['name'],
                         'project' => $task['project'],
-                        'estimated_hours' => $hours,
-                        'actual_hours' => $hours, // Para compatibilidad
+                        'estimated_hours' => $estimatedHours,
+                        'actual_hours' => $actualHours, // separar estimadas vs reales
                         'earnings' => $earnings,
                         'completed_at' => $task['completed_at'],
                         'type' => $task['type'] ?? 'Task'
@@ -1119,7 +1245,7 @@ class PaymentController extends Controller
                             $reworkTasksForExcel[] = [
                                 'name' => $task['name'],
                                 'project' => $task['project'],
-                                'hours' => $hours,
+                                'hours' => $actualHours,
                                 'payment' => $earnings,
                                 'rework_type' => str_replace('Rework Task - ', '', $task['type']),
                                 'rework_reason' => $task['rework_reason'] ?? 'No especificado',
@@ -1130,7 +1256,7 @@ class PaymentController extends Controller
                             $reworkBugsForExcel[] = [
                                 'name' => $task['name'],
                                 'project' => $task['project'],
-                                'hours' => $hours,
+                                'hours' => $actualHours,
                                 'payment' => $earnings,
                                 'rework_type' => str_replace('Rework Bug - ', '', $task['type']),
                                 'rework_reason' => $task['rework_reason'] ?? 'No especificado',
@@ -1584,7 +1710,7 @@ class PaymentController extends Controller
     /**
      * Generar Excel para reporte por proyecto
      */
-    private function generateProjectExcel($data)
+    public function generateProjectExcel($data)
     {
         $filename = 'project_payment_report_' . $data['project']['name'] . '_' . date('Y-m-d_H-i-s') . '.xlsx';
         
@@ -1664,7 +1790,7 @@ class PaymentController extends Controller
     /**
      * Generar Excel para reporte por tipo de usuario
      */
-    private function generateUserTypeExcel($data)
+    public function generateUserTypeExcel($data)
     {
         $filename = 'user_type_payment_report_' . $data['user_type'] . '_' . date('Y-m-d_H-i-s') . '.xlsx';
         
@@ -1787,7 +1913,7 @@ class PaymentController extends Controller
         $pdf = PDF::loadView('reports.project-payment', $data);
         $filename = 'project_payment_report_' . $data['project']['name'] . '_' . date('Y-m-d_H-i-s') . '.pdf';
 
-        Mail::send('emails.project-payment-report', $data, function ($message) use ($request, $pdf, $filename) {
+        Mail::send('emails.project-payment-report', $data, function ($message) use ($request, $pdf, $filename, $data) {
             $message->to($request->email)
                     ->subject('Project Payment Report - ' . $data['project']['name'] . ' - ' . date('Y-m-d'))
                     ->attachData($pdf->output(), $filename);

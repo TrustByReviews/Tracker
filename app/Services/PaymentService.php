@@ -126,14 +126,23 @@ class PaymentService
         $inProgressBugs = $inProgressBugsQuery->get();
 
         // Get QA work (testing of tasks and bugs)
+        // Consider both legacy qa_* fields and qa_testing_* fields, and only final states
         $qaTestingTasks = Task::where('qa_assigned_to', $user->id)
-            ->whereIn('qa_status', ['testing_finished', 'approved', 'rejected'])
-            ->whereBetween('qa_testing_finished_at', [$startDate, $endDate])
+            ->whereIn('qa_status', ['approved', 'rejected'])
+            ->where(function ($query) use ($startDate, $endDate) {
+                $query->whereBetween('qa_testing_finished_at', [$startDate, $endDate])
+                      ->orWhereBetween('qa_completed_at', [$startDate, $endDate])
+                      ->orWhereBetween('qa_reviewed_at', [$startDate, $endDate]);
+            })
             ->get();
 
         $qaTestingBugs = Bug::where('qa_assigned_to', $user->id)
-            ->whereIn('qa_status', ['testing_finished', 'approved', 'rejected'])
-            ->whereBetween('qa_testing_finished_at', [$startDate, $endDate])
+            ->whereIn('qa_status', ['approved', 'rejected'])
+            ->where(function ($query) use ($startDate, $endDate) {
+                $query->whereBetween('qa_testing_finished_at', [$startDate, $endDate])
+                      ->orWhereBetween('qa_completed_at', [$startDate, $endDate])
+                      ->orWhereBetween('qa_reviewed_at', [$startDate, $endDate]);
+            })
             ->get();
 
         // Get rework data (tasks and bugs with changes requested or rejected)
@@ -141,10 +150,18 @@ class PaymentService
         $reworkBugs = $this->getReworkBugs($user, $startDate, $endDate, $projectId);
 
         // Calculate total development hours
-        $completedTaskHours = $completedTasks->sum('actual_hours');
-        $inProgressTaskHours = $inProgressTasks->sum('actual_hours');
-        $completedBugHours = $completedBugs->sum('actual_hours');
-        $inProgressBugHours = $inProgressBugs->sum('actual_hours');
+        $completedTaskHours = $completedTasks->sum(function ($task) {
+            return $this->getTaskHours($task);
+        });
+        $inProgressTaskHours = $inProgressTasks->sum(function ($task) {
+            return $this->getTaskHours($task);
+        });
+        $completedBugHours = $completedBugs->sum(function ($bug) {
+            return $this->getBugHours($bug);
+        });
+        $inProgressBugHours = $inProgressBugs->sum(function ($bug) {
+            return $this->getBugHours($bug);
+        });
         
         // Calculate total QA hours
         $qaTaskHours = $this->calculateQaTestingHours($qaTestingTasks);
@@ -168,8 +185,9 @@ class PaymentService
                     'name' => $task->name,
                     'type' => 'task',
                     'project' => $task->sprint->project->name ?? 'N/A',
-                    'hours' => $task->actual_hours ?? 0,
-                    'payment' => ($task->actual_hours ?? 0) * $user->hour_value,
+                    'hours' => $this->getTaskHours($task),
+                    'estimated_hours' => $this->getEstimatedTaskHours($task),
+                    'payment' => $this->getTaskHours($task) * $user->hour_value,
                     'completed_at' => $task->actual_finish,
                 ];
             }),
@@ -179,8 +197,9 @@ class PaymentService
                     'name' => $task->name,
                     'type' => 'task',
                     'project' => $task->sprint->project->name ?? 'N/A',
-                    'hours' => $task->actual_hours ?? 0,
-                    'payment' => ($task->actual_hours ?? 0) * $user->hour_value,
+                    'hours' => $this->getTaskHours($task),
+                    'estimated_hours' => $this->getEstimatedTaskHours($task),
+                    'payment' => $this->getTaskHours($task) * $user->hour_value,
                     'last_updated' => $task->updated_at,
                 ];
             }),
@@ -194,8 +213,9 @@ class PaymentService
                     'name' => $bug->title,
                     'type' => 'bug',
                     'project' => $bug->project->name ?? 'N/A',
-                    'hours' => $bug->actual_hours ?? 0,
-                    'payment' => ($bug->actual_hours ?? 0) * $user->hour_value,
+                    'hours' => $this->getBugHours($bug),
+                    'estimated_hours' => $this->getEstimatedBugHours($bug),
+                    'payment' => $this->getBugHours($bug) * $user->hour_value,
                     'completed_at' => $bug->resolved_at,
                     'importance' => $bug->importance,
                     'bug_type' => $bug->bug_type,
@@ -207,8 +227,9 @@ class PaymentService
                     'name' => $bug->title,
                     'type' => 'bug',
                     'project' => $bug->project->name ?? 'N/A',
-                    'hours' => $bug->actual_hours ?? 0,
-                    'payment' => ($bug->actual_hours ?? 0) * $user->hour_value,
+                    'hours' => $this->getBugHours($bug),
+                    'estimated_hours' => $this->getEstimatedBugHours($bug),
+                    'payment' => $this->getBugHours($bug) * $user->hour_value,
                     'last_updated' => $bug->updated_at,
                     'importance' => $bug->importance,
                     'bug_type' => $bug->bug_type,
@@ -226,8 +247,9 @@ class PaymentService
                     'type' => 'qa_task',
                     'project' => $task->sprint->project->name ?? 'N/A',
                     'hours' => $testingHours,
+                    'estimated_hours' => 0, // QA no tiene estimaciones
                     'payment' => $testingHours * $user->hour_value,
-                    'testing_finished_at' => $task->qa_testing_finished_at,
+                    'testing_finished_at' => $task->qa_testing_finished_at ?: $task->qa_completed_at ?: $task->qa_reviewed_at,
                     'qa_status' => $task->qa_status,
                     'qa_notes' => $task->qa_notes ?? null,
                 ];
@@ -240,8 +262,9 @@ class PaymentService
                     'type' => 'qa_bug',
                     'project' => $bug->project->name ?? 'N/A',
                     'hours' => $testingHours,
+                    'estimated_hours' => 0, // QA no tiene estimaciones
                     'payment' => $testingHours * $user->hour_value,
-                    'testing_finished_at' => $bug->qa_testing_finished_at,
+                    'testing_finished_at' => $bug->qa_testing_finished_at ?: $bug->qa_completed_at ?: $bug->qa_reviewed_at,
                     'qa_status' => $bug->qa_status,
                     'qa_notes' => $bug->qa_notes ?? null,
                 ];
@@ -545,12 +568,25 @@ class PaymentService
      */
     private function calculateTaskTestingHours($task)
     {
-        if (!$task->qa_testing_started_at || !$task->qa_testing_finished_at) {
+        // Prefer explicit qa_testing_* timestamps; fall back progressively
+        $start = $task->qa_testing_started_at
+            ?: $task->qa_started_at
+            ?: $task->qa_assigned_at;
+        $finish = $task->qa_testing_finished_at
+            ?: $task->qa_completed_at
+            ?: $task->qa_reviewed_at;
+
+        if (!$start || !$finish) {
             return 0;
         }
 
-        $startTime = Carbon::parse($task->qa_testing_started_at);
-        $finishTime = Carbon::parse($task->qa_testing_finished_at);
+        $startTime = Carbon::parse($start);
+        $finishTime = Carbon::parse($finish);
+        
+        // Ensure finish time is after start time
+        if ($finishTime <= $startTime) {
+            return 0;
+        }
         
         // If there are pauses, calculate the actual testing time
         if ($task->qa_testing_paused_at) {
@@ -558,15 +594,14 @@ class PaymentService
             $resumeTime = $task->qa_testing_resumed_at ? Carbon::parse($task->qa_testing_resumed_at) : $finishTime;
             
             // Calculate time before pause + time after resume
-            $timeBeforePause = $pausedTime->diffInSeconds($startTime);
-            $timeAfterResume = $finishTime->diffInSeconds($resumeTime);
+            $timeBeforePause = $startTime->diffInSeconds($pausedTime);
+            $timeAfterResume = $resumeTime->diffInSeconds($finishTime);
             $activeTime = $timeBeforePause + $timeAfterResume;
         } else {
-            $activeTime = $finishTime->diffInSeconds($startTime);
+            $activeTime = $startTime->diffInSeconds($finishTime);
         }
 
-        // Ensure we don't return negative values
-        return max(0, round($activeTime / 3600, 2)); // Convert seconds to hours
+        return max(0, round($activeTime / 3600, 2));
     }
 
     /**
@@ -596,12 +631,25 @@ class PaymentService
      */
     private function calculateBugTestingHours($bug)
     {
-        if (!$bug->qa_testing_started_at || !$bug->qa_testing_finished_at) {
+        // Prefer explicit qa_testing_* timestamps; fall back progressively
+        $start = $bug->qa_testing_started_at
+            ?: $bug->qa_started_at
+            ?: $bug->qa_assigned_at;
+        $finish = $bug->qa_testing_finished_at
+            ?: $bug->qa_completed_at
+            ?: $bug->qa_reviewed_at;
+
+        if (!$start || !$finish) {
             return 0;
         }
 
-        $startTime = Carbon::parse($bug->qa_testing_started_at);
-        $finishTime = Carbon::parse($bug->qa_testing_finished_at);
+        $startTime = Carbon::parse($start);
+        $finishTime = Carbon::parse($finish);
+        
+        // Ensure finish time is after start time
+        if ($finishTime <= $startTime) {
+            return 0;
+        }
         
         // If there are pauses, calculate the actual testing time
         if ($bug->qa_testing_paused_at) {
@@ -609,15 +657,58 @@ class PaymentService
             $resumeTime = $bug->qa_testing_resumed_at ? Carbon::parse($bug->qa_testing_resumed_at) : $finishTime;
             
             // Calculate time before pause + time after resume
-            $timeBeforePause = $pausedTime->diffInSeconds($startTime);
-            $timeAfterResume = $finishTime->diffInSeconds($resumeTime);
+            $timeBeforePause = $startTime->diffInSeconds($pausedTime);
+            $timeAfterResume = $resumeTime->diffInSeconds($finishTime);
             $activeTime = $timeBeforePause + $timeAfterResume;
         } else {
-            $activeTime = $finishTime->diffInSeconds($startTime);
+            $activeTime = $startTime->diffInSeconds($finishTime);
         }
 
-        // Ensure we don't return negative values
-        return max(0, round($activeTime / 3600, 2)); // Convert seconds to hours
+        return max(0, round($activeTime / 3600, 2));
+    }
+
+    /**
+     * Fallback-aware hours for tasks
+     */
+    private function getTaskHours($task): float
+    {
+        $hours = (float) ($task->actual_hours ?? 0);
+        if ($hours <= 0 && $task->total_time_seconds) {
+            $hours = round($task->total_time_seconds / 3600, 2);
+        }
+        return max(0, $hours);
+    }
+
+    /**
+     * Fallback-aware hours for bugs
+     */
+    private function getBugHours($bug): float
+    {
+        $hours = (float) ($bug->actual_hours ?? 0);
+        if ($hours <= 0 && $bug->total_time_seconds) {
+            $hours = round($bug->total_time_seconds / 3600, 2);
+        }
+        return max(0, $hours);
+    }
+
+    /**
+     * Estimated hours helper for tasks
+     */
+    private function getEstimatedTaskHours($task): float
+    {
+        $estimated = (float) ($task->estimated_hours ?? 0);
+        $estimated += ((float) ($task->estimated_minutes ?? 0)) / 60;
+        return max(0, round($estimated, 2));
+    }
+
+    /**
+     * Estimated hours helper for bugs
+     */
+    private function getEstimatedBugHours($bug): float
+    {
+        $estimated = (float) ($bug->estimated_hours ?? 0);
+        $estimated += ((float) ($bug->estimated_minutes ?? 0)) / 60;
+        return max(0, round($estimated, 2));
     }
 
     /**

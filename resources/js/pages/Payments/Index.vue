@@ -356,7 +356,7 @@
                                                 class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
                                             >
                                             <div>
-                                                <p class="text-sm font-medium text-gray-900 dark:text-white">By Roleeeeeee</p>
+                                                <p class="text-sm font-medium text-gray-900 dark:text-white">By Role</p>
                                                 <p class="text-xs text-gray-500 dark:text-gray-400">Filter by user role</p>
                                             </div>
                                         </label>
@@ -392,7 +392,7 @@
                                     </select>
                                 </div>
 
-                                <!-- Roleeeeeee Selection (when report type is role) -->
+                                <!-- Role Selection (when report type is role) -->
                                 <div v-if="reportType === 'role'">
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                         Select Role
@@ -448,7 +448,7 @@
                                                                  <!-- Developer Selection -->
                                  <div>
                                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                         Select Developers
+                                         Select Users
                                      </label>
                                      
                                      <!-- Show loading indicator when loading users -->
@@ -508,7 +508,28 @@
                                              </div>
                                          </label>
                                          
-                                         <!-- Show all developers when no project is selected -->
+                                         <!-- Show role-filtered users when role is selected -->
+                                         <label 
+                                             v-else-if="reportType === 'role' && selectedRole"
+                                             v-for="developer in roleFilteredUsers" 
+                                             :key="`role-${developer.id}`"
+                                             class="flex items-center space-x-3 p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer"
+                                         >
+                                             <input 
+                                                 type="checkbox" 
+                                                 :value="developer.id" 
+                                                 v-model="selectedDevelopers"
+                                                 class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
+                                             >
+                                             <div class="flex-1 min-w-0">
+                                                 <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ developer.name }}</p>
+                                                 <p class="text-xs text-gray-500 dark:text-gray-400">{{ developer.email }}</p>
+                                                 <p class="text-xs text-gray-500 dark:text-gray-400">${{ developer.hour_value }}/hr</p>
+                                                 <p class="text-xs text-gray-500 dark:text-gray-400">{{ developer.roles.join(', ') }}</p>
+                                             </div>
+                                         </label>
+                                         
+                                         <!-- Show all developers when no specific filter is selected -->
                                          <label 
                                              v-else
                                              v-for="developer in developers" 
@@ -1097,6 +1118,9 @@ const availableWeeks = ref([]);
 const projectUsers = ref([]);
 const loadingUsers = ref(false);
 
+// Variables para usuarios filtrados por rol
+const roleFilteredUsers = ref([]);
+
 // Variables para análisis de rework
 const reworkStats = ref(null);
 const reworkItems = ref([]);
@@ -1297,9 +1321,48 @@ const loadUsersByProject = async (projectId, role = null) => {
     }
 };
 
+// Function to filter users by role
+const filterUsersByRole = (role) => {
+    if (!role) {
+        roleFilteredUsers.value = [];
+        return;
+    }
+    
+    console.log('🔍 Filtering users for role:', role);
+    console.log('📋 Available developers:', props.developers);
+    
+    // Filter developers by the selected role
+    roleFilteredUsers.value = props.developers.filter(developer => {
+        console.log('👤 Checking developer:', developer.name);
+        console.log('🎭 Developer roles:', developer.roles);
+        
+        if (!developer.roles || !Array.isArray(developer.roles)) {
+            console.log('❌ Developer has no roles or roles is not an array');
+            return false;
+        }
+        
+        // Check if developer has roles and if any role matches the selected role
+        const hasRole = developer.roles.some(devRole => {
+            console.log('🔍 Checking role:', devRole.name, 'value:', devRole.value, 'against:', role);
+            // Check both role name and value for flexibility
+            const matches = devRole.name === role || devRole.value === role;
+            console.log('✅ Role matches:', matches);
+            return matches;
+        });
+        
+        console.log('🎯 Developer', developer.name, 'has role', role, ':', hasRole);
+        return hasRole;
+    });
+    
+    console.log(`📊 Filtered users for role '${role}':`, roleFilteredUsers.value.length);
+    console.log('👥 Filtered users:', roleFilteredUsers.value);
+};
+
 const selectAll = () => {
     if (reportType.value === 'project' && selectedProject.value) {
         selectedDevelopers.value = projectUsers.value.map(d => d.id);
+    } else if (reportType.value === 'role' && selectedRole.value) {
+        selectedDevelopers.value = roleFilteredUsers.value.map(d => d.id);
     } else {
         selectedDevelopers.value = props.developers.map(d => d.id);
     }
@@ -1600,10 +1663,19 @@ const markAsPaid = (reportId) => {
 watch(reportType, (newType) => {
     if (newType === 'project') {
         loadProjects();
+    } else if (newType === 'role') {
+        // Clear project users when switching to role type
+        projectUsers.value = [];
+        selectedDevelopers.value = [];
+        // Filter users by selected role if any
+        if (selectedRole.value) {
+            filterUsersByRole(selectedRole.value);
+        }
     } else {
         // Clear project users when switching away from project type
         projectUsers.value = [];
         selectedDevelopers.value = [];
+        roleFilteredUsers.value = [];
     }
 });
 
@@ -1621,6 +1693,11 @@ watch(selectedProject, (newProjectId) => {
 watch(selectedRole, (newRole) => {
     if (selectedProject.value && reportType.value === 'project') {
         loadUsersByProject(selectedProject.value, newRole);
+    } else if (reportType.value === 'role') {
+        // Filter users by the selected role
+        filterUsersByRole(newRole);
+        // Clear selected developers when role changes
+        selectedDevelopers.value = [];
     }
 });
 
